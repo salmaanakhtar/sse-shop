@@ -45,7 +45,7 @@ rules.
 
 ## Data model
 
-Thirteen tables, deliberately narrow. Every table carries `created_at`; most carry `updated_at`.
+Sixteen tables, deliberately narrow. Every table carries `created_at`; most carry `updated_at`.
 
 | Table | Holds | Notes |
 | --- | --- | --- |
@@ -55,6 +55,9 @@ Thirteen tables, deliberately narrow. Every table carries `created_at`; most car
 | `two_factor` | TOTP secret, backup codes | Required for admin |
 | `products` | Merchandised product | `slug` unique, `status` is `draft`/`active`/`archived` |
 | `variants` | Priced, stocked unit | `sku` unique, `price_minor`, `stock_qty` |
+| `product_options` | A named choice a product offers | e.g. `Size`, `Colour`; ordered by `position` |
+| `product_option_values` | The choices within an option | e.g. `S`, `M`, `L` |
+| `variant_option_values` | Which values a variant represents | join row; unique on `(variant_id, option_id)` |
 | `product_media` | Ordered images per product | `storage_key`, `alt`, `position` |
 | `carts` | One basket per shopper token | Token hashed; `expires_at` |
 | `cart_items` | Variants in a cart | Unique on `(cart_id, variant_id)` |
@@ -69,6 +72,8 @@ Thirteen tables, deliberately narrow. Every table carries `created_at`; most car
   order from yesterday.
 - `orders.number` is drawn once, inside the placement transaction, and never reused.
 - `variants.stock_qty` never goes negative; decrements take a row lock.
+- A product with options has exactly one option value per option on every variant. A variant missing
+  a value is not sellable, and the admin refuses to publish it.
 - Stored order totals must be reproducible from their lines. If they disagree, the bug is in
   placement, not in the display.
 - A cart is consumed when its order is placed; it never becomes the same cart again.
@@ -76,17 +81,42 @@ Thirteen tables, deliberately narrow. Every table carries `created_at`; most car
 
 ## Money, tax, currency
 
-All amounts are integers in fils. `price_minor` is the list price. Order totals are
-`subtotal_minor + shipping_minor + tax_minor - discount_minor = total_minor`, each an integer.
+All amounts are integers in fils. `price_minor` is the list price. Prices and shipping are
+**VAT-inclusive**, which is the norm for UAE retail: the number a shopper sees is the number they
+pay.
+
+Each order stores four numbers, and the relationship between them is an invariant:
+
+```text
+total_minor = subtotal_minor + shipping_minor - discount_minor
+tax_minor   = round(total_minor × rate_bp / (10000 + rate_bp))
+```
+
+`tax_minor` is **not an addend**. It is the 5% VAT already contained in the total, stored so the
+cart, confirmation, and invoice can print "including AED 11.43 VAT" without recomputing at display
+time. With `rate_bp = 500` the component is `total × 500 / 10500`, rounded half-up. A future
+developer who adds `tax_minor` to the total will double-charge the customer, which is why the
+equation is written down here and in `docs/adr/0006-vat-inclusive-pricing.md`.
+
+Discounts apply before VAT extraction. Shipping is VAT-inclusive at the same rate. The breakdown
+therefore always reconciles to the total.
 
 Only the storefront formats currency. No formatting, parsing, or rounding happens anywhere near
-persistence, because round-trip formatting is where cent-level bugs live.
+persistence, because round-trip formatting is where fils-level bugs live.
 
 The single currency is AED. Multi-currency is out of scope until there is a reason for it; the
 `currency` column exists so a future migration is additive rather than a rewrite.
 
-UAE VAT is 5%. Whether display prices include VAT is an open question in `docs/ROADMAP.md`. Until
-answered, `tax_minor` is stored and set to `0`, and the checkout summary shows no tax line.
+## Shipping
+
+One flat rate and one free-shipping threshold, both in `settings` (`shipping.flat_rate_minor`,
+`shipping.free_threshold_minor`). Shipping is free when the item subtotal reaches the threshold,
+computed on subtotal before discounts so a discount code cannot silently push an order back into
+paying for shipping.
+
+The rule lives in `src/lib/shipping.ts` as a pure function taking `(subtotalMinor, settings)` and
+returning a minor amount, which makes it unit-testable without a database. Per-emirate tables and
+carrier rates replace it behind the same function signature.
 
 ## Cart and checkout
 
@@ -94,7 +124,7 @@ answered, `tax_minor` is stored and set to `0`, and the checkout summary shows n
 anonymous visit ──► cart token (httpOnly cookie) ──► cart row
       │
       ▼
-add / update / remove ──► server recomputes every total on read
+add / update / remove ──► server recomputes lines, shipping, and VAT on read
       │
       ▼
 checkout: email + address ──► server re-validates stock and prices
@@ -114,6 +144,12 @@ payment provider ──► paid / failed ──► confirmation + email
 The cart is server-owned because a browser-owned cart means trusting a client with prices. It lives
 in Postgres behind an httpOnly cookie so a mid-session restart does not lose it, and so stock can be
 checked against the same row the order will lock.
+
+All totals come from one function, `priceCart()` in `src/server/services/pricing.ts`: line totals
+from stored prices, shipping from the pure rule, then the VAT component extracted from the
+inclusive total. The cart page renders its result; the checkout action recomputes it and compares
+the shopper's expected total with the fresh one. A mismatch fails the checkout with a "prices
+changed, please review" message rather than charging a number the shopper did not see.
 
 Stock is decremented at placement, before payment. That briefly holds inventory for abandoned
 payments, which is acceptable at this size. A reservation table with an expiry is the later fix,

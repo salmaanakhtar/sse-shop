@@ -25,6 +25,14 @@ _Avoid_: Option, SKU, variation
 The merchant's own unique code for one variant.
 _Avoid_: Product code, item number
 
+**Product option**:
+A named choice a product offers, such as Size or Colour.
+_Avoid_: Attribute, property, dimension
+
+**Option value**:
+One choice within a product option, such as Large or Black.
+_Avoid_: Variant, attribute value
+
 **Stock**:
 The number of units of a variant available to sell right now.
 
@@ -70,6 +78,14 @@ Store-wide configuration the admin changes without a deploy — name, theme, con
 shipping rules.
 _Avoid_: Config, options, preferences
 
+**Shipping rate**:
+The flat amount charged for delivery, waived once an order reaches the free-shipping threshold.
+_Avoid_: Delivery fee, postage, P&P
+
+**Free-shipping threshold**:
+The item subtotal at which shipping becomes free.
+_Avoid_: Minimum order, free delivery limit
+
 **Audit Entry**:
 A record of one admin change, with the actor, the before and after values, and the time.
 _Avoid_: Log, history, event
@@ -87,3 +103,8 @@ _Avoid_: Price, amount, value
 **List price**:
 What a variant costs before discounts or shipping.
 _Avoid_: Base price, MSRP
+
+**VAT component**:
+The part of a VAT-inclusive total that is tax. Stored for display and invoicing, never added to the
+total.
+_Avoid_: Tax amount, tax line

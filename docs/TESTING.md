@@ -8,7 +8,7 @@ what blocks a merge.
 
 | Layer | Tool | Location | Speed | What belongs here |
 | --- | --- | --- | --- | --- |
-| Unit | Vitest | `tests/unit` | ms | Money math, pricing, cart totals, stock rules, slugs, Zod schemas, formatting |
+| Unit | Vitest | `tests/unit` | ms | Money math, VAT extraction, shipping rule, cart totals, stock rules, slugs, Zod schemas, formatting |
 | Integration | Vitest | `tests/integration` | ~10s | Services against a real Postgres: cart persistence, checkout transaction, inventory locking, audit writes |
 | Component | Vitest + Testing Library | `tests/unit` | ms | One interaction that is hard to reach in a browser: a quantity stepper, an address form |
 | End-to-end | Playwright | `tests/e2e` | ~1min | A shopper path and an admin path, driven through the UI against a real build |

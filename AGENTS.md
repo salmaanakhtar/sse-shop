@@ -18,6 +18,10 @@ never a security boundary — that is how framework middleware-bypass CVEs turn 
 floats, no arithmetic on decimal strings, no parsing formatted currency back into a number. Format
 only at the edge with `Intl.NumberFormat("en-AE", { style: "currency", currency: "AED" })`.
 
+**Prices are VAT-inclusive.** `total = subtotal + shipping - discount`, and `tax_minor` is the 5%
+component already inside that total — an addend would double-charge the shopper. See
+`docs/adr/0006-vat-inclusive-pricing.md`.
+
 **A feature ships with its tests.** A unit test for each rule, a Playwright journey for each user
 path. Red CI blocks the merge, and a feature without them is unfinished.
 

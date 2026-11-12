@@ -18,14 +18,16 @@ Docs, conventions, and an empty but green pipeline.
 The smallest version that can honestly take an order.
 
 **In scope**
-- Schema for products, variants, media, carts, orders, order items, settings, audit log.
-- Storefront: product list, product detail with variant selection, add to cart.
-- Server-owned cart with a cookie token, quantity edits, correct totals.
+- Schema for products, options, variants, media, carts, orders, order items, settings, audit log.
+- Storefront: product list, product detail with option selection, add to cart.
+- Server-owned cart with a cookie token, quantity edits, correct totals, flat-rate shipping with a
+  free threshold, VAT shown as included.
 - Guest checkout: email + UAE address, server-side revalidation, order creation with stock
   decrement inside one transaction.
 - Payment provider interface with a mock provider that marks the order paid.
 - Confirmation page and guest order lookup by signed link.
-- Admin sign-in with TOTP, product CRUD, variant CRUD, publish/unpublish, single image upload.
+- Admin sign-in with TOTP, product CRUD including free-form options and variants, publish/unpublish,
+  single image upload.
 
 **Out of scope on purpose**: discounts, search, accounts, shipping carriers, invoices, emails
 beyond a console driver, themes.
@@ -62,7 +64,8 @@ live storefront without a deploy, and each writes an audit entry.
 
 ## Phase 4 — Depth
 
-- Product options as reusable attributes (size, colour) with variant images.
+- Reusable option presets, so a size and colour set is defined once and applied to many products.
+- Variant images, so each colour has its own gallery.
 - Discount codes and automatic promotions, with a documented precedence order.
 - Search and category navigation.
 - Customer accounts with order history, plus claiming a guest order.
@@ -81,16 +84,22 @@ live storefront without a deploy, and each writes an audit entry.
 
 These block or shape upcoming work. Answers land in `CONTEXT.md`, an ADR, or this file.
 
-1. **VAT.** Are displayed prices VAT-inclusive? The store is presumably charging 5% VAT — is it
-   registered, and do invoices need a TRN?
-2. **Shipping pricing.** Flat rate, per-emirate table, free over a threshold, or weight-based?
-3. **Product options.** Free-form option names per product, or a fixed attribute set with variant
-   combinations?
-4. **Variant images.** Is one image set per product enough, or does each colour need its own
-   gallery?
-5. **Language.** English only for launch, or Arabic and RTL in the first release?
-6. **Domain and DNS.** What is the production domain, and who controls the DNS record for the admin
+1. **Variant images.** Is one image set per product enough for launch, or does each colour need its
+   own gallery?
+2. **Language.** English only for launch, or Arabic and RTL in the first release?
+3. **Domain and DNS.** What is the production domain, and who controls the DNS record for the admin
    subdomain?
-7. **Email.** Which provider and sending domain, and is there a warm-up period before launch?
-8. **Stock policy.** When the last unit is sold, does the product hide, show "sold out", or accept
+4. **Email.** Which provider and sending domain, and is there a warm-up period before launch?
+5. **Stock policy.** When the last unit is sold, does the product hide, show "sold out", or accept
    backorders?
+6. **Returns.** Is there a returns window that must be stated on the storefront, and are refunds
+   recorded in this system or handled outside it?
+
+## Answered
+
+- **VAT**: prices are VAT-inclusive at 5%. See `docs/adr/0006-vat-inclusive-pricing.md`.
+- **Shipping**: one flat rate, waived above a free-shipping threshold, both in `settings`.
+- **Options**: free-form per product — the admin names the options and their values. Reusable
+  presets come in Phase 4.
+- **Testing**: Vitest for unit, integration, and component tests; Playwright for journeys; Next.js
+  remains the bundler.

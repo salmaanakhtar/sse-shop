@@ -10,9 +10,9 @@ feature ships with tests.
 the server decides price, stock, shipping, tax, and totals from database state. Every mutation
 re-reads what it needs instead of trusting the request body.
 
-**Authorization lives in the handler.** `middleware.ts` routes by host and redirects; each page,
-server action, and route handler checks the session and role itself. Middleware is a convenience,
-never a security boundary — that is how framework middleware-bypass CVEs turn into breaches.
+**Authorization lives in the handler.** `src/proxy.ts` routes by host and rewrites; each page,
+server action, and route handler checks the session and role itself. Proxy is a convenience, never a
+security boundary — that is how middleware-bypass CVEs turn into breaches.
 
 **Money is an integer count of fils.** 1 AED = 100 fils, so AED 240.00 is stored as `24000`. No
 floats, no arithmetic on decimal strings, no parsing formatted currency back into a number. Format

@@ -24,7 +24,8 @@ process.
 ```
 
 Two hostnames, one app: `example.com` serves the storefront, `admin.example.com` serves the admin.
-Middleware rewrites by host so `/admin` lives at the root of the admin subdomain. Both are the same
+`src/proxy.ts` (Next 16's rename of middleware) rewrites by host so `/admin` lives at the root of
+the admin subdomain. Both are the same
 process, which keeps deployment and authorization logic in one place.
 
 Admin is additionally gated outside the app (Caddy basic auth, mTLS, or Tailscale later). The app
@@ -225,7 +226,7 @@ Operationally:
 | Overselling | `SELECT … FOR UPDATE` on variant rows inside the placement transaction |
 | Admin takeover | Proxy-level gate, 2FA, 8-hour sessions, audit log |
 | Credential stuffing | Rate limit + lockout, breached-password check on signup |
-| Middleware bypass CVE | Authorization repeated in every handler |
+| Proxy bypass CVE | Authorization repeated in every handler |
 | Vulnerable dependency | CVE gates in CI, weekly scan, Dependabot |
 | Secret in git | Trivy secret scan on every push, `.env*` ignored except `.env.example` |
 | Scraping | Rate limits per IP on catalog listing and search |

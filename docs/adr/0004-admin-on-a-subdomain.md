@@ -9,8 +9,8 @@ host are not sent to the storefront host, so an admin session is not exposed to 
 to any script they load. Because it is the same process, there is one deployment, one dependency
 tree, and one set of authorization helpers.
 
-Middleware rewrites the admin host to the `/admin` route tree. Middleware is routing only: every
-admin page, action, and route handler re-checks the session and role itself, because middleware has
+The proxy rewrites the admin host to the `/admin` route tree. Proxy is routing only: every admin
+page, action, and route handler re-checks the session and role itself, because middleware has
 been the bypassed layer in real framework CVEs.
 
 ## Consequences

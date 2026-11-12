@@ -153,9 +153,10 @@ export default defineConfig({
 known catalog with predictable prices, one admin user whose password and TOTP secret come from
 env vars, and a low-stock variant used by the stock-limit spec.
 
-Admin authentication is captured once into `tests/e2e/.auth/admin.json` via `storageState`, with a
-setup project that runs first. Do not sign in through the UI in every spec; that tests the form six
-times and makes flakes stack up.
+Admin authentication is captured once into `tests/e2e/.auth/admin.json` via `storageState`, using a
+setup project that runs first. The setup signs in through the real form and enrols TOTP, generating
+codes with `otplib`; the file is gitignored. Do not sign in through the UI in every spec; that tests
+the form six times and makes flakes stack up.
 
 Locator rules:
 
@@ -174,7 +175,7 @@ Every pull request runs, in this order, and all must pass:
 | Types | `pnpm typecheck` | 2 min |
 | Unit + components + integration | `pnpm test` | 5 min |
 | Build | `pnpm build` | 4 min |
-| End-to-end | `pnpm test:e2e` | 10 min |
+| End-to-end (Postgres service) | `pnpm test:e2e` | 10 min |
 | Dependency review | GitHub action, fails on high or critical | 1 min |
 | Dependency audit | `pnpm audit --audit-level=high` | 1 min |
 | Repo scan | Trivy: vulnerabilities, secrets, misconfiguration | 2 min |

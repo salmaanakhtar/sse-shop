@@ -235,7 +235,7 @@
     </div>
   </div>
   <div class="stamp">
-    <strong>Phase 0 complete · Phase 1 in progress</strong><br>
+    <strong>Phase 1 complete · Phase 2 next</strong><br>
     Updated 13 Nov 2026
   </div>
 </header>
@@ -251,14 +251,62 @@
     </div>
 
     <article class="card done">
+      <h2>Catalog</h2>
+      <p>Product list and detail pages, free-form options rendered as selectors, variant resolved from the selected values.</p>
+      <span class="tag">Phase 1</span>
+    </article>
+
+    <article class="card done">
+      <h2>Server-owned cart</h2>
+      <p>Hashed cookie token, database basket, quantity edits, totals recomputed on every read, stock checked before add.</p>
+      <span class="tag">Phase 1</span>
+    </article>
+
+    <article class="card done">
+      <h2>Pricing engine</h2>
+      <p>Line totals, flat shipping with a free threshold, VAT extracted from the inclusive total. 33 unit tests.</p>
+      <span class="tag">Phase 1</span>
+    </article>
+
+    <article class="card done">
+      <h2>Checkout and order</h2>
+      <p>UAE address, server revalidation against the shown total, stock decrement under a row lock, frozen line prices.</p>
+      <span class="tag">Phase 1</span>
+    </article>
+
+    <article class="card done">
+      <h2>Mock payment and confirmation</h2>
+      <p>Payment provider interface, mock driver, confirmation page, 90-day hashed guest lookup link, console mailer.</p>
+      <span class="tag">Phase 1</span>
+    </article>
+
+    <article class="card done">
+      <h2>Admin: products</h2>
+      <p>TOTP sign-in and enrolment, product CRUD, options and values, variant generation, image upload with WebP re-encode.</p>
+      <span class="tag">Phase 1</span>
+    </article>
+
+    <article class="card done">
+      <h2>Six Playwright journeys</h2>
+      <p>Browse and buy, cart survives reload, stock limit, admin creates and publishes, admin edits price, bad lookup link.</p>
+      <span class="tag">Phase 1</span>
+    </article>
+
+    <article class="card done">
+      <h2>Docker Compose deployment</h2>
+      <p>Web, Postgres, Caddy. TLS, volumes, health endpoint, non-root image, dev database on 5433.</p>
+      <span class="tag">Phase 1</span>
+    </article>
+
+    <article class="card done">
       <h2>Application scaffold</h2>
-      <p>Next 16, Tailwind 4, seventeen-table Postgres schema with a committed migration, Better Auth with TOTP, Docker Compose with Caddy, 33 unit tests and two Playwright journeys.</p>
+      <p>Next 16, Tailwind 4, eighteen-table schema with migrations, Better Auth with TOTP, Vitest and Playwright.</p>
       <span class="tag">Phase 1</span>
     </article>
 
     <article class="card done">
       <h2>Project foundation</h2>
-      <p>Agent contract, glossary, architecture, testing strategy, and roadmap. Conventions that every later feature inherits.</p>
+      <p>Agent contract, glossary, architecture, testing strategy, and roadmap.</p>
       <span class="tag">Phase 0</span>
     </article>
 
@@ -301,51 +349,21 @@
     </div>
 
     <article class="card">
-      <h2>Catalog</h2>
-      <p>Product list and detail pages, free-form options rendered as selectors, variant picked by option values.</p>
-      <span class="tag">Phase 1</span>
+      <h2>Stripe Checkout</h2>
+      <p>Real payments behind the existing provider interface: hosted checkout, webhook verification, idempotent handling.</p>
+      <span class="tag">Phase 2</span>
     </article>
 
     <article class="card">
-      <h2>Server-owned cart</h2>
-      <p>Cookie token, database-backed basket, quantity edits, totals recomputed on every read.</p>
-      <span class="tag">Phase 1</span>
+      <h2>Real transactional email</h2>
+      <p>Order confirmation and dispatch notices through a provider, replacing the console mailer.</p>
+      <span class="tag">Phase 2</span>
     </article>
 
     <article class="card">
-      <h2>Pricing engine</h2>
-      <p>Line totals, flat shipping with a free threshold, VAT extracted from the inclusive total. One pure function, fully unit-tested.</p>
-      <span class="tag">Phase 1</span>
-    </article>
-
-    <article class="card">
-      <h2>Checkout and order</h2>
-      <p>UAE address, server-side revalidation, stock decrement under a row lock, order with frozen line prices, all in one transaction.</p>
-      <span class="tag">Phase 1</span>
-    </article>
-
-    <article class="card">
-      <h2>Mock payment and confirmation</h2>
-      <p>Payment provider interface with a mock driver, confirmation page, signed guest order lookup link.</p>
-      <span class="tag">Phase 1</span>
-    </article>
-
-    <article class="card">
-      <h2>Admin: products</h2>
-      <p>TOTP sign-in, create and edit products, options, and variants, publish and unpublish, image upload with re-encoding.</p>
-      <span class="tag">Phase 1</span>
-    </article>
-
-    <article class="card">
-      <h2>Six Playwright journeys</h2>
-      <p>Browse and buy, cart survives reload, stock limit, admin creates and publishes, admin edits price, guest order lookup.</p>
-      <span class="tag">Phase 1</span>
-    </article>
-
-    <article class="card">
-      <h2>Docker Compose deployment</h2>
-      <p>Web, Postgres, Caddy. TLS, volumes for data and uploads, health endpoint, backups.</p>
-      <span class="tag">Phase 1</span>
+      <h2>Payment failure and refunds</h2>
+      <p>Declined payments leave no held stock; refunds are recorded against the order with an audit entry.</p>
+      <span class="tag">Phase 2</span>
     </article>
   </section>
 

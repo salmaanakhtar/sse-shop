@@ -45,7 +45,7 @@ rules.
 
 ## Data model
 
-Seventeen tables, deliberately narrow. Every table carries `created_at`; most carry `updated_at`.
+Eighteen tables, deliberately narrow. Every table carries `created_at`; most carry `updated_at`.
 | Table | Holds | Notes |
 | --- | --- | --- |
 | `users` | Admin and customer identity | `role` is `admin` or `customer`; single admin in v1 |
@@ -65,6 +65,7 @@ Seventeen tables, deliberately narrow. Every table carries `created_at`; most ca
 | `order_items` | Snapshot of what was bought | Prices frozen at placement |
 | `audit_log` | Admin changes | Actor, action, before/after JSON, IP |
 | `settings` | Store configuration | Key → JSONB, changed in admin |
+| `counters` | Monotonic sequences | Order numbers come from here, inside the placement transaction |
 
 ### Invariants
 
@@ -169,8 +170,8 @@ building/villa, optional PO box, optional notes. Postal codes are not used.
 - Rate limits, enforced in the database so they survive a restart: login 5 per 15 minutes per
   IP+email, checkout 10 per hour per IP, order lookup 5 per hour per IP.
 - Every admin mutation writes an audit entry with before and after state.
-- Guests retrieve their order through a signed, expiring link sent by email, not through a
-  guessable order number alone.
+- Guests retrieve their order through a link containing a 24-byte random token, stored only as a
+  SHA-256 hash and valid for 90 days. The order number alone is not enough to read an order.
 
 ## Admin surface
 

@@ -9,10 +9,9 @@ time. Every feature ships with a unit test and a Playwright journey.
 
 ## Status
 
-Phase 1 in progress. The application scaffold is in place: Next.js 16 with Tailwind 4, a Postgres
-schema with seventeen tables and a committed migration, Better Auth with TOTP, Docker Compose, and
-green unit and Playwright suites. Catalog, cart, and checkout are next. See
-[`docs/ROADMAP.md`](docs/ROADMAP.md).
+Phase 1 complete. A shopper can browse, add to cart, check out with a UAE address, and receive an
+order with a lookup link; an admin can sign in with TOTP and manage products, options, variants, and
+images. Payments are simulated behind a provider interface. See [`docs/ROADMAP.md`](docs/ROADMAP.md).
 
 ## Stack
 
@@ -40,7 +39,7 @@ Requires Node 24 (`nvm use`), pnpm, and Docker.
 ```bash
 pnpm install
 cp .env.example .env.local        # then set BETTER_AUTH_SECRET: openssl rand -base64 32
-pnpm db:up                        # Postgres on 127.0.0.1:5432
+pnpm db:up                        # Postgres on 127.0.0.1:5433
 pnpm db:migrate
 pnpm db:seed                      # one demo product with two options and four variants
 pnpm dev                          # http://localhost:3000

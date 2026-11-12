@@ -19,7 +19,8 @@ Docs, conventions, and an empty but green pipeline.
 
 The smallest version that can honestly take an order.
 
-**Status: in progress. Scaffold complete; catalog is next.**
+**Status: complete.** Catalog, server-owned cart, pricing, guest checkout with a mock payment, and
+admin product management all ship with tests.
 
 **In scope**
 - Schema for products, options, variants, media, carts, orders, order items, settings, audit log.

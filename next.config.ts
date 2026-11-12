@@ -4,9 +4,16 @@ import type { NextConfig } from "next";
 // that output mode, so it is opt-in per build target.
 const isDockerBuild = process.env.NEXT_BUILD_TARGET === "docker";
 
-const nextConfig: NextConfig = {
+export const nextConfig: NextConfig = {
   ...(isDockerBuild ? { output: "standalone" as const } : {}),
   poweredByHeader: false,
+  experimental: {
+    serverActions: {
+      // Product images are re-encoded server-side; the default 1 MB ceiling is
+      // smaller than a phone photo.
+      bodySizeLimit: "12mb",
+    },
+  },
 };
 
 export default nextConfig;

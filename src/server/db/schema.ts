@@ -279,6 +279,8 @@ export const orders = pgTable(
   {
     id: id(),
     number: text("number").notNull().unique(),
+    /** SHA-256 of the signed lookup token; the raw token only ever lives in the link. */
+    lookupTokenHash: text("lookup_token_hash").notNull(),
     userId: text("user_id").references(() => users.id, { onDelete: "set null" }),
     email: text("email").notNull(),
     status: orderStatus("status").notNull().default("pending"),
@@ -346,6 +348,16 @@ export const settings = pgTable("settings", {
   key: text("key").primaryKey(),
   value: jsonb("value").notNull(),
   updatedBy: text("updated_by").references(() => users.id, { onDelete: "set null" }),
+  updatedAt: updatedAt(),
+});
+
+/**
+ * Monotonic counters. Order numbers come from here rather than a sequence so
+ * the value is transactional and the schema stays declarative.
+ */
+export const counters = pgTable("counters", {
+  key: text("key").primaryKey(),
+  value: integer("value").notNull().default(0),
   updatedAt: updatedAt(),
 });
 

@@ -50,6 +50,12 @@ CREATE TABLE "carts" (
 	CONSTRAINT "carts_token_hash_unique" UNIQUE("token_hash")
 );
 --> statement-breakpoint
+CREATE TABLE "counters" (
+	"key" text PRIMARY KEY NOT NULL,
+	"value" integer DEFAULT 0 NOT NULL,
+	"updated_at" timestamp with time zone DEFAULT now() NOT NULL
+);
+--> statement-breakpoint
 CREATE TABLE "order_items" (
 	"id" text PRIMARY KEY NOT NULL,
 	"order_id" text NOT NULL,
@@ -65,6 +71,7 @@ CREATE TABLE "order_items" (
 CREATE TABLE "orders" (
 	"id" text PRIMARY KEY NOT NULL,
 	"number" text NOT NULL,
+	"lookup_token_hash" text NOT NULL,
 	"user_id" text,
 	"email" text NOT NULL,
 	"status" "order_status" DEFAULT 'pending' NOT NULL,

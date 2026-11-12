@@ -5,6 +5,7 @@ import {
   productOptions,
   products,
   settings,
+  users,
   variantOptionValues,
   variants,
 } from "../src/server/db/schema";
@@ -111,10 +112,66 @@ async function seedDemoProduct() {
   console.info(`seeded ${DEMO_SLUG}: ${optionSpec.length} options, 4 variants`);
 }
 
+async function seedLowStockProduct() {
+  await db.delete(products).where(eq(products.slug, "sample-cap"));
+
+  const [product] = await db
+    .insert(products)
+    .values({
+      slug: "sample-cap",
+      title: "Sample Cap",
+      description: "Single-variant product seeded for development. Two in stock.",
+      status: "active",
+      publishedAt: new Date(),
+    })
+    .returning({ id: products.id });
+
+  if (!product) throw new Error("failed to insert the low-stock product");
+
+  await db.insert(variants).values({
+    productId: product.id,
+    sku: "CAP-ONE",
+    title: "Default",
+    priceMinor: 4_500,
+    stockQty: 2,
+  });
+}
+
+async function seedAdmin() {
+  const email = process.env.ADMIN_EMAIL?.trim().toLowerCase();
+  const password = process.env.ADMIN_PASSWORD;
+
+  if (!email || !password) {
+    console.warn("ADMIN_EMAIL or ADMIN_PASSWORD is unset; skipping the admin user.");
+    return;
+  }
+  if (password.length < 12) {
+    throw new Error("ADMIN_PASSWORD must be at least 12 characters.");
+  }
+
+  const [existing] = await db.select().from(users).where(eq(users.email, email)).limit(1);
+
+  if (existing) {
+    if (existing.role !== "admin") {
+      await db.update(users).set({ role: "admin" }).where(eq(users.id, existing.id));
+    }
+    console.info(`admin ${email} already exists`);
+    return;
+  }
+
+  const { auth } = await import("../src/server/auth");
+  await auth.api.signUpEmail({ body: { email, password, name: "Store owner" } });
+  await db.update(users).set({ role: "admin" }).where(eq(users.email, email));
+
+  console.info(`created admin ${email} — enrol TOTP on first sign-in`);
+}
+
 async function main() {
   console.info("seeding…");
   await seedSettings();
+  await seedAdmin();
   await seedDemoProduct();
+  await seedLowStockProduct();
   console.info("done");
 }
 

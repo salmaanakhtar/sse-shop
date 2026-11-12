@@ -9,7 +9,9 @@ time. Every feature ships with a unit test and a Playwright journey.
 
 ## Status
 
-Foundation. Docs and conventions are in place; the application scaffold is next. See
+Phase 1 in progress. The application scaffold is in place: Next.js 16 with Tailwind 4, a Postgres
+schema with seventeen tables and a committed migration, Better Auth with TOTP, Docker Compose, and
+green unit and Playwright suites. Catalog, cart, and checkout are next. See
 [`docs/ROADMAP.md`](docs/ROADMAP.md).
 
 ## Stack
@@ -33,7 +35,27 @@ Why these choices: [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) and [`docs/adr
 
 ## Local development
 
-Requires Node 24 (`nvm use`) and pnpm. Setup instructions land with the scaffold.
+Requires Node 24 (`nvm use`), pnpm, and Docker.
+
+```bash
+pnpm install
+cp .env.example .env.local        # then set BETTER_AUTH_SECRET: openssl rand -base64 32
+pnpm db:up                        # Postgres on 127.0.0.1:5432
+pnpm db:migrate
+pnpm db:seed                      # one demo product with two options and four variants
+pnpm dev                          # http://localhost:3000
+```
+
+| Command | What it does |
+| --- | --- |
+| `pnpm test` | Unit and component tests |
+| `pnpm test:e2e` | Playwright, against a production build |
+| `pnpm db:generate` | Generate a migration after a schema change |
+| `pnpm db:studio` | Browse the database |
+| `pnpm db:down` | Stop the development database |
+
+The admin sits on a second hostname. Locally, `admin.localhost` resolves to your machine on most
+systems; the rewrite lands with the admin screens.
 
 ---
 

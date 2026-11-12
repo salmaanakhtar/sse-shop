@@ -1,0 +1,400 @@
+import { getTableColumns, relations, sql } from "drizzle-orm";
+import {
+  boolean,
+  foreignKey,
+  index,
+  integer,
+  jsonb,
+  pgEnum,
+  pgTable,
+  primaryKey,
+  text,
+  timestamp,
+  uniqueIndex,
+} from "drizzle-orm/pg-core";
+import { uuidv7 } from "../../lib/id";
+
+/* ─────────────────────────── helpers ─────────────────────────── */
+
+const id = () => text("id").primaryKey().$defaultFn(uuidv7);
+const createdAt = () => timestamp("created_at", { withTimezone: true, mode: "date" }).notNull().defaultNow();
+const updatedAt = () => timestamp("updated_at", { withTimezone: true, mode: "date" }).notNull().defaultNow();
+
+/* ─────────────────────────── enums ─────────────────────────── */
+
+export const userRole = pgEnum("user_role", ["admin", "customer"]);
+export const productStatus = pgEnum("product_status", ["draft", "active", "archived"]);
+export const orderStatus = pgEnum("order_status", ["pending", "confirmed", "cancelled", "fulfilled"]);
+export const paymentStatus = pgEnum("payment_status", ["unpaid", "paid", "refunded", "failed"]);
+
+/* ─────────────────────── auth (Better Auth) ───────────────────────
+ * Key names are camelCase because the adapter resolves models by these keys;
+ * column names stay snake_case.
+ */
+
+export const users = pgTable("users", {
+  id: id(),
+  name: text("name").notNull(),
+  email: text("email").notNull().unique(),
+  emailVerified: boolean("email_verified").notNull().default(false),
+  image: text("image"),
+  role: userRole("role").notNull().default("customer"),
+  twoFactorEnabled: boolean("two_factor_enabled").notNull().default(false),
+  createdAt: createdAt(),
+  updatedAt: updatedAt(),
+});
+
+export const sessions = pgTable(
+  "sessions",
+  {
+    id: id(),
+    token: text("token").notNull().unique(),
+    userId: text("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    expiresAt: timestamp("expires_at", { withTimezone: true, mode: "date" }).notNull(),
+    ipAddress: text("ip_address"),
+    userAgent: text("user_agent"),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (table) => [index("sessions_user_id_idx").on(table.userId)],
+);
+
+export const accounts = pgTable(
+  "accounts",
+  {
+    id: id(),
+    accountId: text("account_id").notNull(),
+    providerId: text("provider_id").notNull(),
+    userId: text("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    accessToken: text("access_token"),
+    refreshToken: text("refresh_token"),
+    idToken: text("id_token"),
+    accessTokenExpiresAt: timestamp("access_token_expires_at", { withTimezone: true, mode: "date" }),
+    refreshTokenExpiresAt: timestamp("refresh_token_expires_at", { withTimezone: true, mode: "date" }),
+    scope: text("scope"),
+    password: text("password"),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (table) => [index("accounts_user_id_idx").on(table.userId)],
+);
+
+export const verifications = pgTable(
+  "verifications",
+  {
+    id: id(),
+    identifier: text("identifier").notNull(),
+    value: text("value").notNull(),
+    expiresAt: timestamp("expires_at", { withTimezone: true, mode: "date" }).notNull(),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (table) => [index("verifications_identifier_idx").on(table.identifier)],
+);
+
+export const twoFactors = pgTable(
+  "two_factors",
+  {
+    id: id(),
+    secret: text("secret").notNull(),
+    backupCodes: text("backup_codes").notNull(),
+    userId: text("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    // Required by the two-factor plugin: it tracks confirmation state and
+    // backs off after repeated bad codes.
+    verified: boolean("verified").notNull().default(true),
+    failedVerificationCount: integer("failed_verification_count").notNull().default(0),
+    lockedUntil: timestamp("locked_until", { withTimezone: true, mode: "date" }),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (table) => [
+    index("two_factors_user_id_idx").on(table.userId),
+    index("two_factors_secret_idx").on(table.secret),
+  ],
+);
+
+/* ─────────────────────────── catalog ─────────────────────────── */
+
+export const products = pgTable(
+  "products",
+  {
+    id: id(),
+    slug: text("slug").notNull().unique(),
+    title: text("title").notNull(),
+    description: text("description").notNull().default(""),
+    status: productStatus("status").notNull().default("draft"),
+    publishedAt: timestamp("published_at", { withTimezone: true, mode: "date" }),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (table) => [index("products_status_idx").on(table.status)],
+);
+
+export const variants = pgTable(
+  "variants",
+  {
+    id: id(),
+    productId: text("product_id")
+      .notNull()
+      .references(() => products.id, { onDelete: "cascade" }),
+    sku: text("sku").notNull().unique(),
+    title: text("title").notNull().default("Default"),
+    priceMinor: integer("price_minor").notNull(),
+    compareAtMinor: integer("compare_at_minor"),
+    costMinor: integer("cost_minor"),
+    stockQty: integer("stock_qty").notNull().default(0),
+    weightGrams: integer("weight_grams"),
+    position: integer("position").notNull().default(0),
+    active: boolean("active").notNull().default(true),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (table) => [index("variants_product_id_idx").on(table.productId)],
+);
+
+export const productOptions = pgTable(
+  "product_options",
+  {
+    id: id(),
+    productId: text("product_id")
+      .notNull()
+      .references(() => products.id, { onDelete: "cascade" }),
+    name: text("name").notNull(),
+    position: integer("position").notNull().default(0),
+    createdAt: createdAt(),
+  },
+  (table) => [uniqueIndex("product_options_product_name_uq").on(table.productId, table.name)],
+);
+
+export const productOptionValues = pgTable(
+  "product_option_values",
+  {
+    id: id(),
+    optionId: text("option_id")
+      .notNull()
+      .references(() => productOptions.id, { onDelete: "cascade" }),
+    value: text("value").notNull(),
+    position: integer("position").notNull().default(0),
+    createdAt: createdAt(),
+  },
+  (table) => [uniqueIndex("product_option_values_option_value_uq").on(table.optionId, table.value)],
+);
+
+/**
+ * Which option values a variant represents. The unique index on
+ * (variant_id, option_id) enforces "one value per option", which is what makes
+ * a variant addressable on the storefront.
+ */
+export const variantOptionValues = pgTable(
+  "variant_option_values",
+  {
+    variantId: text("variant_id").notNull(),
+    optionId: text("option_id").notNull(),
+    optionValueId: text("option_value_id").notNull(),
+  },
+  (table) => [
+    primaryKey({ columns: [table.variantId, table.optionId] }),
+    index("variant_option_values_value_idx").on(table.optionValueId),
+    // Named explicitly: the generated names exceed Postgres's 63-character
+    // identifier limit and would be silently truncated.
+    foreignKey({
+      name: "variant_option_values_variant_fk",
+      columns: [table.variantId],
+      foreignColumns: [variants.id],
+    }).onDelete("cascade"),
+    foreignKey({
+      name: "variant_option_values_option_fk",
+      columns: [table.optionId],
+      foreignColumns: [productOptions.id],
+    }).onDelete("cascade"),
+    foreignKey({
+      name: "variant_option_values_value_fk",
+      columns: [table.optionValueId],
+      foreignColumns: [productOptionValues.id],
+    }).onDelete("cascade"),
+  ],
+);
+
+export const productMedia = pgTable(
+  "product_media",
+  {
+    id: id(),
+    productId: text("product_id")
+      .notNull()
+      .references(() => products.id, { onDelete: "cascade" }),
+    storageKey: text("storage_key").notNull(),
+    alt: text("alt").notNull().default(""),
+    width: integer("width"),
+    height: integer("height"),
+    position: integer("position").notNull().default(0),
+    createdAt: createdAt(),
+  },
+  (table) => [index("product_media_product_id_idx").on(table.productId)],
+);
+
+/* ─────────────────────────── carts ─────────────────────────── */
+
+export const carts = pgTable(
+  "carts",
+  {
+    id: id(),
+    /** SHA-256 of the cookie token. The raw token never touches the database. */
+    tokenHash: text("token_hash").notNull().unique(),
+    userId: text("user_id").references(() => users.id, { onDelete: "set null" }),
+    currency: text("currency").notNull().default("AED"),
+    expiresAt: timestamp("expires_at", { withTimezone: true, mode: "date" }).notNull(),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (table) => [index("carts_user_id_idx").on(table.userId)],
+);
+
+export const cartItems = pgTable(
+  "cart_items",
+  {
+    id: id(),
+    cartId: text("cart_id")
+      .notNull()
+      .references(() => carts.id, { onDelete: "cascade" }),
+    variantId: text("variant_id")
+      .notNull()
+      .references(() => variants.id, { onDelete: "cascade" }),
+    quantity: integer("quantity").notNull(),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (table) => [uniqueIndex("cart_items_cart_variant_uq").on(table.cartId, table.variantId)],
+);
+
+/* ─────────────────────────── orders ─────────────────────────── */
+
+export const orders = pgTable(
+  "orders",
+  {
+    id: id(),
+    number: text("number").notNull().unique(),
+    userId: text("user_id").references(() => users.id, { onDelete: "set null" }),
+    email: text("email").notNull(),
+    status: orderStatus("status").notNull().default("pending"),
+    paymentStatus: paymentStatus("payment_status").notNull().default("unpaid"),
+    currency: text("currency").notNull().default("AED"),
+    subtotalMinor: integer("subtotal_minor").notNull(),
+    shippingMinor: integer("shipping_minor").notNull().default(0),
+    discountMinor: integer("discount_minor").notNull().default(0),
+    taxMinor: integer("tax_minor").notNull().default(0),
+    taxRateBp: integer("tax_rate_bp").notNull().default(500),
+    totalMinor: integer("total_minor").notNull(),
+    shippingAddress: jsonb("shipping_address").notNull(),
+    notes: text("notes"),
+    placedAt: timestamp("placed_at", { withTimezone: true, mode: "date" }).notNull().defaultNow(),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (table) => [
+    index("orders_email_idx").on(table.email),
+    index("orders_placed_at_idx").on(table.placedAt),
+  ],
+);
+
+export const orderItems = pgTable(
+  "order_items",
+  {
+    id: id(),
+    orderId: text("order_id")
+      .notNull()
+      .references(() => orders.id, { onDelete: "cascade" }),
+    /** Nullable: a variant may be deleted later, the order must survive. */
+    variantId: text("variant_id").references(() => variants.id, { onDelete: "set null" }),
+    sku: text("sku").notNull(),
+    title: text("title").notNull(),
+    unitPriceMinor: integer("unit_price_minor").notNull(),
+    quantity: integer("quantity").notNull(),
+    lineTotalMinor: integer("line_total_minor").notNull(),
+    position: integer("position").notNull().default(0),
+  },
+  (table) => [index("order_items_order_id_idx").on(table.orderId)],
+);
+
+/* ─────────────────────── operations ─────────────────────── */
+
+export const auditLog = pgTable(
+  "audit_log",
+  {
+    id: id(),
+    actorUserId: text("actor_user_id").references(() => users.id, { onDelete: "set null" }),
+    action: text("action").notNull(),
+    entity: text("entity").notNull(),
+    entityId: text("entity_id"),
+    before: jsonb("before"),
+    after: jsonb("after"),
+    ip: text("ip"),
+    createdAt: createdAt(),
+  },
+  (table) => [
+    index("audit_log_entity_idx").on(table.entity, table.entityId),
+    index("audit_log_created_at_idx").on(table.createdAt),
+  ],
+);
+
+export const settings = pgTable("settings", {
+  key: text("key").primaryKey(),
+  value: jsonb("value").notNull(),
+  updatedBy: text("updated_by").references(() => users.id, { onDelete: "set null" }),
+  updatedAt: updatedAt(),
+});
+
+/* ─────────────────────────── relations ─────────────────────────── */
+
+export const productsRelations = relations(products, ({ many }) => ({
+  variants: many(variants),
+  options: many(productOptions),
+  media: many(productMedia),
+}));
+
+export const variantsRelations = relations(variants, ({ one, many }) => ({
+  product: one(products, { fields: [variants.productId], references: [products.id] }),
+  optionValues: many(variantOptionValues),
+}));
+
+export const productOptionsRelations = relations(productOptions, ({ one, many }) => ({
+  product: one(products, { fields: [productOptions.productId], references: [products.id] }),
+  values: many(productOptionValues),
+}));
+
+export const productOptionValuesRelations = relations(productOptionValues, ({ one }) => ({
+  option: one(productOptions, {
+    fields: [productOptionValues.optionId],
+    references: [productOptions.id],
+  }),
+}));
+
+export const cartItemsRelations = relations(cartItems, ({ one }) => ({
+  cart: one(carts, { fields: [cartItems.cartId], references: [carts.id] }),
+  variant: one(variants, { fields: [cartItems.variantId], references: [variants.id] }),
+}));
+
+export const cartsRelations = relations(carts, ({ many }) => ({
+  items: many(cartItems),
+}));
+
+export const ordersRelations = relations(orders, ({ many }) => ({
+  items: many(orderItems),
+}));
+
+export const orderItemsRelations = relations(orderItems, ({ one }) => ({
+  order: one(orders, { fields: [orderItems.orderId], references: [orders.id] }),
+}));
+
+/** Column sets, useful for snapshots written to the audit log. */
+export const auditColumns = {
+  products: getTableColumns(products),
+  variants: getTableColumns(variants),
+};
+
+export const nowSql = sql`now()`;

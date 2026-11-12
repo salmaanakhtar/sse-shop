@@ -7,6 +7,8 @@ hold, not when the code is written.
 
 Docs, conventions, and an empty but green pipeline.
 
+**Status: complete.**
+
 **Done when**
 - `AGENTS.md`, `CONTEXT.md`, and the three docs exist and agree with each other.
 - The app scaffolds, builds, and serves a placeholder page.
@@ -16,6 +18,8 @@ Docs, conventions, and an empty but green pipeline.
 ## Phase 1 — Walking skeleton
 
 The smallest version that can honestly take an order.
+
+**Status: in progress. Scaffold complete; catalog is next.**
 
 **In scope**
 - Schema for products, options, variants, media, carts, orders, order items, settings, audit log.

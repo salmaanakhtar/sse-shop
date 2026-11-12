@@ -45,14 +45,14 @@ rules.
 
 ## Data model
 
-Sixteen tables, deliberately narrow. Every table carries `created_at`; most carry `updated_at`.
-
+Seventeen tables, deliberately narrow. Every table carries `created_at`; most carry `updated_at`.
 | Table | Holds | Notes |
 | --- | --- | --- |
 | `users` | Admin and customer identity | `role` is `admin` or `customer`; single admin in v1 |
 | `sessions` | Session records | Token stored hashed, never raw |
 | `accounts` | Password credentials | Better Auth |
-| `two_factor` | TOTP secret, backup codes | Required for admin |
+| `verifications` | Short-lived tokens | Email verification, password reset |
+| `two_factors` | TOTP secret, backup codes | Required for admin |
 | `products` | Merchandised product | `slug` unique, `status` is `draft`/`active`/`archived` |
 | `variants` | Priced, stocked unit | `sku` unique, `price_minor`, `stock_qty` |
 | `product_options` | A named choice a product offers | e.g. `Size`, `Colour`; ordered by `position` |
@@ -208,7 +208,7 @@ outside the repository with `600` permissions.
 
 Operationally:
 
-- `/api/health` checks the database and returns liveness for uptime monitoring.
+- `/api/health` reports liveness. Database readiness joins it when the data layer serves traffic, so the endpoint never claims a healthy database it cannot reach.
 - Nightly `pg_dump`, compressed, kept 7 daily and 4 weekly, copied off-host.
 - Weekly `rsync` of the uploads volume.
 - A restore is rehearsed quarterly; an untested backup is a hope, not a backup.

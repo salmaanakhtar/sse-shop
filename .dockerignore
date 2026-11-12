@@ -1,0 +1,16 @@
+.git
+.github
+.next
+node_modules
+coverage
+drizzle/meta
+playwright-report
+test-results
+data
+uploads
+.env
+.env.*
+!.env.example
+*.log
+docs/kanban.html
+README.md

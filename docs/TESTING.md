@@ -39,17 +39,19 @@ without replacing it.
 Two projects in one config so `pnpm test` runs both and CI can filter them.
 
 ```ts
-// vitest.config.ts
+// vitest.config.mts
 import { defineConfig } from "vitest/config";
 import react from "@vitejs/plugin-react";
-import path from "node:path";
+import { fileURLToPath } from "node:url";
+
+const src = fileURLToPath(new URL("./src", import.meta.url));
 
 export default defineConfig({
-  resolve: { alias: { "@": path.resolve(__dirname, "src") } },
+  resolve: { alias: { "@": src } },
   test: {
     projects: [
       {
-        plugins: [react()],
+        resolve: { alias: { "@": src } },
         test: {
           name: "unit",
           environment: "node",
@@ -58,6 +60,7 @@ export default defineConfig({
       },
       {
         plugins: [react()],
+        resolve: { alias: { "@": src } },
         test: {
           name: "components",
           environment: "jsdom",
@@ -66,13 +69,14 @@ export default defineConfig({
         },
       },
       {
+        resolve: { alias: { "@": src } },
         test: {
           name: "integration",
           environment: "node",
           include: ["tests/integration/**/*.test.ts"],
           setupFiles: ["tests/setup/db.ts"],
           pool: "forks",
-          poolOptions: { forks: { singleFork: true } },
+          fileParallelism: false,
           testTimeout: 20_000,
         },
       },
@@ -80,6 +84,9 @@ export default defineConfig({
   },
 });
 ```
+
+The integration project is registered and empty. Its `passWithNoTests` flag comes off with the
+first service test, which is also when the CI job gains a Postgres service container.
 
 Integration tests use a real Postgres, not a mock. A mocked database proves the mock works. The
 `schema` module enforces serial execution because every test truncates and reseeds.

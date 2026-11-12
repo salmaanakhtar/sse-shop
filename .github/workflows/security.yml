@@ -22,33 +22,15 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
-
-      # Temporary: keeps the workflow green while the repository has no lockfile.
-      # Remove the gate once the application scaffold lands.
-      - id: gate
-        run: |
-          if [ -f pnpm-lock.yaml ]; then
-            echo "present=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "present=false" >> "$GITHUB_OUTPUT"
-            echo "No pnpm-lock.yaml yet, skipping the audit."
-          fi
-
-      - if: steps.gate.outputs.present == 'true'
-        uses: pnpm/action-setup@v6
-
-      - if: steps.gate.outputs.present == 'true'
-        uses: actions/setup-node@v7
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v7
         with:
           node-version-file: .nvmrc
           cache: pnpm
 
-      - if: steps.gate.outputs.present == 'true'
-        name: Install
-        run: pnpm install --frozen-lockfile
+      - run: pnpm install --frozen-lockfile
 
-      - if: steps.gate.outputs.present == 'true'
-        name: Audit for high and critical advisories
+      - name: Audit for high and critical advisories
         run: pnpm audit --audit-level=high
 
   dependency-review:

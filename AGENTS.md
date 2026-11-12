@@ -71,12 +71,14 @@ pnpm dev              # local dev server
 pnpm build            # production build
 pnpm typecheck        # tsc --noEmit
 pnpm lint             # eslint
-pnpm test             # vitest run (unit + integration)
+pnpm test             # vitest run (unit + component + integration)
 pnpm test:watch       # vitest watch
-pnpm test:e2e         # playwright
+pnpm test:e2e         # playwright against a production build
+pnpm db:up            # local Postgres container
+pnpm db:down          # stop it
 pnpm db:generate      # generate a migration from schema changes
 pnpm db:migrate       # apply migrations
-pnpm db:seed          # deterministic seed data
+pnpm db:seed          # deterministic demo data
 ```
 
 ## Conventions

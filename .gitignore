@@ -1,0 +1,36 @@
+node_modules/
+.pnpm-store/
+
+# next
+.next/
+out/
+next-env.d.ts
+*.tsbuildinfo
+
+# build and test output
+coverage/
+playwright-report/
+test-results/
+blob-report/
+.playwright/
+
+# local data
+data/
+uploads/
+
+# env
+.env
+.env.local
+.env.*.local
+!.env.example
+
+# editors and os
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# logs
+*.log
+npm-debug.log*
+pnpm-debug.log*

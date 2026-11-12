@@ -1,0 +1,109 @@
+# sse-shop
+
+A custom storefront and no-code admin for physical goods, sold in the UAE in AED. One Next.js app,
+one Postgres database, one Docker host. The store grows one small feature at a time, and each
+feature ships with tests.
+
+## Ground rules
+
+**The server is the source of truth.** The browser sends intent — a variant id and a quantity — and
+the server decides price, stock, shipping, tax, and totals from database state. Every mutation
+re-reads what it needs instead of trusting the request body.
+
+**Authorization lives in the handler.** `middleware.ts` routes by host and redirects; each page,
+server action, and route handler checks the session and role itself. Middleware is a convenience,
+never a security boundary — that is how framework middleware-bypass CVEs turn into breaches.
+
+**Money is an integer count of fils.** 1 AED = 100 fils, so AED 240.00 is stored as `24000`. No
+floats, no arithmetic on decimal strings, no parsing formatted currency back into a number. Format
+only at the edge with `Intl.NumberFormat("en-AE", { style: "currency", currency: "AED" })`.
+
+**A feature ships with its tests.** A unit test for each rule, a Playwright journey for each user
+path. Red CI blocks the merge, and a feature without them is unfinished.
+
+**Ask, then record.** Ambiguity gets a question, not a guess. Once answered, the answer lands where
+it belongs: `CONTEXT.md` for vocabulary, `docs/adr/` for a decision that is expensive to reverse,
+`docs/ROADMAP.md` for sequencing and open questions.
+
+## Stack
+
+| Layer | Choice |
+| --- | --- |
+| App | Next.js 16 (App Router), React 19, TypeScript strict |
+| Styling | Tailwind CSS 4, shadcn/ui components vendored into `src/components/ui` |
+| Data | Postgres 17, Drizzle ORM, drizzle-kit migrations (SQL committed) |
+| Auth | Better Auth — email + password, DB sessions, TOTP 2FA for admin |
+| Validation | Zod schemas at every boundary: forms, actions, env, webhooks |
+| Unit + integration | Vitest (+ React Testing Library where a component is worth it) |
+| End-to-end | Playwright |
+| Deploy | Docker Compose on a VPS: `web`, `db`, `caddy`, volumes for `pgdata` and `uploads` |
+
+Vitest runs on Vite; Next.js remains the application bundler. That combination is intentional —
+see `docs/TESTING.md`.
+
+## Repo map
+
+```
+src/
+  app/                routes: (storefront), admin, api
+  components/ui/      shadcn primitives, edited in place
+  components/storefront/  storefront sections
+  components/admin/       admin screens
+  server/
+    db/               schema.ts, client.ts, migrations/
+    services/         catalog, cart, checkout, orders, inventory, payments/, mail/
+    auth/             better-auth config, session helpers, guards
+  lib/                money, slugs, result, dates — pure, importable anywhere
+tests/
+  unit/               fast, no I/O
+  integration/        services against a real Postgres
+  e2e/                Playwright journeys
+```
+
+## Commands
+
+```bash
+pnpm dev              # local dev server
+pnpm build            # production build
+pnpm typecheck        # tsc --noEmit
+pnpm lint             # eslint
+pnpm test             # vitest run (unit + integration)
+pnpm test:watch       # vitest watch
+pnpm test:e2e         # playwright
+pnpm db:generate      # generate a migration from schema changes
+pnpm db:migrate       # apply migrations
+pnpm db:seed          # deterministic seed data
+```
+
+## Conventions
+
+- Server Components read. Server actions mutate. Route handlers exist only for webhooks, uploads,
+  and transports a form cannot carry.
+- Name an action after the user's intent: `addToCart`, `placeOrder`, `publishProduct`.
+- Every action validates input with Zod on its first line, then returns a discriminated result
+  (`{ ok: true, data }` / `{ ok: false, error }`). Log unexpected errors; return a generic message.
+- Import `@/server/**` from server code only. `@/lib/**` stays pure so client bundles can use it.
+- Derive types from the schema (`typeof products.$inferSelect`) rather than restating shapes.
+- Entity ids are UUID v7. Only `orders.number` is sequential and human-readable.
+- Migrations are generated, reviewed as SQL, and committed together with the schema change.
+- UI copy is English. Arabic and RTL are a later feature, not an assumption.
+
+## Working agreement
+
+- One feature per pull request, small enough to review in one sitting.
+- Conventional commits: `feat:`, `fix:`, `chore:`, `docs:`, `test:`.
+- Update the docs a change invalidates in the same pull request.
+- Secrets live in `.env.local` locally and in the host environment in production. `.env.example`
+  documents every key with a fake value.
+- A CVE gate is never silenced. Add an entry to the allowlist with a justification, an owner, and
+  an expiry date, and let the gate keep running.
+
+## Where to look
+
+| When you are… | Read |
+| --- | --- |
+| Adding, renaming, or questioning a domain term | `CONTEXT.md` |
+| Touching schema, auth, checkout, media, or deployment | `docs/ARCHITECTURE.md` |
+| Writing tests, debugging a flake, or changing CI | `docs/TESTING.md` |
+| Choosing what to build next | `docs/ROADMAP.md` |
+| Wondering why something is shaped the way it is | `docs/adr/` |

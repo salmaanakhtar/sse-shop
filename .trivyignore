@@ -1,0 +1,7 @@
+# Trivy exceptions. The gate keeps running; each entry needs a reason, an owner,
+# and an expiry, or it is not an exception, it is a disabled control.
+#
+# Example entry, one CVE id per line:
+#   CVE-2025-00000
+# with a matching line in docs/security-exceptions.md naming the package, the
+# reason, the owner, and the review date.

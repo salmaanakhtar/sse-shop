@@ -1,0 +1,100 @@
+name: Security
+
+on:
+  push:
+    branches: [master, main]
+  pull_request:
+  schedule:
+    # Advisories are published against code that has not changed, so scan on a clock too.
+    - cron: "23 3 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: security-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  audit:
+    name: Dependency audit
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      # Temporary: keeps the workflow green while the repository has no lockfile.
+      # Remove the gate once the application scaffold lands.
+      - id: gate
+        run: |
+          if [ -f pnpm-lock.yaml ]; then
+            echo "present=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "present=false" >> "$GITHUB_OUTPUT"
+            echo "No pnpm-lock.yaml yet, skipping the audit."
+          fi
+
+      - if: steps.gate.outputs.present == 'true'
+        uses: pnpm/action-setup@v6
+
+      - if: steps.gate.outputs.present == 'true'
+        uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+
+      - if: steps.gate.outputs.present == 'true'
+        name: Install
+        run: pnpm install --frozen-lockfile
+
+      - if: steps.gate.outputs.present == 'true'
+        name: Audit for high and critical advisories
+        run: pnpm audit --audit-level=high
+
+  dependency-review:
+    name: Dependency review
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+    permissions:
+      contents: read
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/dependency-review-action@v5
+        with:
+          fail-on-severity: high
+          comment-summary-in-pr: on-failure
+
+  repository-scan:
+    name: Repository scan
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Trivy (vulnerabilities, secrets, misconfiguration)
+        uses: aquasecurity/trivy-action@v0.36.0
+        with:
+          scan-type: fs
+          scan-ref: .
+          scanners: vuln,secret,misconfig
+          severity: HIGH,CRITICAL
+          # A known-unfixable advisory should be visible, not a permanent red build.
+          ignore-unfixed: true
+          exit-code: "1"
+          format: sarif
+          output: trivy-results.sarif
+          trivyignores: .trivyignore
+
+      - name: Upload findings
+        if: always()
+        uses: github/codeql-action/upload-sarif@v4
+        with:
+          sarif_file: trivy-results.sarif
+          category: trivy
+
+# CodeQL is intentionally not configured here. Enable "CodeQL" default setup in
+# repository settings instead: it selects the language, needs no build step, and
+# stays current without a workflow file to pin.

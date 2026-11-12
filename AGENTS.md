@@ -97,6 +97,8 @@ pnpm db:seed          # deterministic seed data
 - One feature per pull request, small enough to review in one sitting.
 - Conventional commits: `feat:`, `fix:`, `chore:`, `docs:`, `test:`.
 - Update the docs a change invalidates in the same pull request.
+- Replace or materially rewrite a feature → move its card in `docs/kanban.html`. Bug fixes and
+  small edits leave the board alone.
 - Secrets live in `.env.local` locally and in the host environment in production. `.env.example`
   documents every key with a fake value.
 - A CVE gate is never silenced. Add an entry to the allowlist with a justification, an owner, and

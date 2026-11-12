@@ -1,0 +1,360 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>sse-shop · board</title>
+<!--
+  Read-only work board. No scripts, no buttons, no filters — open the file and read it.
+
+  Maintenance: update when a feature is replaced or materially rewritten, or when a
+  phase starts or finishes. Bug fixes, copy changes, and small tweaks do not belong here.
+  Move the card between columns; keep the one-line summary honest.
+
+  Column counts are CSS counters and cannot drift. The phase line in the header is the
+  only hand-maintained status text.
+-->
+<style>
+  :root {
+    color-scheme: light dark;
+    --bg: #f7f7f8;
+    --panel: #ffffff;
+    --ink: #18181b;
+    --muted: #71717a;
+    --line: #e4e4e7;
+    --accent: #c026d3;
+    --done: #15803d;
+    --done-soft: #f0fdf4;
+    --work: #b45309;
+    --work-soft: #fffbeb;
+    --todo: #3f3f46;
+    --todo-soft: #f4f4f5;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #101012;
+      --panel: #17171a;
+      --ink: #f4f4f5;
+      --muted: #a1a1aa;
+      --line: #2a2a2f;
+      --done: #4ade80;
+      --done-soft: #12251a;
+      --work: #fbbf24;
+      --work-soft: #261d0c;
+      --todo: #d4d4d8;
+      --todo-soft: #1e1e22;
+    }
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    padding: 40px 32px 64px;
+    background: var(--bg);
+    color: var(--ink);
+    font: 15px/1.5 ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  header {
+    max-width: 1240px;
+    margin: 0 auto 32px;
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 24px;
+    flex-wrap: wrap;
+  }
+
+  .brand { display: flex; align-items: center; gap: 14px; }
+
+  .mark {
+    width: 40px; height: 40px;
+    border-radius: 9px;
+    background: var(--accent);
+    color: #fff;
+    font-size: 16px;
+    font-weight: 700;
+    letter-spacing: 0.4px;
+    display: grid;
+    place-items: center;
+    flex: none;
+  }
+
+  h1 { margin: 0; font-size: 21px; font-weight: 650; letter-spacing: -0.2px; }
+
+  .sub { margin: 2px 0 0; color: var(--muted); font-size: 13.5px; }
+
+  .stamp {
+    text-align: right;
+    font-size: 12.5px;
+    color: var(--muted);
+    line-height: 1.7;
+  }
+
+  .stamp strong { color: var(--ink); font-weight: 600; }
+
+  .board {
+    max-width: 1240px;
+    margin: 0 auto;
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 18px;
+    align-items: start;
+  }
+
+  @media (max-width: 900px) {
+    body { padding: 24px 16px 48px; }
+    .board { grid-template-columns: 1fr; }
+  }
+
+  .column {
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: 14px;
+    padding: 14px;
+    counter-reset: items;
+  }
+
+  .column-head {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 4px 6px 12px;
+    border-bottom: 1px solid var(--line);
+    margin-bottom: 12px;
+  }
+
+  .dot { width: 8px; height: 8px; border-radius: 50%; flex: none; }
+
+  .column-title {
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+
+  .count {
+    margin-left: auto;
+    font-size: 11.5px;
+    font-weight: 600;
+    color: var(--muted);
+    background: var(--todo-soft);
+    border-radius: 999px;
+    padding: 1px 8px;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .count::after { content: counter(items); }
+
+  .dot.done { background: var(--done); }
+  .dot.work { background: var(--work); }
+  .dot.todo { background: var(--muted); }
+
+  .card {
+    counter-increment: items;
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    padding: 12px 13px;
+    margin-bottom: 10px;
+    background: var(--panel);
+  }
+
+  .card:last-child { margin-bottom: 0; }
+
+  .card h2 {
+    margin: 0;
+    font-size: 14px;
+    font-weight: 600;
+    line-height: 1.35;
+    letter-spacing: -0.1px;
+  }
+
+  .card p {
+    margin: 5px 0 0;
+    font-size: 12.5px;
+    line-height: 1.5;
+    color: var(--muted);
+  }
+
+  .tag {
+    display: inline-block;
+    margin-top: 9px;
+    font-size: 10.5px;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--muted);
+    border: 1px solid var(--line);
+    border-radius: 5px;
+    padding: 1px 6px;
+  }
+
+  .card.done { background: var(--done-soft); border-color: transparent; }
+  .card.done h2 { color: var(--done); }
+  .card.done h2::before { content: "✓ "; font-weight: 700; }
+  .card.done .tag { border-color: transparent; color: var(--done); opacity: 0.85; }
+
+  .card.work { background: var(--work-soft); border-color: transparent; }
+  .card.work h2 { color: var(--work); }
+  .card.work .tag { border-color: transparent; color: var(--work); }
+
+  .empty {
+    border: 1px dashed var(--line);
+    border-radius: 10px;
+    padding: 18px 13px;
+    text-align: center;
+    font-size: 12.5px;
+    color: var(--muted);
+  }
+
+  footer {
+    max-width: 1240px;
+    margin: 28px auto 0;
+    padding-top: 16px;
+    border-top: 1px solid var(--line);
+    font-size: 12px;
+    color: var(--muted);
+    display: flex;
+    justify-content: space-between;
+    gap: 16px;
+    flex-wrap: wrap;
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="brand">
+    <div class="mark">SS</div>
+    <div>
+      <h1>sse-shop</h1>
+      <p class="sub">Storefront + no-code admin · physical goods · AED</p>
+    </div>
+  </div>
+  <div class="stamp">
+    <strong>Phase 0 complete · Phase 1 next</strong><br>
+    Updated 13 Nov 2026
+  </div>
+</header>
+
+<main class="board">
+
+  <!-- ───────────── COMPLETE ───────────── -->
+  <section class="column">
+    <div class="column-head">
+      <span class="dot done"></span>
+      <span class="column-title">Complete</span>
+      <span class="count"></span>
+    </div>
+
+    <article class="card done">
+      <h2>Project foundation</h2>
+      <p>Agent contract, glossary, architecture, testing strategy, and roadmap. Conventions that every later feature inherits.</p>
+      <span class="tag">Phase 0</span>
+    </article>
+
+    <article class="card done">
+      <h2>Six decisions recorded</h2>
+      <p>One app, Postgres + Drizzle, money in fils, admin subdomain, server-owned cart, VAT-inclusive pricing.</p>
+      <span class="tag">Phase 0</span>
+    </article>
+
+    <article class="card done">
+      <h2>CVE gates in CI</h2>
+      <p>Dependency review on PRs, audit on push and weekly, Trivy for secrets and misconfiguration, Dependabot.</p>
+      <span class="tag">Phase 0</span>
+    </article>
+
+    <article class="card done">
+      <h2>Stack and testing locked</h2>
+      <p>Next 16 · React 19 · Tailwind 4 · Postgres 17 · Better Auth · Vitest · Playwright. Single app, split-ready.</p>
+      <span class="tag">Phase 0</span>
+    </article>
+  </section>
+
+  <!-- ───────────── WORKING ───────────── -->
+  <section class="column">
+    <div class="column-head">
+      <span class="dot work"></span>
+      <span class="column-title">Working</span>
+      <span class="count"></span>
+    </div>
+
+    <div class="empty">Nothing in flight.</div>
+  </section>
+
+  <!-- ───────────── TODO ───────────── -->
+  <section class="column">
+    <div class="column-head">
+      <span class="dot todo"></span>
+      <span class="column-title">Todo</span>
+      <span class="count"></span>
+    </div>
+
+    <article class="card">
+      <h2>Application scaffold</h2>
+      <p>Next 16, Tailwind 4, shadcn, Drizzle schema with sixteen tables and a first migration, Better Auth, Docker Compose, Vitest and Playwright configs.</p>
+      <span class="tag">Phase 1</span>
+    </article>
+
+    <article class="card">
+      <h2>Catalog</h2>
+      <p>Product list and detail pages, free-form options rendered as selectors, variant picked by option values.</p>
+      <span class="tag">Phase 1</span>
+    </article>
+
+    <article class="card">
+      <h2>Server-owned cart</h2>
+      <p>Cookie token, database-backed basket, quantity edits, totals recomputed on every read.</p>
+      <span class="tag">Phase 1</span>
+    </article>
+
+    <article class="card">
+      <h2>Pricing engine</h2>
+      <p>Line totals, flat shipping with a free threshold, VAT extracted from the inclusive total. One pure function, fully unit-tested.</p>
+      <span class="tag">Phase 1</span>
+    </article>
+
+    <article class="card">
+      <h2>Checkout and order</h2>
+      <p>UAE address, server-side revalidation, stock decrement under a row lock, order with frozen line prices, all in one transaction.</p>
+      <span class="tag">Phase 1</span>
+    </article>
+
+    <article class="card">
+      <h2>Mock payment and confirmation</h2>
+      <p>Payment provider interface with a mock driver, confirmation page, signed guest order lookup link.</p>
+      <span class="tag">Phase 1</span>
+    </article>
+
+    <article class="card">
+      <h2>Admin: products</h2>
+      <p>TOTP sign-in, create and edit products, options, and variants, publish and unpublish, image upload with re-encoding.</p>
+      <span class="tag">Phase 1</span>
+    </article>
+
+    <article class="card">
+      <h2>Six Playwright journeys</h2>
+      <p>Browse and buy, cart survives reload, stock limit, admin creates and publishes, admin edits price, guest order lookup.</p>
+      <span class="tag">Phase 1</span>
+    </article>
+
+    <article class="card">
+      <h2>Docker Compose deployment</h2>
+      <p>Web, Postgres, Caddy. TLS, volumes for data and uploads, health endpoint, backups.</p>
+      <span class="tag">Phase 1</span>
+    </article>
+  </section>
+
+</main>
+
+<footer>
+  <span>Read-only board. Updated on feature replacement, not on bug fixes.</span>
+  <span>Source of truth: docs/ROADMAP.md</span>
+</footer>
+
+</body>
+</html>

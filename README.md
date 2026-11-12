@@ -28,6 +28,7 @@ Why these choices: [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) and [`docs/adr
 | [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) | Runtime shape, data model, auth, checkout, deployment, threat model |
 | [`docs/TESTING.md`](docs/TESTING.md) | Test layers, configs, CI gates, the CVE gate, flake policy |
 | [`docs/ROADMAP.md`](docs/ROADMAP.md) | Phases, completion criteria, open questions |
+| [`docs/kanban.html`](docs/kanban.html) | Read-only board of what is complete, in flight, and next — open the file directly |
 | [`docs/adr/`](docs/adr/) | Decisions that are expensive to reverse |
 
 ## Local development

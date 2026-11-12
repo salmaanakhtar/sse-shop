@@ -1,6 +1,6 @@
 import { expect, test } from "@playwright/test";
 
-test("home page renders without page errors", async ({ page }) => {
+test("home page renders the catalog without page errors", async ({ page }) => {
   const pageErrors: string[] = [];
   page.on("pageerror", (error) => pageErrors.push(error.message));
 
@@ -8,8 +8,10 @@ test("home page renders without page errors", async ({ page }) => {
 
   expect(response?.status()).toBe(200);
   await expect(page).toHaveTitle(/sse-shop/);
-  await expect(page.getByRole("heading", { level: 1 })).toHaveText("The store is being built.");
-  await expect(page.getByText("Prices in UAE dirhams, stored as whole fils.")).toBeVisible();
+  await expect(page.getByRole("heading", { level: 1 })).toHaveText(
+    "Considered goods, delivered across the UAE.",
+  );
+  await expect(page.getByRole("link", { name: /Essential Tee/ })).toBeVisible();
   expect(pageErrors).toEqual([]);
 });
 

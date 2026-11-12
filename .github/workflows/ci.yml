@@ -39,6 +39,26 @@ jobs:
   end-to-end:
     name: End-to-end
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: sse_shop
+          POSTGRES_PASSWORD: sse_shop
+          POSTGRES_DB: sse_shop
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U sse_shop -d sse_shop"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      DATABASE_URL: postgres://sse_shop:sse_shop@localhost:5432/sse_shop
+      BETTER_AUTH_URL: http://localhost:3100
+      NEXT_PUBLIC_STORE_URL: http://localhost:3100
+      ADMIN_EMAIL: owner@example.com
+      ADMIN_PASSWORD: change-this-admin-password
     steps:
       - uses: actions/checkout@v7
       - uses: pnpm/action-setup@v6
@@ -49,6 +69,8 @@ jobs:
 
       - run: pnpm install --frozen-lockfile
       - run: pnpm exec playwright install --with-deps chromium
+
+      # Global setup migrates and seeds this database before the first spec.
       - run: pnpm test:e2e
 
       - name: Upload report

@@ -62,6 +62,8 @@ class CheckoutError extends Error {
 }
 
 const ORDER_COUNTER = "order_number";
+/** Long enough for a delivery dispute, short enough that a forwarded link rots. */
+const LOOKUP_TTL_DAYS = 90;
 
 async function nextOrderNumber(tx: Parameters<Parameters<typeof db.transaction>[0]>[0]) {
   await tx.insert(counters).values({ key: ORDER_COUNTER, value: 0 }).onConflictDoNothing();
@@ -206,6 +208,7 @@ export async function placeOrder(input: {
         .values({
           number,
           lookupTokenHash: lookup.hash,
+          lookupExpiresAt: new Date(Date.now() + LOOKUP_TTL_DAYS * 24 * 60 * 60 * 1000),
           email: email.data,
           status: "pending",
           paymentStatus: "unpaid",
@@ -328,6 +331,7 @@ export async function getOrderForGuest(
     .limit(1);
 
   if (!order) return null;
+  if (order.lookupExpiresAt.getTime() < Date.now()) return null;
 
   const items = await db
     .select()

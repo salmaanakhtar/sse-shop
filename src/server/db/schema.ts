@@ -281,6 +281,8 @@ export const orders = pgTable(
     number: text("number").notNull().unique(),
     /** SHA-256 of the signed lookup token; the raw token only ever lives in the link. */
     lookupTokenHash: text("lookup_token_hash").notNull(),
+    /** Guests lose access after this moment; accounts make the link redundant. */
+    lookupExpiresAt: timestamp("lookup_expires_at", { withTimezone: true, mode: "date" }).notNull(),
     userId: text("user_id").references(() => users.id, { onDelete: "set null" }),
     email: text("email").notNull(),
     status: orderStatus("status").notNull().default("pending"),

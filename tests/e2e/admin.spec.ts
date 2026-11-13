@@ -163,27 +163,44 @@ test("admin builds a category tree, a collection, and a badge", async ({ page })
 });
 
 test("admin creates a promotion carousel and it appears on the home page", async ({ page }) => {
-  const createSlide = async (headline: string, subheadline: string, cta: string) => {
+  const fillSlide = async (headline: string, subheadline: string, cta: string) => {
     await page.goto("/admin/promotions/new");
     await page.getByLabel("Headline", { exact: true }).fill(headline);
     await page.getByLabel("Subheadline").fill(subheadline);
     await page.getByLabel("Button label").fill(cta);
-    await page.getByLabel("Link").fill(`/products/${SLUG}`);
     await page.setInputFiles("#promotion-image", "tests/e2e/fixtures/product.png");
     await page.getByLabel("Image alt text").fill(headline);
-    await page.getByRole("button", { name: "Create slide" }).click();
-    await expect(page).toHaveURL(/\/admin\/promotions$/);
   };
 
-  await createSlide("Weekend Sale", "Up to 34% off selected pieces", "Shop the sale");
-  await createSlide("New Arrivals", "Fresh pieces just landed", "Browse new");
+  await fillSlide("Weekend Sale", "Up to 34% off selected pieces", "Shop the sale");
+  await page.getByLabel("Category").selectOption({ label: "Playwright Apparel" });
+  await page.getByRole("button", { name: "Create slide" }).click();
+  await expect(page).toHaveURL(/\/admin\/promotions$/);
+
+  await fillSlide("New Arrivals", "Fresh pieces just landed", "Browse new");
+  await page.getByRole("button", { name: "Product" }).click();
+  await page.getByRole("button", { name: "Choose a product" }).click();
+  const productDialog = page.getByRole("dialog", { name: "Choose a product" });
+  await productDialog.getByLabel("Search products").fill("Playwright Hoodie");
+  await productDialog.getByRole("button", { name: /Playwright Hoodie/ }).click();
+  await expect(productDialog).toBeHidden();
+  await page.getByRole("button", { name: "Create slide" }).click();
+  await expect(page).toHaveURL(/\/admin\/promotions$/);
 
   await page.goto("/");
   await page.getByRole("region", { name: "Promotions" }).hover();
   await expect(page.getByRole("heading", { name: "Weekend Sale" })).toBeVisible();
+  await expect(page.getByRole("link", { name: /Weekend Sale/ })).toHaveAttribute(
+    "href",
+    "/category/playwright-apparel",
+  );
+
   await page.getByRole("button", { name: "Next slide" }).click();
   await expect(page.getByRole("heading", { name: "New Arrivals" })).toBeVisible();
-  await expect(page.getByRole("link", { name: /New Arrivals/ })).toBeVisible();
+  await expect(page.getByRole("link", { name: /New Arrivals/ })).toHaveAttribute(
+    "href",
+    "/products/playwright-hoodie",
+  );
 });
 
 test("admin can open the customer list", async ({ page }) => {

@@ -2,9 +2,11 @@
 
 import { unlink } from "node:fs/promises";
 import path from "node:path";
+import { eq } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { parseDubaiDateTimeInput } from "@/lib/dates";
+import { isPromotionTargetType } from "@/lib/promotions";
 import { requireAdminAction } from "../auth/guard";
 import { db } from "../db/client";
 import { auditLog, promotions } from "../db/schema";
@@ -12,22 +14,14 @@ import { storeProductImage, uploadsRoot } from "../media/storage";
 import {
   createPromotion,
   deletePromotion,
+  getPromotionTarget,
   movePromotion,
   replacePromotionImage,
   updatePromotion,
+  type PromotionInput,
 } from "../services/promotions";
-import { eq } from "drizzle-orm";
 
-type PromotionFields = {
-  headline: string;
-  subheadline: string;
-  ctaLabel: string;
-  href: string;
-  imageAlt: string;
-  active: boolean;
-  startsAt: Date | null;
-  endsAt: Date | null;
-};
+type PromotionFields = Omit<PromotionInput, "imageKey">;
 
 function backToNew(error?: string): never {
   const query = error ? `?error=${encodeURIComponent(error)}` : "";
@@ -39,20 +33,22 @@ function backToPromotion(id: string, error?: string): never {
   redirect(`/admin/promotions/${id}${query}`);
 }
 
-function readFields(formData: FormData): PromotionFields | string {
+async function readFields(formData: FormData): Promise<PromotionFields | string> {
   const headline = String(formData.get("headline") ?? "").trim();
   const subheadline = String(formData.get("subheadline") ?? "").trim();
   const ctaLabel = String(formData.get("ctaLabel") ?? "").trim() || "Shop now";
-  const href = String(formData.get("href") ?? "").trim();
+  const targetType = String(formData.get("targetType") ?? "");
+  const targetId = String(formData.get("targetId") ?? "").trim();
   const imageAlt = String(formData.get("imageAlt") ?? "").trim();
 
   if (headline.length > 120) return "Keep the headline under 120 characters.";
   if (subheadline.length > 240) return "Keep the subheadline under 240 characters.";
   if (ctaLabel.length > 40) return "Keep the button label under 40 characters.";
-  if (!href.startsWith("/") || href.startsWith("//")) {
-    return "Use an internal link starting with / (for example /products/essential-tee).";
-  }
-  if (href.length > 500) return "That link is too long.";
+  if (!isPromotionTargetType(targetType)) return "Choose where the slide should go.";
+  if (!targetId) return "Choose a category, collection, or product.";
+
+  const target = await getPromotionTarget(targetType, targetId);
+  if (!target) return "That destination no longer exists. Choose another one.";
 
   const startsAt = parseDubaiDateTimeInput(String(formData.get("startsAt") ?? ""));
   if (startsAt === "invalid") return "Enter a valid start time.";
@@ -64,7 +60,8 @@ function readFields(formData: FormData): PromotionFields | string {
     headline,
     subheadline,
     ctaLabel,
-    href,
+    targetType,
+    targetId,
     imageAlt,
     active: formData.get("active") === "on",
     startsAt,
@@ -72,9 +69,34 @@ function readFields(formData: FormData): PromotionFields | string {
   };
 }
 
+function revalidateTarget(href: string | undefined): void {
+  if (href) revalidatePath(href);
+}
+
+function promotionSummary(promotion: {
+  headline: string;
+  targetType: string;
+  targetId: string | null;
+  target?: { label: string; href: string } | null;
+  active: boolean;
+  startsAt: Date | null;
+  endsAt: Date | null;
+}) {
+  return {
+    headline: promotion.headline,
+    targetType: promotion.targetType,
+    targetId: promotion.targetId,
+    targetLabel: promotion.target?.label ?? null,
+    targetHref: promotion.target?.href ?? null,
+    active: promotion.active,
+    startsAt: promotion.startsAt,
+    endsAt: promotion.endsAt,
+  };
+}
+
 export async function createPromotionAction(formData: FormData): Promise<void> {
   const session = await requireAdminAction();
-  const fields = readFields(formData);
+  const fields = await readFields(formData);
   if (typeof fields === "string") backToNew(fields);
 
   const file = formData.get("image");
@@ -100,17 +122,12 @@ export async function createPromotionAction(formData: FormData): Promise<void> {
     action: "promotion.create",
     entity: "promotions",
     entityId: promotion.id,
-    after: {
-      headline: promotion.headline,
-      href: promotion.href,
-      active: promotion.active,
-      startsAt: promotion.startsAt,
-      endsAt: promotion.endsAt,
-    },
+    after: promotionSummary(promotion),
   });
 
   revalidatePath("/");
   revalidatePath("/admin/promotions");
+  revalidateTarget(promotion.target?.href);
   redirect("/admin/promotions");
 }
 
@@ -119,7 +136,7 @@ export async function updatePromotionAction(formData: FormData): Promise<void> {
   const id = String(formData.get("id") ?? "").trim();
   if (!id) redirect("/admin/promotions");
 
-  const fields = readFields(formData);
+  const fields = await readFields(formData);
   if (typeof fields === "string") backToPromotion(id, fields);
 
   const [before] = await db.select().from(promotions).where(eq(promotions.id, id)).limit(1);
@@ -135,23 +152,19 @@ export async function updatePromotionAction(formData: FormData): Promise<void> {
     entityId: id,
     before: {
       headline: before.headline,
-      href: before.href,
+      targetType: before.targetType,
+      targetId: before.targetId,
       active: before.active,
       startsAt: before.startsAt,
       endsAt: before.endsAt,
     },
-    after: {
-      headline: updated.headline,
-      href: updated.href,
-      active: updated.active,
-      startsAt: updated.startsAt,
-      endsAt: updated.endsAt,
-    },
+    after: promotionSummary(updated),
   });
 
   revalidatePath("/");
   revalidatePath("/admin/promotions");
   revalidatePath(`/admin/promotions/${id}`);
+  revalidateTarget(updated.target?.href);
   backToPromotion(id);
 }
 
@@ -197,6 +210,7 @@ export async function replacePromotionImageAction(formData: FormData): Promise<v
   revalidatePath("/");
   revalidatePath("/admin/promotions");
   revalidatePath(`/admin/promotions/${id}`);
+  revalidateTarget(updated.target?.href);
   backToPromotion(id);
 }
 
@@ -205,8 +219,13 @@ export async function deletePromotionAction(formData: FormData): Promise<void> {
   const id = String(formData.get("id") ?? "").trim();
   if (!id) redirect("/admin/promotions");
 
+  const [beforeRow] = await db.select().from(promotions).where(eq(promotions.id, id)).limit(1);
+  if (!beforeRow) redirect("/admin/promotions");
+
   const deleted = await deletePromotion(id);
   if (!deleted) redirect("/admin/promotions");
+
+  const target = await getPromotionTarget(deleted.targetType, deleted.targetId ?? "");
 
   await db.insert(auditLog).values({
     actorUserId: session.user.id,
@@ -215,7 +234,8 @@ export async function deletePromotionAction(formData: FormData): Promise<void> {
     entityId: id,
     before: {
       headline: deleted.headline,
-      href: deleted.href,
+      targetType: deleted.targetType,
+      targetId: deleted.targetId,
       imageKey: deleted.imageKey,
     },
   });
@@ -226,6 +246,7 @@ export async function deletePromotionAction(formData: FormData): Promise<void> {
 
   revalidatePath("/");
   revalidatePath("/admin/promotions");
+  revalidateTarget(target?.href);
   redirect("/admin/promotions");
 }
 

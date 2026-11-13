@@ -406,8 +406,10 @@ export const promotions = pgTable(
     headline: text("headline").notNull().default(""),
     subheadline: text("subheadline").notNull().default(""),
     ctaLabel: text("cta_label").notNull().default("Shop now"),
-    /** Internal path only, e.g. /products/essential-tee or /collections/sale. */
-    href: text("href").notNull(),
+    /** category | collection | product; validated by the admin action. */
+    targetType: text("target_type").notNull().default("product"),
+    /** Resolved through the target table, so slug changes keep working. */
+    targetId: text("target_id"),
     imageKey: text("image_key").notNull(),
     imageAlt: text("image_alt").notNull().default(""),
     active: boolean("active").notNull().default(true),
@@ -417,7 +419,10 @@ export const promotions = pgTable(
     createdAt: createdAt(),
     updatedAt: updatedAt(),
   },
-  (table) => [index("promotions_active_position_idx").on(table.active, table.position)],
+  (table) => [
+    index("promotions_active_position_idx").on(table.active, table.position),
+    index("promotions_target_idx").on(table.targetType, table.targetId),
+  ],
 );
 
 /* ─────────────────────── taxonomy and merchandising ─────────────────────── */

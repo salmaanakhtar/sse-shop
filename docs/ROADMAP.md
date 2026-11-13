@@ -3,9 +3,9 @@
 Sequenced so every phase leaves a working store. A phase is done when its completion criteria
 hold, not when the code is written.
 
-**Current:** Phase 3 complete. Phase 4 in progress — sales, promotions, categories, collections, and
-badges are live. The final phase is a full UI redesign of layout, theme, and design language. No-code
-control is a continuous background stream, not a numbered phase.
+**Current:** Phase 4 complete. Sales, promotions, categories, collections, and badges are live; Phase 5
+(wishlist) is next. The final phase is a full UI redesign of layout, theme, and design language.
+No-code control is a continuous background stream, not a numbered phase.
 
 ## Phase 0 — Foundation
 
@@ -73,16 +73,18 @@ create, and the tree survives the migration.
 
 ## Phase 4 — Merchandising
 
-**Status: in progress — sales, promotions, categories, collections, and badges shipped; promotion
-targets are being reworked.**
+**Status: complete.**
 
 - **Sales (done):** per-variant sale price with an optional start/end in Asia/Dubai; the sale must
   be below the regular price; cart, checkout, and order snapshots use the effective price. The
   storefront shows the percentage off, original price, sale price, and a countdown. The admin sale
   change writes an audit entry.
 - **Promotions (done):** manually managed top-of-home carousel slides with image, headline, CTA,
-  internal link, optional schedule, active flag, ordering, and audit entries. The storefront carousel
-  auto-advances, pauses on hover/focus, respects reduced motion, and has arrows and dots.
+  optional schedule, active flag, ordering, and audit entries. A slide targets a category,
+  collection, or product — never a free-form URL. Categories and collections use a dropdown; a
+  product uses a searchable selector modal. The storefront resolves the current slug at read time
+  and hides a slide whose target is missing or inactive. The carousel auto-advances, pauses on
+  hover/focus, respects reduced motion, and has arrows and dots.
 - **Categories (done):** a hierarchical tree with subcategories, sibling ordering, active flags, and
   a navbar with child dropdowns. Category pages include descendant products; deletion is blocked
   while children or products remain. Every change writes an audit entry.
@@ -94,7 +96,7 @@ targets are being reworked.**
   page; the sale flag is top-right.
 
 **Done when** a sale, a carousel slide, a category, a collection, and a badge can each be changed
-in admin and appear on the storefront without a deploy, with an audit entry.
+in admin and appear on the storefront without a deploy, with an audit entry. All five are live.
 
 **Out of scope:** discount codes, automatic best sellers, category-level sale campaigns, and
 shareable collections.
@@ -221,8 +223,10 @@ These shape upcoming work. Answers land in `CONTEXT.md`, an ADR, or this file.
   active price, used by the storefront, cart, checkout, and order snapshot, with a countdown and an
   audit entry.
 - **Wishlist:** private named lists; first qualifying drop sends one email, including sale prices.
-- **Carousel:** manually managed slides with image, headline, CTA, internal link, schedule, active
-  flag, and ordering. It auto-advances, pauses on hover/focus, and has arrows and dots.
+- **Carousel:** manually managed slides with image, headline, CTA, schedule, active flag, and
+  ordering. A slide targets a category, collection, or product by id; categories and collections use
+  a dropdown and products use a selector modal. The storefront resolves the slug at read time. It
+  auto-advances, pauses on hover/focus, and has arrows and dots.
 - **Arabic:** interface-only first, per-customer numerals, storefront only.
 - **Dark mode:** customer toggle with system default; admin stays light.
 - **Roadmap order:** accounts → variations/images → sales/promotions → categories/collections →

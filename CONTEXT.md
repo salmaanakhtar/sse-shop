@@ -153,8 +153,14 @@ _Avoid_: Campaign dates
 
 **Promotion**:
 A merchandising message at the top of the home page: an image, optional headline and subheadline,
-a call to action, and an internal link. A group of promotions becomes a carousel.
+a call to action, and a destination. A group of promotions becomes a carousel.
 _Avoid_: Banner, ad
+
+**Promotion destination**:
+The category, collection, or product a promotion links to, stored as a target type and entity id.
+The storefront resolves the current slug at read time, so renaming a product does not break the
+slide. A slide whose destination is missing or inactive is hidden and flagged in admin.
+_Avoid_: Link, URL, href
 
 **Promotion window**:
 The optional start and end of a promotion, edited in Asia/Dubai. Empty bounds mean open-ended; an
@@ -162,12 +168,12 @@ inactive or expired promotion is not shown.
 _Avoid_: Campaign dates
 
 **Call to action**:
-The button label on a promotion, such as “Shop the sale”. It links to the promotion's internal path.
+The button label on a promotion, such as “Shop the sale”. It follows the promotion's destination.
 _Avoid_: CTA as a database term, button text everywhere
 
 **Carousel slide**:
 One promotion in the rotating top-of-home carousel, with an image, optional headline and
-subheadline, a call to action, an internal link, and a schedule.
+subheadline, a call to action, a destination, and a schedule.
 
 ## Wishlist
 

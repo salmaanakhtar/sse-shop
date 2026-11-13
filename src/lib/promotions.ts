@@ -4,6 +4,24 @@ export type PromotionWindow = {
   endsAt: Date | string | null;
 };
 
+export const PROMOTION_TARGET_TYPES = ["category", "collection", "product"] as const;
+export type PromotionTargetType = (typeof PROMOTION_TARGET_TYPES)[number];
+
+export function isPromotionTargetType(value: string): value is PromotionTargetType {
+  return (PROMOTION_TARGET_TYPES as readonly string[]).includes(value);
+}
+
+export function promotionTargetPath(type: PromotionTargetType, slug: string): string {
+  switch (type) {
+    case "category":
+      return `/category/${slug}`;
+    case "collection":
+      return `/collections/${slug}`;
+    case "product":
+      return `/products/${slug}`;
+  }
+}
+
 function instant(value: Date | string | null): number | null {
   if (!value) return null;
   const date = value instanceof Date ? value : new Date(value);

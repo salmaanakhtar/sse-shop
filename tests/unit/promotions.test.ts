@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { isPromotionLive, promotionStatus } from "@/lib/promotions";
+import {
+  isPromotionLive,
+  isPromotionTargetType,
+  promotionStatus,
+  promotionTargetPath,
+} from "@/lib/promotions";
 
 const now = new Date("2026-06-01T12:00:00.000Z");
 
@@ -52,5 +57,21 @@ describe("promotionStatus", () => {
       ),
     ).toBe("expired");
     expect(promotionStatus({ active: false, startsAt: null, endsAt: null }, now)).toBe("inactive");
+  });
+});
+
+describe("promotion targets", () => {
+  it("accepts only category, collection, and product", () => {
+    expect(isPromotionTargetType("category")).toBe(true);
+    expect(isPromotionTargetType("collection")).toBe(true);
+    expect(isPromotionTargetType("product")).toBe(true);
+    expect(isPromotionTargetType("url")).toBe(false);
+    expect(isPromotionTargetType("")).toBe(false);
+  });
+
+  it("builds the storefront path for each target type", () => {
+    expect(promotionTargetPath("category", "tops")).toBe("/category/tops");
+    expect(promotionTargetPath("collection", "featured")).toBe("/collections/featured");
+    expect(promotionTargetPath("product", "essential-tee")).toBe("/products/essential-tee");
   });
 });

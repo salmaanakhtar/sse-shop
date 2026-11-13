@@ -73,7 +73,7 @@ tables stay minimal.
 | `cart_items` | Variants in a cart | Unique on `(cart_id, variant_id)` |
 | `orders` | Placed order and its totals | `number` unique and sequential; `user_id` links the owner; `billing_address` snapshot |
 | `order_items` | Snapshot of what was bought | Prices frozen at placement |
-| `promotions` | Home-page carousel slides | image, headline, CTA, internal link, schedule, order |
+| `promotions` | Home-page carousel slides | image, headline, CTA, target type/id, schedule, order |
 | `audit_log` | Admin and account changes | Actor, action, before/after JSON, IP |
 | `settings` | Store configuration | Key → JSONB, changed in admin |
 | `counters` | Monotonic sequences | Order numbers come from here, inside the placement transaction |
@@ -214,25 +214,32 @@ Three separate systems share the product catalog but mean different things:
   edit page. Active badges render top-left on cards and under the product title; the sale flag moved
   top-right so the two never collide.
 
-Both assignments are many-to-many (`product_categories`, `product_badges`), so a product can sit in
-several categories and carry several badges. Every create, update, delete, reorder, and assignment
-writes an `audit_log` entry.
+All three assignments are many-to-many (`product_categories`, `collection_products`,
+`product_badges`), so a product can sit in several categories, several collections, and carry
+several badges. Every create, update, delete, reorder, and assignment writes an `audit_log` entry.
 
 ## Home page promotions
 
 `promotions` holds the slides above the catalog on the home page:
 
-- image (same upload pipeline as products), headline, subheadline, call-to-action label, and an
-  internal path such as `/products/essential-tee` or `/collections/weekend`.
+- image (same upload pipeline as products), headline, subheadline, call-to-action label, and a
+  destination. The destination is `target_type` (`category`, `collection`, or `product`) plus
+  `target_id`; there is no free-form URL.
+- the admin chooses a category or collection from a dropdown, or opens a searchable product selector
+  modal. The server validates that the target exists and matches the declared type.
+- the storefront resolves the target's current slug at read time, so renaming a product, category,
+  or collection does not break an existing slide. A target that was deleted, deactivated, or left
+  inactive is skipped; the admin list flags it as missing or inactive.
 - active flag, position, and an optional Asia/Dubai start/end window. Only active slides inside
-  their window are selected; expired and scheduled slides stay in the admin list with a status.
+  their window and with an active destination are selected; expired and scheduled slides stay in
+  the admin list with a status.
 - the admin list supports create, edit, reorder, image replacement, and delete. Every mutation
   writes an `audit_log` entry.
 - the storefront carousel renders the live slides in position order. It auto-advances every six
   seconds when there is more than one slide, pauses on hover/focus, respects reduced motion, and
   exposes previous/next and dot controls. A single slide renders without controls.
-- links are internal paths only. This prevents a slide from becoming an open redirect or a
-  `javascript:` link.
+- because destinations are entity ids, a slide cannot become an open redirect or a `javascript:`
+  link.
 
 ## Cart and checkout
 
@@ -350,7 +357,7 @@ The product editor defines levels and values, then builds the variant tree. The 
 table: groups expand inline, the selected branch opens in a side inspector, and a single “Add
 branches” form creates only the ticked values. Nothing is generated from a Cartesian product.
 
-The admin also manages the home-page promotion carousel: image, headline, CTA, internal link,
+The admin also manages the home-page promotion carousel: image, headline, CTA, destination picker,
 schedule, order, and active state, with an audit entry for every change.
 
 A no-code boundary is intentional: admin edits `settings` and content rows, never code. Anything

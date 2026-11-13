@@ -12,7 +12,7 @@ import {
 } from "@/server/actions/admin-promotions";
 import { formatDubaiDateTime } from "@/lib/dates";
 import { requireAdminPage } from "@/server/auth/guard";
-import { getPromotion } from "@/server/services/promotions";
+import { getPromotion, listPromotionTargets } from "@/server/services/promotions";
 
 export const metadata = { title: "Edit promotion" };
 
@@ -24,7 +24,11 @@ export default async function EditPromotionPage({
   searchParams: Promise<{ error?: string }>;
 }) {
   await requireAdminPage();
-  const [{ id }, { error }] = await Promise.all([params, searchParams]);
+  const [{ id }, { error }, targets] = await Promise.all([
+    params,
+    searchParams,
+    listPromotionTargets(),
+  ]);
   const promotion = await getPromotion(id);
   if (!promotion) notFound();
 
@@ -36,6 +40,11 @@ export default async function EditPromotionPage({
             {promotion.headline || "Untitled slide"}
           </h1>
           <p className="mt-1 text-xs text-muted capitalize">{promotion.status}</p>
+          <p className="mt-1 text-xs text-muted">
+            {promotion.target
+              ? `${promotion.target.type}: ${promotion.target.label} → ${promotion.target.href}`
+              : "Destination missing — choose one before publishing."}
+          </p>
           {promotion.startsAt || promotion.endsAt ? (
             <p className="mt-1 text-xs text-muted">
               {formatDubaiDateTime(promotion.startsAt) || "Open"} →{" "}
@@ -51,6 +60,7 @@ export default async function EditPromotionPage({
       <PromotionForm
         action={updatePromotionAction}
         values={promotion}
+        targets={targets}
         submitLabel="Save slide"
         error={error}
       />

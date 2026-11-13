@@ -45,8 +45,9 @@ without replacing it.
     is the chosen path, not a phantom combination.
 13. **Sale price** - admin sets a sale with an end time; the storefront shows the discount, original
     price, and timer; the cart total uses the sale price.
-14. **Promotion carousel** - admin creates two scheduled slides; the home page shows the first, the
-    next arrow moves to the second, and the slide links to its internal path.
+14. **Promotion carousel** - admin creates two scheduled slides, one targeting a category and one a
+    product chosen in the selector modal; the home page shows the first, the next arrow moves to the
+    second, and each slide links to its resolved storefront path.
 15. **Merchandising** - admin creates a parent category and a child, assigns a product, and sees the
     navbar and both category pages; creates a collection, adds the product, and sees the home row and
     collection page; creates a badge, assigns it, and sees it on the card and detail page.
@@ -147,7 +148,10 @@ free sale, the discount percentage, and the Asia/Dubai input round trip. The cat
 test asserts the effective from-price and the sale fields on the product detail.
 
 Promotion tests cover live/scheduled/expired/inactive status, filtering live slides, position order,
-moving a slide, and deletion. The admin e2e creates two slides and drives the carousel arrows.
+moving a slide, and deletion. They also cover all three destination types, resolved hrefs, draft and
+inactive targets being skipped, missing or null targets being hidden and flagged in admin, and slug
+changes not breaking existing slides. The admin e2e creates one slide targeting a category and one
+targeting a product chosen in the selector modal, then drives the carousel and checks both hrefs.
 
 Category tests cover tree building, sibling order, depth-first flattening, paths, cycle rejection,
 deletion guards, descendant product lookup, and product assignment. Collection tests cover curated
@@ -198,8 +202,9 @@ export default defineConfig({
 ```
 
 `globalSetup` resets the database, applies migrations, and loads `pnpm db:seed`. The seed creates a
-known catalog with predictable prices, one admin user whose password and TOTP secret come from
-env vars, and a low-stock variant used by the stock-limit spec.
+known catalog with predictable prices, a small category tree, two collections, two badges, one admin
+user whose password and TOTP secret come from env vars, and a low-stock variant used by the
+stock-limit spec.
 
 Admin authentication is captured once into `tests/e2e/.auth/admin.json` via `storageState`, using a
 setup project that runs first. The setup signs in through the real form, enrols TOTP when the

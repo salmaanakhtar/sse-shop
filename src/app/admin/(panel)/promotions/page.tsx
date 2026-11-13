@@ -50,7 +50,7 @@ export default async function AdminPromotionsPage() {
             <thead className="border-b border-line text-left text-xs tracking-wide text-muted uppercase">
               <tr>
                 <th className="px-5 py-3 font-semibold">Slide</th>
-                <th className="hidden px-5 py-3 font-semibold sm:table-cell">Link</th>
+                <th className="hidden px-5 py-3 font-semibold sm:table-cell">Destination</th>
                 <th className="hidden px-5 py-3 font-semibold lg:table-cell">Window</th>
                 <th className="px-5 py-3 font-semibold">Status</th>
                 <th className="px-5 py-3 font-semibold">Order</th>
@@ -83,7 +83,19 @@ export default async function AdminPromotionsPage() {
                     </div>
                   </td>
                   <td className="hidden px-5 py-3 text-xs text-muted sm:table-cell">
-                    {promotion.href}
+                    {promotion.target ? (
+                      <>
+                        <span className="block text-ink">{promotion.target.label}</span>
+                        <span className="block">
+                          {promotion.target.type} · {promotion.target.href}
+                        </span>
+                        {promotion.target.active ? null : (
+                          <span className="block text-amber-700">inactive target</span>
+                        )}
+                      </>
+                    ) : (
+                      <span className="text-red-600">Missing destination</span>
+                    )}
                   </td>
                   <td className="hidden px-5 py-3 text-xs text-muted lg:table-cell">
                     {promotion.startsAt || promotion.endsAt

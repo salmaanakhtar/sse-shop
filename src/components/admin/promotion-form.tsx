@@ -1,13 +1,18 @@
 import { Button } from "@/components/ui/button";
 import { Input, Label } from "@/components/ui/field";
 import { formatDubaiDateTimeInput } from "@/lib/dates";
+import {
+  PromotionDestinationPicker,
+  type PromotionTargetOptions,
+} from "@/components/admin/promotion-destination-picker";
 
 export type PromotionFormValues = {
   id?: string;
   headline?: string;
   subheadline?: string;
   ctaLabel?: string;
-  href?: string;
+  targetType?: string;
+  targetId?: string | null;
   imageAlt?: string;
   active?: boolean;
   startsAt?: Date | null;
@@ -17,12 +22,14 @@ export type PromotionFormValues = {
 export function PromotionForm({
   action,
   values,
+  targets,
   submitLabel,
   error,
   showImage = false,
 }: {
   action: (formData: FormData) => void | Promise<void>;
   values?: PromotionFormValues;
+  targets: PromotionTargetOptions;
   submitLabel: string;
   error?: string;
   showImage?: boolean;
@@ -60,31 +67,21 @@ export function PromotionForm({
         />
       </div>
 
-      <div className="grid gap-4 sm:grid-cols-2">
-        <div>
-          <Label htmlFor="promotion-cta">Button label</Label>
-          <Input
-            id="promotion-cta"
-            name="ctaLabel"
-            maxLength={40}
-            defaultValue={values?.ctaLabel ?? "Shop now"}
-          />
-        </div>
-        <div>
-          <Label htmlFor="promotion-href">Link</Label>
-          <Input
-            id="promotion-href"
-            name="href"
-            required
-            maxLength={500}
-            defaultValue={values?.href ?? ""}
-            placeholder="/products/essential-tee"
-          />
-          <p className="mt-1.5 text-xs text-muted">
-            Internal path only, starting with a single slash.
-          </p>
-        </div>
+      <div>
+        <Label htmlFor="promotion-cta">Button label</Label>
+        <Input
+          id="promotion-cta"
+          name="ctaLabel"
+          maxLength={40}
+          defaultValue={values?.ctaLabel ?? "Shop now"}
+        />
       </div>
+
+      <PromotionDestinationPicker
+        targets={targets}
+        defaultType={values?.targetType ?? "category"}
+        defaultTargetId={values?.targetId ?? null}
+      />
 
       <div className="grid gap-4 sm:grid-cols-2">
         <div>

@@ -1,9 +1,9 @@
 import { describe, expect, it } from "vitest";
 import {
   isPromotionLive,
-  isPromotionTargetType,
+  isPromotionRowKind,
+  promotionPagePath,
   promotionStatus,
-  promotionTargetPath,
 } from "@/lib/promotions";
 
 const now = new Date("2026-06-01T12:00:00.000Z");
@@ -60,18 +60,16 @@ describe("promotionStatus", () => {
   });
 });
 
-describe("promotion targets", () => {
-  it("accepts only category, collection, and product", () => {
-    expect(isPromotionTargetType("category")).toBe(true);
-    expect(isPromotionTargetType("collection")).toBe(true);
-    expect(isPromotionTargetType("product")).toBe(true);
-    expect(isPromotionTargetType("url")).toBe(false);
-    expect(isPromotionTargetType("")).toBe(false);
+describe("promotion rows", () => {
+  it("accepts only category, collection, and products", () => {
+    expect(isPromotionRowKind("category")).toBe(true);
+    expect(isPromotionRowKind("collection")).toBe(true);
+    expect(isPromotionRowKind("products")).toBe(true);
+    expect(isPromotionRowKind("product")).toBe(false);
+    expect(isPromotionRowKind("url")).toBe(false);
   });
 
-  it("builds the storefront path for each target type", () => {
-    expect(promotionTargetPath("category", "tops")).toBe("/category/tops");
-    expect(promotionTargetPath("collection", "featured")).toBe("/collections/featured");
-    expect(promotionTargetPath("product", "essential-tee")).toBe("/products/essential-tee");
+  it("builds the promotion page path", () => {
+    expect(promotionPagePath("hardware-sale")).toBe("/promotions/hardware-sale");
   });
 });

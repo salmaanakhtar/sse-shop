@@ -476,13 +476,10 @@ export const promotions = pgTable(
   "promotions",
   {
     id: id(),
+    slug: text("slug").notNull().unique(),
     headline: text("headline").notNull().default(""),
     subheadline: text("subheadline").notNull().default(""),
     ctaLabel: text("cta_label").notNull().default("Shop now"),
-    /** category | collection | product; validated by the admin action. */
-    targetType: text("target_type").notNull().default("product"),
-    /** Resolved through the target table, so slug changes keep working. */
-    targetId: text("target_id"),
     imageKey: text("image_key").notNull(),
     imageAlt: text("image_alt").notNull().default(""),
     active: boolean("active").notNull().default(true),
@@ -492,10 +489,7 @@ export const promotions = pgTable(
     createdAt: createdAt(),
     updatedAt: updatedAt(),
   },
-  (table) => [
-    index("promotions_active_position_idx").on(table.active, table.position),
-    index("promotions_target_idx").on(table.targetType, table.targetId),
-  ],
+  (table) => [index("promotions_active_position_idx").on(table.active, table.position)],
 );
 
 /* ─────────────────────── taxonomy and merchandising ─────────────────────── */
@@ -591,6 +585,64 @@ export const productBadges = pgTable(
   (table) => [
     primaryKey({ columns: [table.productId, table.badgeId] }),
     index("product_badges_badge_id_idx").on(table.badgeId),
+  ],
+);
+
+/* ─────────────────────── promotion pages ─────────────────────── */
+
+/**
+ * A promotion page is the carousel slide itself. Rows are ordered sections:
+ * a collection, a category (including descendants), or hand-picked products.
+ * The partial unique indexes reject adding the same category or collection
+ * twice to one page; products may repeat across different rows.
+ */
+export const promotionRows = pgTable(
+  "promotion_rows",
+  {
+    id: id(),
+    promotionId: text("promotion_id")
+      .notNull()
+      .references(() => promotions.id, { onDelete: "cascade" }),
+    /** category | collection | products; validated by the admin action. */
+    kind: text("kind").notNull(),
+    title: text("title").notNull(),
+    categoryId: text("category_id").references(() => categories.id, {
+      onDelete: "cascade",
+    }),
+    collectionId: text("collection_id").references(() => collections.id, {
+      onDelete: "cascade",
+    }),
+    position: integer("position").notNull().default(0),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (table) => [
+    index("promotion_rows_promotion_id_idx").on(table.promotionId),
+    index("promotion_rows_category_id_idx").on(table.categoryId),
+    index("promotion_rows_collection_id_idx").on(table.collectionId),
+    uniqueIndex("promotion_rows_category_uq")
+      .on(table.promotionId, table.categoryId)
+      .where(sql`${table.kind} = 'category' and ${table.categoryId} is not null`),
+    uniqueIndex("promotion_rows_collection_uq")
+      .on(table.promotionId, table.collectionId)
+      .where(sql`${table.kind} = 'collection' and ${table.collectionId} is not null`),
+  ],
+);
+
+export const promotionRowProducts = pgTable(
+  "promotion_row_products",
+  {
+    rowId: text("row_id")
+      .notNull()
+      .references(() => promotionRows.id, { onDelete: "cascade" }),
+    productId: text("product_id")
+      .notNull()
+      .references(() => products.id, { onDelete: "cascade" }),
+    position: integer("position").notNull().default(0),
+  },
+  (table) => [
+    primaryKey({ columns: [table.rowId, table.productId] }),
+    index("promotion_row_products_product_id_idx").on(table.productId),
   ],
 );
 

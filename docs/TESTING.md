@@ -45,9 +45,9 @@ without replacing it.
     is the chosen path, not a phantom combination.
 13. **Sale price** - admin sets a sale with an end time; the storefront shows the discount, original
     price, and timer; the cart total uses the sale price.
-14. **Promotion carousel** - admin creates two scheduled slides, one targeting a category and one a
-    product chosen in the selector modal; the home page shows the first, the next arrow moves to the
-    second, and each slide links to its resolved storefront path.
+14. **Promotion pages** - admin creates a promotion, adds a category row, a collection row, and a
+    hand-picked product row, then checks the carousel link, the resolved promotion page, and the
+    products in all three rows.
 15. **Merchandising** - admin creates a parent category and a child, assigns a product, and sees the
     navbar and both category pages; creates a collection, adds the product, and sees the home row and
     collection page; creates a badge, assigns it, and sees it on the card and detail page.
@@ -152,10 +152,11 @@ free sale, the discount percentage, and the Asia/Dubai input round trip. The cat
 test asserts the effective from-price and the sale fields on the product detail.
 
 Promotion tests cover live/scheduled/expired/inactive status, filtering live slides, position order,
-moving a slide, and deletion. They also cover all three destination types, resolved hrefs, draft and
-inactive targets being skipped, missing or null targets being hidden and flagged in admin, and slug
-changes not breaking existing slides. The admin e2e creates one slide targeting a category and one
-targeting a product chosen in the selector modal, then drives the carousel and checks both hrefs.
+moving a slide, deletion, and the promotion page. Page tests cover category rows (including
+descendants), collection order, hand-picked order, editable headings, row reorder/delete, duplicate
+category/collection rejection, product dedupe inside a hand-picked row, and empty/inactive pages. The
+admin e2e creates one promotion page with all three row types and checks the carousel link and each
+rendered row.
 
 Category tests cover tree building, sibling order, depth-first flattening, paths, cycle rejection,
 deletion guards, descendant product lookup, and product assignment. Collection tests cover curated

@@ -1,18 +1,13 @@
 import { Button } from "@/components/ui/button";
 import { Input, Label } from "@/components/ui/field";
 import { formatDubaiDateTimeInput } from "@/lib/dates";
-import {
-  PromotionDestinationPicker,
-  type PromotionTargetOptions,
-} from "@/components/admin/promotion-destination-picker";
 
 export type PromotionFormValues = {
   id?: string;
+  slug?: string;
   headline?: string;
   subheadline?: string;
   ctaLabel?: string;
-  targetType?: string;
-  targetId?: string | null;
   imageAlt?: string;
   active?: boolean;
   startsAt?: Date | null;
@@ -22,14 +17,12 @@ export type PromotionFormValues = {
 export function PromotionForm({
   action,
   values,
-  targets,
   submitLabel,
   error,
   showImage = false,
 }: {
   action: (formData: FormData) => void | Promise<void>;
   values?: PromotionFormValues;
-  targets: PromotionTargetOptions;
   submitLabel: string;
   error?: string;
   showImage?: boolean;
@@ -44,16 +37,32 @@ export function PromotionForm({
         </p>
       ) : null}
 
-      <div>
-        <Label htmlFor="promotion-headline">Headline</Label>
-        <Input
-          id="promotion-headline"
-          name="headline"
-          maxLength={120}
-          defaultValue={values?.headline ?? ""}
-          placeholder="Weekend sale"
-        />
-        <p className="mt-1.5 text-xs text-muted">Optional; the image and CTA still work.</p>
+      <div className="grid gap-4 sm:grid-cols-2">
+        <div>
+          <Label htmlFor="promotion-headline">Headline</Label>
+          <Input
+            id="promotion-headline"
+            name="headline"
+            maxLength={120}
+            defaultValue={values?.headline ?? ""}
+            placeholder="Weekend sale"
+          />
+          <p className="mt-1.5 text-xs text-muted">Optional; the image and CTA still work.</p>
+        </div>
+        <div>
+          <Label htmlFor="promotion-slug">Page URL slug</Label>
+          <Input
+            id="promotion-slug"
+            name="slug"
+            maxLength={80}
+            defaultValue={values?.slug ?? ""}
+            placeholder="hardware-sale"
+          />
+          <p className="mt-1.5 text-xs text-muted">
+            The slide links to /promotions/&lt;slug&gt;. Leave empty to derive it from the headline.
+            Changing it later breaks old links.
+          </p>
+        </div>
       </div>
 
       <div>
@@ -76,12 +85,6 @@ export function PromotionForm({
           defaultValue={values?.ctaLabel ?? "Shop now"}
         />
       </div>
-
-      <PromotionDestinationPicker
-        targets={targets}
-        defaultType={values?.targetType ?? "category"}
-        defaultTargetId={values?.targetId ?? null}
-      />
 
       <div className="grid gap-4 sm:grid-cols-2">
         <div>

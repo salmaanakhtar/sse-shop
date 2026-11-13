@@ -152,15 +152,22 @@ expired sale automatically falls back to the list price.
 _Avoid_: Campaign dates
 
 **Promotion**:
-A merchandising message at the top of the home page: an image, optional headline and subheadline,
-a call to action, and a destination. A group of promotions becomes a carousel.
+A merchandising message at the top of the home page with its own page at `/promotions/[slug]`. The
+slide has an image, optional headline and subheadline, a call to action, and a schedule. A group of
+promotions becomes a carousel.
 _Avoid_: Banner, ad
 
-**Promotion destination**:
-The category, collection, or product a promotion links to, stored as a target type and entity id.
-The storefront resolves the current slug at read time, so renaming a product does not break the
-slide. A slide whose destination is missing or inactive is hidden and flagged in admin.
-_Avoid_: Link, URL, href
+**Promotion page**:
+The page a promotion slide opens. It contains ordered rows of products: category rows, collection
+rows, or hand-picked product rows. The same category or collection cannot be added twice; products
+may repeat across different rows.
+_Avoid_: Landing page, campaign
+
+**Promotion row**:
+One ordered section on a promotion page. It has an editable heading and either a category
+(including its descendants), a collection in its curated order, or a hand-picked ordered product
+selection.
+_Avoid_: Section, block
 
 **Promotion window**:
 The optional start and end of a promotion, edited in Asia/Dubai. Empty bounds mean open-ended; an
@@ -168,12 +175,12 @@ inactive or expired promotion is not shown.
 _Avoid_: Campaign dates
 
 **Call to action**:
-The button label on a promotion, such as “Shop the sale”. It follows the promotion's destination.
+The button label on a promotion, such as “Shop the sale”. It opens the promotion page.
 _Avoid_: CTA as a database term, button text everywhere
 
 **Carousel slide**:
 One promotion in the rotating top-of-home carousel, with an image, optional headline and
-subheadline, a call to action, a destination, and a schedule.
+subheadline, a call to action, a page URL, and a schedule.
 
 ## Wishlist
 

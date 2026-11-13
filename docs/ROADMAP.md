@@ -80,11 +80,12 @@ create, and the tree survives the migration.
   storefront shows the percentage off, original price, sale price, and a countdown. The admin sale
   change writes an audit entry.
 - **Promotions (done):** manually managed top-of-home carousel slides with image, headline, CTA,
-  optional schedule, active flag, ordering, and audit entries. A slide targets a category,
-  collection, or product — never a free-form URL. Categories and collections use a dropdown; a
-  product uses a searchable selector modal. The storefront resolves the current slug at read time
-  and hides a slide whose target is missing or inactive. The carousel auto-advances, pauses on
-  hover/focus, respects reduced motion, and has arrows and dots.
+  optional schedule, active flag, ordering, and audit entries. Each slide has its own page at
+  `/promotions/[slug]` with unlimited ordered rows: a category (including descendants), a
+  collection in curated order, or hand-picked products. Rows have editable headings; the same
+  category or collection cannot be added twice, and a hand-picked row cannot repeat a product.
+  Products may appear in different rows. Rows with no visible products are hidden. The carousel
+  auto-advances, pauses on hover/focus, respects reduced motion, and has arrows and dots.
 - **Categories (done):** a hierarchical tree with subcategories, sibling ordering, active flags, and
   a navbar with child dropdowns. Category pages include descendant products; deletion is blocked
   while children or products remain. Every change writes an audit entry.
@@ -238,8 +239,8 @@ These shape upcoming work. Answers land in `CONTEXT.md`, an ADR, or this file.
   price across lists, with an atomic claim row and lazy checks. Selected items add to the cart, then
   checkout.
 - **Carousel:** manually managed slides with image, headline, CTA, schedule, active flag, and
-  ordering. A slide targets a category, collection, or product by id; categories and collections use
-  a dropdown and products use a selector modal. The storefront resolves the slug at read time. It
+  ordering. Each slide is also a promotion page with ordered category, collection, and hand-picked
+  product rows. Duplicate category/collection rows are blocked; products may repeat across rows. It
   auto-advances, pauses on hover/focus, and has arrows and dots.
 - **Arabic:** interface-only first, per-customer numerals, storefront only.
 - **Dark mode:** Auto, Light, or Dark with system default; cookie for guests and account persistence

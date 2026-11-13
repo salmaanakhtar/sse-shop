@@ -10,7 +10,7 @@ time. Every feature ships with a unit test and a Playwright journey.
 ## Status
 
 Phase 4 is complete. Phase 5 is complete, and Phase 6 is in progress: dark mode is live and Arabic
-is next. Per-variant sales, the home-page promotion carousel, and category, collection, and badge
+is next. Per-variant sales, promotion carousel and pages, and category, collection, and badge
 merchandising are live. A shopper can browse, choose a parent branch and child, save variants to
 named wishlists, receive one console-mailed price-drop alert, add a wishlist selection to the cart,
 check out with a UAE address, and receive an order with a lookup link. They can also create an

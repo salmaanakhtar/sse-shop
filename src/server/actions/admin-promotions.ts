@@ -6,19 +6,27 @@ import { eq } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { parseDubaiDateTimeInput } from "@/lib/dates";
-import { isPromotionTargetType } from "@/lib/promotions";
+import { isPromotionRowKind } from "@/lib/promotions";
 import { requireAdminAction } from "../auth/guard";
 import { db } from "../db/client";
 import { auditLog, promotions } from "../db/schema";
 import { storeProductImage, uploadsRoot } from "../media/storage";
+import { slugify } from "../services/catalog";
 import {
+  addPromotionRow,
+  addPromotionRowProducts,
   createPromotion,
   deletePromotion,
-  getPromotionTarget,
+  deletePromotionRow,
+  getPromotionRow,
   movePromotion,
+  movePromotionRow,
+  removePromotionRowProduct,
   replacePromotionImage,
   updatePromotion,
+  updatePromotionRowTitle,
   type PromotionInput,
+  type PromotionRowInput,
 } from "../services/promotions";
 
 type PromotionFields = Omit<PromotionInput, "imageKey">;
@@ -28,27 +36,24 @@ function backToNew(error?: string): never {
   redirect(`/admin/promotions/new${query}`);
 }
 
-function backToPromotion(id: string, error?: string): never {
+function backToPromotion(id: string, error?: string, anchor = ""): never {
   const query = error ? `?error=${encodeURIComponent(error)}` : "";
-  redirect(`/admin/promotions/${id}${query}`);
+  const hash = anchor ? `#${anchor}` : "";
+  redirect(`/admin/promotions/${id}${query}${hash}`);
 }
 
-async function readFields(formData: FormData): Promise<PromotionFields | string> {
+function readFields(formData: FormData): PromotionFields | string {
   const headline = String(formData.get("headline") ?? "").trim();
   const subheadline = String(formData.get("subheadline") ?? "").trim();
   const ctaLabel = String(formData.get("ctaLabel") ?? "").trim() || "Shop now";
-  const targetType = String(formData.get("targetType") ?? "");
-  const targetId = String(formData.get("targetId") ?? "").trim();
+  const rawSlug = String(formData.get("slug") ?? "").trim();
+  const slug = slugify(rawSlug || headline);
   const imageAlt = String(formData.get("imageAlt") ?? "").trim();
 
   if (headline.length > 120) return "Keep the headline under 120 characters.";
   if (subheadline.length > 240) return "Keep the subheadline under 240 characters.";
   if (ctaLabel.length > 40) return "Keep the button label under 40 characters.";
-  if (!isPromotionTargetType(targetType)) return "Choose where the slide should go.";
-  if (!targetId) return "Choose a category, collection, or product.";
-
-  const target = await getPromotionTarget(targetType, targetId);
-  if (!target) return "That destination no longer exists. Choose another one.";
+  if (!slug) return "Enter a URL slug for the promotion page.";
 
   const startsAt = parseDubaiDateTimeInput(String(formData.get("startsAt") ?? ""));
   if (startsAt === "invalid") return "Enter a valid start time.";
@@ -57,11 +62,10 @@ async function readFields(formData: FormData): Promise<PromotionFields | string>
   if (startsAt && endsAt && startsAt >= endsAt) return "The slide must end after it starts.";
 
   return {
+    slug,
     headline,
     subheadline,
     ctaLabel,
-    targetType,
-    targetId,
     imageAlt,
     active: formData.get("active") === "on",
     startsAt,
@@ -69,34 +73,45 @@ async function readFields(formData: FormData): Promise<PromotionFields | string>
   };
 }
 
-function revalidateTarget(href: string | undefined): void {
-  if (href) revalidatePath(href);
+function revalidatePromotion(slug: string): void {
+  revalidatePath("/");
+  revalidatePath("/admin/promotions");
+  revalidatePath(`/promotions/${slug}`);
 }
 
 function promotionSummary(promotion: {
+  slug: string;
   headline: string;
-  targetType: string;
-  targetId: string | null;
-  target?: { label: string; href: string } | null;
   active: boolean;
   startsAt: Date | null;
   endsAt: Date | null;
 }) {
   return {
+    slug: promotion.slug,
     headline: promotion.headline,
-    targetType: promotion.targetType,
-    targetId: promotion.targetId,
-    targetLabel: promotion.target?.label ?? null,
-    targetHref: promotion.target?.href ?? null,
     active: promotion.active,
     startsAt: promotion.startsAt,
     endsAt: promotion.endsAt,
   };
 }
 
+function rowSummary(row: {
+  kind: string;
+  title: string;
+  categoryId: string | null;
+  collectionId: string | null;
+}) {
+  return {
+    kind: row.kind,
+    title: row.title,
+    categoryId: row.categoryId,
+    collectionId: row.collectionId,
+  };
+}
+
 export async function createPromotionAction(formData: FormData): Promise<void> {
   const session = await requireAdminAction();
-  const fields = await readFields(formData);
+  const fields = readFields(formData);
   if (typeof fields === "string") backToNew(fields);
 
   const file = formData.get("image");
@@ -111,11 +126,19 @@ export async function createPromotionAction(formData: FormData): Promise<void> {
     backToNew(error instanceof Error ? error.message : "Upload failed.");
   }
 
-  const promotion = await createPromotion({
-    ...fields,
-    imageKey: stored.storageKey,
-    imageAlt: fields.imageAlt || fields.headline,
-  });
+  let promotion;
+  try {
+    promotion = await createPromotion({
+      ...fields,
+      imageKey: stored.storageKey,
+      imageAlt: fields.imageAlt || fields.headline,
+    });
+  } catch (error) {
+    await unlink(path.join(uploadsRoot(), stored.storageKey)).catch(() => {
+      // A missing file is already the desired state.
+    });
+    backToNew(error instanceof Error ? error.message : "Could not create the promotion.");
+  }
 
   await db.insert(auditLog).values({
     actorUserId: session.user.id,
@@ -125,10 +148,8 @@ export async function createPromotionAction(formData: FormData): Promise<void> {
     after: promotionSummary(promotion),
   });
 
-  revalidatePath("/");
-  revalidatePath("/admin/promotions");
-  revalidateTarget(promotion.target?.href);
-  redirect("/admin/promotions");
+  revalidatePromotion(promotion.slug);
+  redirect(`/admin/promotions/${promotion.id}#rows`);
 }
 
 export async function updatePromotionAction(formData: FormData): Promise<void> {
@@ -136,13 +157,18 @@ export async function updatePromotionAction(formData: FormData): Promise<void> {
   const id = String(formData.get("id") ?? "").trim();
   if (!id) redirect("/admin/promotions");
 
-  const fields = await readFields(formData);
+  const fields = readFields(formData);
   if (typeof fields === "string") backToPromotion(id, fields);
 
   const [before] = await db.select().from(promotions).where(eq(promotions.id, id)).limit(1);
   if (!before) backToPromotion(id, "That slide could not be found.");
 
-  const updated = await updatePromotion(id, fields);
+  let updated;
+  try {
+    updated = await updatePromotion(id, fields);
+  } catch (error) {
+    backToPromotion(id, error instanceof Error ? error.message : "Could not save the promotion.");
+  }
   if (!updated) backToPromotion(id, "That slide could not be found.");
 
   await db.insert(auditLog).values({
@@ -150,21 +176,13 @@ export async function updatePromotionAction(formData: FormData): Promise<void> {
     action: "promotion.update",
     entity: "promotions",
     entityId: id,
-    before: {
-      headline: before.headline,
-      targetType: before.targetType,
-      targetId: before.targetId,
-      active: before.active,
-      startsAt: before.startsAt,
-      endsAt: before.endsAt,
-    },
+    before: promotionSummary(before),
     after: promotionSummary(updated),
   });
 
-  revalidatePath("/");
-  revalidatePath("/admin/promotions");
+  revalidatePromotion(before.slug);
+  revalidatePromotion(updated.slug);
   revalidatePath(`/admin/promotions/${id}`);
-  revalidateTarget(updated.target?.href);
   backToPromotion(id);
 }
 
@@ -207,10 +225,8 @@ export async function replacePromotionImageAction(formData: FormData): Promise<v
     });
   }
 
-  revalidatePath("/");
-  revalidatePath("/admin/promotions");
+  revalidatePromotion(updated.slug);
   revalidatePath(`/admin/promotions/${id}`);
-  revalidateTarget(updated.target?.href);
   backToPromotion(id);
 }
 
@@ -219,13 +235,11 @@ export async function deletePromotionAction(formData: FormData): Promise<void> {
   const id = String(formData.get("id") ?? "").trim();
   if (!id) redirect("/admin/promotions");
 
-  const [beforeRow] = await db.select().from(promotions).where(eq(promotions.id, id)).limit(1);
-  if (!beforeRow) redirect("/admin/promotions");
+  const [before] = await db.select().from(promotions).where(eq(promotions.id, id)).limit(1);
+  if (!before) redirect("/admin/promotions");
 
   const deleted = await deletePromotion(id);
   if (!deleted) redirect("/admin/promotions");
-
-  const target = await getPromotionTarget(deleted.targetType, deleted.targetId ?? "");
 
   await db.insert(auditLog).values({
     actorUserId: session.user.id,
@@ -233,9 +247,7 @@ export async function deletePromotionAction(formData: FormData): Promise<void> {
     entity: "promotions",
     entityId: id,
     before: {
-      headline: deleted.headline,
-      targetType: deleted.targetType,
-      targetId: deleted.targetId,
+      ...promotionSummary(deleted),
       imageKey: deleted.imageKey,
     },
   });
@@ -244,9 +256,7 @@ export async function deletePromotionAction(formData: FormData): Promise<void> {
     // A missing file is already the desired state.
   });
 
-  revalidatePath("/");
-  revalidatePath("/admin/promotions");
-  revalidateTarget(target?.href);
+  revalidatePromotion(before.slug);
   redirect("/admin/promotions");
 }
 
@@ -260,4 +270,196 @@ export async function movePromotionAction(formData: FormData): Promise<void> {
   revalidatePath("/");
   revalidatePath("/admin/promotions");
   redirect("/admin/promotions");
+}
+
+function readRowInput(formData: FormData): PromotionRowInput | string {
+  const kind = String(formData.get("kind") ?? "");
+  const title = String(formData.get("title") ?? "").trim();
+  if (!isPromotionRowKind(kind)) return "Choose a row type.";
+
+  if (kind === "category") {
+    const categoryId = String(formData.get("sourceId") ?? "").trim();
+    if (!categoryId) return "Choose a category.";
+    return { kind, categoryId, title };
+  }
+
+  if (kind === "collection") {
+    const collectionId = String(formData.get("sourceId") ?? "").trim();
+    if (!collectionId) return "Choose a collection.";
+    return { kind, collectionId, title };
+  }
+
+  const productIds = formData
+    .getAll("productIds")
+    .map((value) => String(value))
+    .filter(Boolean);
+  return { kind, productIds, title };
+}
+
+export async function addPromotionRowAction(formData: FormData): Promise<void> {
+  const session = await requireAdminAction();
+  const promotionId = String(formData.get("promotionId") ?? "").trim();
+  if (!promotionId) redirect("/admin/promotions");
+
+  const input = readRowInput(formData);
+  if (typeof input === "string") backToPromotion(promotionId, input, "rows");
+
+  const result = await addPromotionRow(promotionId, input);
+  if (!result.ok) backToPromotion(promotionId, result.error, "rows");
+
+  await db.insert(auditLog).values({
+    actorUserId: session.user.id,
+    action: "promotion.row.add",
+    entity: "promotions",
+    entityId: promotionId,
+    after: input,
+  });
+
+  revalidatePath(`/admin/promotions/${promotionId}`);
+  revalidatePath("/");
+  backToPromotion(promotionId, undefined, "rows");
+}
+
+export async function updatePromotionRowTitleAction(formData: FormData): Promise<void> {
+  const session = await requireAdminAction();
+  const promotionId = String(formData.get("promotionId") ?? "").trim();
+  const rowId = String(formData.get("rowId") ?? "").trim();
+  if (!promotionId || !rowId) redirect("/admin/promotions");
+
+  const row = await getPromotionRow(rowId);
+  if (!row || row.promotionId !== promotionId) {
+    backToPromotion(promotionId, "That row could not be found.", "rows");
+  }
+
+  const result = await updatePromotionRowTitle(rowId, String(formData.get("title") ?? ""));
+  if (!result.ok) backToPromotion(promotionId, result.error, "rows");
+
+  await db.insert(auditLog).values({
+    actorUserId: session.user.id,
+    action: "promotion.row.title",
+    entity: "promotions",
+    entityId: promotionId,
+    before: rowSummary(row),
+    after: { ...rowSummary(row), title: result.data.title },
+  });
+
+  revalidatePath(`/admin/promotions/${promotionId}`);
+  revalidatePath("/");
+  backToPromotion(promotionId, undefined, "rows");
+}
+
+export async function movePromotionRowAction(formData: FormData): Promise<void> {
+  const session = await requireAdminAction();
+  const promotionId = String(formData.get("promotionId") ?? "").trim();
+  const rowId = String(formData.get("rowId") ?? "").trim();
+  const direction = formData.get("direction") === "up" ? "up" : "down";
+  if (!promotionId || !rowId) redirect("/admin/promotions");
+
+  const row = await getPromotionRow(rowId);
+  if (!row || row.promotionId !== promotionId) {
+    backToPromotion(promotionId, "That row could not be found.", "rows");
+  }
+
+  const moved = await movePromotionRow(rowId, direction);
+  if (!moved) backToPromotion(promotionId, "That row cannot move any further.", "rows");
+
+  await db.insert(auditLog).values({
+    actorUserId: session.user.id,
+    action: "promotion.row.move",
+    entity: "promotions",
+    entityId: promotionId,
+    before: rowSummary(row),
+    after: { direction },
+  });
+
+  revalidatePath(`/admin/promotions/${promotionId}`);
+  revalidatePath("/");
+  backToPromotion(promotionId, undefined, "rows");
+}
+
+export async function deletePromotionRowAction(formData: FormData): Promise<void> {
+  const session = await requireAdminAction();
+  const promotionId = String(formData.get("promotionId") ?? "").trim();
+  const rowId = String(formData.get("rowId") ?? "").trim();
+  if (!promotionId || !rowId) redirect("/admin/promotions");
+
+  const row = await getPromotionRow(rowId);
+  if (!row || row.promotionId !== promotionId) {
+    backToPromotion(promotionId, "That row could not be found.", "rows");
+  }
+
+  const result = await deletePromotionRow(rowId);
+  if (!result.ok) backToPromotion(promotionId, result.error, "rows");
+
+  await db.insert(auditLog).values({
+    actorUserId: session.user.id,
+    action: "promotion.row.delete",
+    entity: "promotions",
+    entityId: promotionId,
+    before: rowSummary(row),
+  });
+
+  revalidatePath(`/admin/promotions/${promotionId}`);
+  revalidatePath("/");
+  backToPromotion(promotionId, undefined, "rows");
+}
+
+export async function addPromotionRowProductsAction(formData: FormData): Promise<void> {
+  const session = await requireAdminAction();
+  const promotionId = String(formData.get("promotionId") ?? "").trim();
+  const rowId = String(formData.get("rowId") ?? "").trim();
+  if (!promotionId || !rowId) redirect("/admin/promotions");
+
+  const row = await getPromotionRow(rowId);
+  if (!row || row.promotionId !== promotionId) {
+    backToPromotion(promotionId, "That row could not be found.", "rows");
+  }
+
+  const productIds = formData
+    .getAll("productIds")
+    .map((value) => String(value))
+    .filter(Boolean);
+
+  const result = await addPromotionRowProducts(rowId, productIds);
+  if (!result.ok) backToPromotion(promotionId, result.error, "rows");
+
+  await db.insert(auditLog).values({
+    actorUserId: session.user.id,
+    action: "promotion.row.products.add",
+    entity: "promotions",
+    entityId: promotionId,
+    after: { rowId, productIds, added: result.data.added },
+  });
+
+  revalidatePath(`/admin/promotions/${promotionId}`);
+  revalidatePath("/");
+  backToPromotion(promotionId, undefined, "rows");
+}
+
+export async function removePromotionRowProductAction(formData: FormData): Promise<void> {
+  const session = await requireAdminAction();
+  const promotionId = String(formData.get("promotionId") ?? "").trim();
+  const rowId = String(formData.get("rowId") ?? "").trim();
+  const productId = String(formData.get("productId") ?? "").trim();
+  if (!promotionId || !rowId || !productId) redirect("/admin/promotions");
+
+  const row = await getPromotionRow(rowId);
+  if (!row || row.promotionId !== promotionId) {
+    backToPromotion(promotionId, "That row could not be found.", "rows");
+  }
+
+  const result = await removePromotionRowProduct(rowId, productId);
+  if (!result.ok) backToPromotion(promotionId, result.error, "rows");
+
+  await db.insert(auditLog).values({
+    actorUserId: session.user.id,
+    action: "promotion.row.products.remove",
+    entity: "promotions",
+    entityId: promotionId,
+    after: { rowId, productId },
+  });
+
+  revalidatePath(`/admin/promotions/${promotionId}`);
+  revalidatePath("/");
+  backToPromotion(promotionId, undefined, "rows");
 }

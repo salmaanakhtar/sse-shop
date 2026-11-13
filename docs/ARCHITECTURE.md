@@ -47,7 +47,7 @@ rules.
 
 ## Data model
 
-Twenty-nine tables, deliberately narrow. Core tables carry `created_at`; most carry `updated_at`;
+Thirty-one tables, deliberately narrow. Core tables carry `created_at`; most carry `updated_at`;
 join tables stay minimal.
 | Table | Holds | Notes |
 | --- | --- | --- |
@@ -76,7 +76,9 @@ join tables stay minimal.
 | `cart_items` | Variants in a cart | Unique on `(cart_id, variant_id)` |
 | `orders` | Placed order and its totals | `number` unique and sequential; `user_id` links the owner; `billing_address` snapshot |
 | `order_items` | Snapshot of what was bought | Prices frozen at placement |
-| `promotions` | Home-page carousel slides | image, headline, CTA, target type/id, schedule, order |
+| `promotions` | Carousel slides and their pages | slug, image, headline, CTA, schedule, order |
+| `promotion_rows` | Ordered rows on a promotion page | category, collection, or hand-picked products |
+| `promotion_row_products` | Hand-picked products in a row | composite key; per-row position |
 | `audit_log` | Admin and account changes | Actor, action, before/after JSON, IP |
 | `settings` | Store configuration | Key → JSONB, changed in admin |
 | `counters` | Monotonic sequences | Order numbers come from here, inside the placement transaction |
@@ -110,6 +112,9 @@ join tables stay minimal.
   concurrent reads cannot send twice. Removing the variant from every list releases the claim.
 - The storefront theme is scoped to `.storefront-shell`; the admin inherits the light palette even
   when the shopper chose dark.
+- A promotion slug is unique. A category or collection can appear at most once on a promotion page;
+  a hand-picked row cannot contain the same product twice. Products may repeat across different
+  rows. Category rows include descendants, and rows with no visible products are hidden.
 - Stored order totals must be reproducible from their lines. If they disagree, the bug is in
   placement, not in the display.
 - A cart is consumed when its order is placed; it never becomes the same cart again.
@@ -227,27 +232,30 @@ All three assignments are many-to-many (`product_categories`, `collection_produc
 `product_badges`), so a product can sit in several categories, several collections, and carry
 several badges. Every create, update, delete, reorder, and assignment writes an `audit_log` entry.
 
-## Home page promotions
+## Promotion pages
 
-`promotions` holds the slides above the catalog on the home page:
+`promotions` holds the carousel slides above the catalog and the page each slide opens:
 
-- image (same upload pipeline as products), headline, subheadline, call-to-action label, and a
-  destination. The destination is `target_type` (`category`, `collection`, or `product`) plus
-  `target_id`; there is no free-form URL.
-- the admin chooses a category or collection from a dropdown, or opens a searchable product selector
-  modal. The server validates that the target exists and matches the declared type.
-- the storefront resolves the target's current slug at read time, so renaming a product, category,
-  or collection does not break an existing slide. A target that was deleted, deactivated, or left
-  inactive is skipped; the admin list flags it as missing or inactive.
-- active flag, position, and an optional Asia/Dubai start/end window. Only active slides inside
-  their window and with an active destination are selected; expired and scheduled slides stay in
-  the admin list with a status.
-- the admin list supports create, edit, reorder, image replacement, and delete. Every mutation
-  writes an `audit_log` entry.
-- the storefront carousel renders the live slides in position order. It auto-advances every six
-  seconds when there is more than one slide, pauses on hover/focus, respects reduced motion, and
-  exposes previous/next and dot controls. A single slide renders without controls.
-- because destinations are entity ids, a slide cannot become an open redirect or a `javascript:`
+- each promotion has a unique slug, image (same upload pipeline as products), headline,
+  subheadline, call-to-action label, active flag, position, and an optional Asia/Dubai window. The
+  slide links to `/promotions/[slug]`.
+- the carousel renders live slides in position order. It auto-advances every six seconds when there
+  is more than one slide, pauses on hover/focus, respects reduced motion, and exposes previous/next
+  and dot controls. A single slide renders without controls.
+- the promotion page uses the same image and copy as its hero, then renders its rows in order.
+- a row is one of three kinds:
+  - **category**: products in the category and its descendants, in catalog order;
+  - **collection**: products in the collection's curated order;
+  - **products**: a hand-picked, ordered product selection.
+- each row has an editable heading. Collection and category rows default their heading to the
+  source name; a hand-picked row requires one.
+- the same category or collection can appear only once on a page, and a hand-picked row cannot
+  contain the same product twice. Products may still appear in different rows. Empty rows are
+  hidden on the storefront; the admin shows every row.
+- the admin editor creates, renames, reorders, and deletes rows, plus adds and removes products in a
+  hand-picked row. Every mutation writes an `audit_log` entry.
+- scheduled, expired, and inactive promotions return 404. Because the page is an internal route with
+  a slug rather than a user-supplied URL, a slide cannot become an open redirect or a `javascript:`
   link.
 
 ## Wishlists and price alerts
@@ -401,8 +409,9 @@ The product editor defines levels and values, then builds the variant tree. The 
 table: groups expand inline, the selected branch opens in a side inspector, and a single “Add
 branches” form creates only the ticked values. Nothing is generated from a Cartesian product.
 
-The admin also manages the home-page promotion carousel: image, headline, CTA, destination picker,
-schedule, order, and active state, with an audit entry for every change.
+The admin also manages promotion pages: image, headline, CTA, slug, schedule, order, and active
+state, plus ordered category, collection, and hand-picked product rows, with an audit entry for
+every change.
 
 A no-code boundary is intentional: admin edits `settings` and content rows, never code. Anything
 that would require a deploy belongs in this repo, not in the admin UI.

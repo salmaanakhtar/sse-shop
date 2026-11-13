@@ -33,7 +33,7 @@ export default async function AdminPromotionsPage() {
           </p>
         </div>
         <Link href="/admin/promotions/new" className={buttonClass("primary", "sm")}>
-          New slide
+          New promotion
         </Link>
       </div>
 
@@ -42,15 +42,15 @@ export default async function AdminPromotionsPage() {
           <div className="px-5 py-12 text-center">
             <p className="text-sm text-muted">No promotions yet.</p>
             <Link href="/admin/promotions/new" className={buttonClass("primary", "sm", "mt-4")}>
-              Add the first slide
+              Add the first promotion
             </Link>
           </div>
         ) : (
           <table className="w-full text-sm">
             <thead className="border-b border-line text-left text-xs tracking-wide text-muted uppercase">
               <tr>
-                <th className="px-5 py-3 font-semibold">Slide</th>
-                <th className="hidden px-5 py-3 font-semibold sm:table-cell">Destination</th>
+                <th className="px-5 py-3 font-semibold">Promotion</th>
+                <th className="hidden px-5 py-3 font-semibold sm:table-cell">Page</th>
                 <th className="hidden px-5 py-3 font-semibold lg:table-cell">Window</th>
                 <th className="px-5 py-3 font-semibold">Status</th>
                 <th className="px-5 py-3 font-semibold">Order</th>
@@ -74,7 +74,7 @@ export default async function AdminPromotionsPage() {
                           href={`/admin/promotions/${promotion.id}`}
                           className="font-medium hover:text-brand"
                         >
-                          {promotion.headline || "Untitled slide"}
+                          {promotion.headline || "Untitled promotion"}
                         </Link>
                         {promotion.subheadline ? (
                           <p className="truncate text-xs text-muted">{promotion.subheadline}</p>
@@ -83,19 +83,14 @@ export default async function AdminPromotionsPage() {
                     </div>
                   </td>
                   <td className="hidden px-5 py-3 text-xs text-muted sm:table-cell">
-                    {promotion.target ? (
-                      <>
-                        <span className="block text-ink">{promotion.target.label}</span>
-                        <span className="block">
-                          {promotion.target.type} · {promotion.target.href}
-                        </span>
-                        {promotion.target.active ? null : (
-                          <span className="block text-amber-700">inactive target</span>
-                        )}
-                      </>
-                    ) : (
-                      <span className="text-red-600">Missing destination</span>
-                    )}
+                    <Link
+                      href={promotion.href}
+                      target="_blank"
+                      className="block text-ink underline-offset-4 hover:underline"
+                    >
+                      /promotions/{promotion.slug}
+                    </Link>
+                    <span className="block capitalize">{promotion.status}</span>
                   </td>
                   <td className="hidden px-5 py-3 text-xs text-muted lg:table-cell">
                     {promotion.startsAt || promotion.endsAt

@@ -1,26 +1,34 @@
+import { eq } from "drizzle-orm";
 import { describe, expect, it } from "vitest";
-import type { PromotionTargetType } from "@/lib/promotions";
 import { db } from "@/server/db/client";
-import { categories, collections, products, promotions, variants } from "@/server/db/schema";
+import { products, promotions, variants } from "@/server/db/schema";
 import {
+  addPromotionRow,
+  createPromotion,
   deletePromotion,
+  deletePromotionRow,
+  getActivePromotionPage,
   getPromotion,
-  getPromotionTarget,
   listActivePromotions,
   listAdminPromotions,
+  listPromotionRows,
   movePromotion,
+  movePromotionRow,
+  updatePromotionRowTitle,
 } from "@/server/services/promotions";
+import { createCategory, setProductCategories } from "@/server/services/categories";
+import { addCollectionProduct, createCollection } from "@/server/services/collections";
 
 const suffix = () => `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 
-async function createProduct(title: string, status: "active" | "draft" = "active") {
+async function createProduct(title: string) {
   const [product] = await db
     .insert(products)
     .values({
       slug: `promo-product-${suffix()}`,
       title,
-      status,
-      publishedAt: status === "active" ? new Date() : null,
+      status: "active",
+      publishedAt: new Date(),
     })
     .returning();
   if (!product) throw new Error("could not create the test product");
@@ -30,187 +38,181 @@ async function createProduct(title: string, status: "active" | "draft" = "active
     sku: `PROMO-${suffix()}`,
     title: "Default",
     priceMinor: 10_000,
-    stockQty: 3,
+    stockQty: 5,
   });
 
   return product;
 }
 
-async function createCategoryRow(active: boolean) {
-  const [row] = await db
-    .insert(categories)
-    .values({
-      name: `Category ${suffix()}`,
-      slug: `promo-category-${suffix()}`,
-      active,
-    })
-    .returning();
-  if (!row) throw new Error("could not create the test category");
-  return row;
-}
-
-async function createCollectionRow(active: boolean) {
-  const [row] = await db
-    .insert(collections)
-    .values({
-      name: `Collection ${suffix()}`,
-      slug: `promo-collection-${suffix()}`,
-      active,
-    })
-    .returning();
-  if (!row) throw new Error("could not create the test collection");
-  return row;
-}
-
-async function createPromotionRow(input: {
-  headline: string;
-  position: number;
-  targetType: PromotionTargetType;
-  targetId: string;
+async function createPromotionPage(input?: {
   active?: boolean;
   startsAt?: Date | null;
   endsAt?: Date | null;
 }) {
-  const [row] = await db
-    .insert(promotions)
-    .values({
-      headline: input.headline,
-      subheadline: "",
-      ctaLabel: "Shop now",
-      targetType: input.targetType,
-      targetId: input.targetId,
-      imageKey: `2026/11/${suffix()}.webp`,
-      imageAlt: input.headline,
-      active: input.active ?? true,
-      position: input.position,
-      startsAt: input.startsAt ?? null,
-      endsAt: input.endsAt ?? null,
-    })
-    .returning();
-  if (!row) throw new Error("could not create the test promotion");
-  return row;
+  const slug = `promo-${suffix()}`;
+  const promotion = await createPromotion({
+    slug,
+    headline: "Hardware Sale",
+    subheadline: "Up to 30% off",
+    ctaLabel: "Shop the sale",
+    imageKey: `2026/11/${suffix()}.webp`,
+    imageAlt: "Hardware Sale",
+    active: input?.active ?? true,
+    startsAt: input?.startsAt ?? null,
+    endsAt: input?.endsAt ?? null,
+  });
+  return { promotion, slug };
 }
 
-describe("promotions", () => {
-  it("resolves entity targets and lists only live slides with an active destination", async () => {
-    const now = new Date("2026-06-01T12:00:00.000Z");
+async function addRow(
+  promotionId: string,
+  input: Parameters<typeof addPromotionRow>[1],
+) {
+  const result = await addPromotionRow(promotionId, input);
+  if (!result.ok) throw new Error(result.error);
+  return result.data.id;
+}
 
-    const activeProduct = await createProduct("Active product");
-    const draftProduct = await createProduct("Draft product", "draft");
-    const activeCategory = await createCategoryRow(true);
-    const inactiveCategory = await createCategoryRow(false);
-    const activeCollection = await createCollectionRow(true);
-    const inactiveCollection = await createCollectionRow(false);
+describe("promotion pages", () => {
+  it("renders ordered category, collection, and product rows without cross-row dedupe", async () => {
+    const { promotion, slug } = await createPromotionPage();
+    const first = await createProduct("First product");
+    const second = await createProduct("Second product");
 
-    const second = await createPromotionRow({
-      headline: "Second",
-      position: 1,
-      targetType: "product",
-      targetId: activeProduct.id,
+    const categoryResult = await createCategory({
+      name: "Hard Drives",
+      slug: `hard-drives-${suffix()}`,
+      description: "",
+      parentId: null,
+      active: true,
     });
-    const first = await createPromotionRow({
-      headline: "First",
-      position: 0,
-      targetType: "collection",
-      targetId: activeCollection.id,
+    expect(categoryResult.ok).toBe(true);
+    if (!categoryResult.ok) return;
+    await setProductCategories(first.id, [categoryResult.data.id]);
+
+    const collectionResult = await createCollection({
+      name: "Featured Hardware",
+      slug: `featured-hardware-${suffix()}`,
+      description: "",
+      active: true,
     });
-    await createPromotionRow({
-      headline: "Future",
-      position: 2,
-      targetType: "category",
-      targetId: activeCategory.id,
-      startsAt: new Date("2026-06-02T00:00:00.000Z"),
+    expect(collectionResult.ok).toBe(true);
+    if (!collectionResult.ok) return;
+    await addCollectionProduct(collectionResult.data.id, first.id);
+    await addCollectionProduct(collectionResult.data.id, second.id);
+
+    const categoryRow = await addRow(promotion.id, {
+      kind: "category",
+      categoryId: categoryResult.data.id,
+      title: "Hard Drives",
     });
-    await createPromotionRow({
-      headline: "Expired",
-      position: 3,
-      targetType: "collection",
-      targetId: activeCollection.id,
-      endsAt: new Date("2026-06-01T11:00:00.000Z"),
+    void categoryRow;
+    const collectionRow = await addRow(promotion.id, {
+      kind: "collection",
+      collectionId: collectionResult.data.id,
+      title: "Featured Hardware",
     });
-    await createPromotionRow({
-      headline: "Inactive",
-      position: 4,
-      targetType: "product",
-      targetId: activeProduct.id,
-      active: false,
-    });
-    await createPromotionRow({
-      headline: "Draft target",
-      position: 5,
-      targetType: "product",
-      targetId: draftProduct.id,
-    });
-    await createPromotionRow({
-      headline: "Inactive category",
-      position: 6,
-      targetType: "category",
-      targetId: inactiveCategory.id,
-    });
-    await createPromotionRow({
-      headline: "Inactive collection",
-      position: 7,
-      targetType: "collection",
-      targetId: inactiveCollection.id,
-    });
-    const missing = await createPromotionRow({
-      headline: "Missing",
-      position: 8,
-      targetType: "product",
-      targetId: "01a1d45e-0000-7000-8000-000000000000",
+    const productRow = await addRow(promotion.id, {
+      kind: "products",
+      productIds: [second.id, first.id, second.id],
+      title: "Editor's picks",
     });
 
-    const live = await listActivePromotions(now);
-    expect(live.map((slide) => slide.headline)).toEqual(["First", "Second"]);
-    expect(live[0]?.href).toBe(`/collections/${activeCollection.slug}`);
-    expect(live[1]?.href).toBe(`/products/${activeProduct.slug}`);
-
-    const admin = await listAdminPromotions();
-    const byId = new Map(admin.map((row) => [row.id, row]));
-    expect(byId.get(first.id)?.target?.label).toBe(activeCollection.name);
-    expect(byId.get(second.id)?.status).toBe("live");
-    expect(byId.get(missing.id)?.target?.missing).toBe(true);
-
-    expect(await getPromotionTarget("product", activeProduct.id)).toMatchObject({
-      label: "Active product",
-      href: `/products/${activeProduct.slug}`,
+    const duplicate = await addPromotionRow(promotion.id, {
+      kind: "category",
+      categoryId: categoryResult.data.id,
+      title: "Another",
     });
-    expect(await getPromotionTarget("category", activeProduct.id)).toBeNull();
-    expect(await getPromotionTarget("unknown", activeProduct.id)).toBeNull();
+    expect(duplicate.ok).toBe(false);
 
-    const fetched = await getPromotion(second.id);
-    expect(fetched?.target?.href).toBe(`/products/${activeProduct.slug}`);
+    const page = await getActivePromotionPage(slug);
+    expect(page?.rows.map((row) => row.title)).toEqual([
+      "Hard Drives",
+      "Featured Hardware",
+      "Editor's picks",
+    ]);
+    expect(page?.rows[0]?.products.map((product) => product.id)).toEqual([first.id]);
+    expect(page?.rows[1]?.products.map((product) => product.id)).toEqual([
+      first.id,
+      second.id,
+    ]);
+    expect(page?.rows[2]?.products.map((product) => product.id)).toEqual([
+      second.id,
+      first.id,
+    ]);
 
-    expect(await movePromotion(second.id, "up")).toBe(true);
-    const reordered = await listActivePromotions(now);
-    expect(reordered.map((slide) => slide.headline)).toEqual(["Second", "First"]);
+    const live = await listActivePromotions();
+    expect(live.find((slide) => slide.id === promotion.id)?.href).toBe(
+      `/promotions/${promotion.slug}`,
+    );
 
-    const deleted = await deletePromotion(first.id);
-    expect(deleted?.id).toBe(first.id);
-    expect((await listAdminPromotions()).some((row) => row.id === first.id)).toBe(false);
+    const admin = (await listAdminPromotions()).find((row) => row.id === promotion.id);
+    expect(admin?.status).toBe("live");
+    expect(admin?.href).toBe(`/promotions/${promotion.slug}`);
+    expect((await getPromotion(promotion.id))?.slug).toBe(promotion.slug);
+
+    expect(await movePromotionRow(productRow, "up")).toBe(true);
+    expect(await updatePromotionRowTitle(productRow, "Handpicked")).toMatchObject({
+      ok: true,
+      data: { title: "Handpicked" },
+    });
+
+    const rows = await listPromotionRows(promotion.id);
+    expect(rows.map((row) => row.title)).toEqual([
+      "Hard Drives",
+      "Handpicked",
+      "Featured Hardware",
+    ]);
+    expect(rows.find((row) => row.id === productRow)?.products).toHaveLength(2);
+
+    expect((await deletePromotionRow(collectionRow)).ok).toBe(true);
+    expect((await getActivePromotionPage(slug))?.rows.map((row) => row.title)).toEqual([
+      "Hard Drives",
+      "Handpicked",
+    ]);
+
+    const deleted = await deletePromotion(promotion.id);
+    expect(deleted?.id).toBe(promotion.id);
+    expect(await getActivePromotionPage(slug)).toBeNull();
+    void categoryRow;
   });
 
-  it("keeps a legacy row without a destination inactive", async () => {
+  it("hides inactive, scheduled, and expired promotion pages", async () => {
+    const inactive = await createPromotionPage({ active: false });
+    const scheduled = await createPromotionPage({
+      startsAt: new Date("2030-01-01T00:00:00.000Z"),
+    });
+    const expired = await createPromotionPage({
+      endsAt: new Date("2020-01-01T00:00:00.000Z"),
+    });
+
+    expect(await getActivePromotionPage(inactive.slug)).toBeNull();
+    expect(await getActivePromotionPage(scheduled.slug)).toBeNull();
+    expect(await getActivePromotionPage(expired.slug)).toBeNull();
+
+    const live = await listActivePromotions(new Date("2026-06-01T12:00:00.000Z"));
+    expect(live.some((slide) => slide.id === inactive.promotion.id)).toBe(false);
+    expect(live.some((slide) => slide.id === scheduled.promotion.id)).toBe(false);
+    expect(live.some((slide) => slide.id === expired.promotion.id)).toBe(false);
+  });
+
+  it("moves a promotion in the carousel and deletes it", async () => {
     await db.delete(promotions);
+    const first = await createPromotionPage();
+    const second = await createPromotionPage();
 
-    const [row] = await db
-      .insert(promotions)
-      .values({
-        headline: "Legacy",
-        ctaLabel: "Shop now",
-        targetType: "product",
-        targetId: null,
-        imageKey: `2026/11/${suffix()}.webp`,
-        active: true,
-        position: 0,
-      })
-      .returning();
+    expect(await movePromotion(first.promotion.id, "up")).toBe(false);
+    expect(await movePromotion(second.promotion.id, "up")).toBe(true);
 
-    expect(row).toBeDefined();
-    expect(await listActivePromotions()).toEqual([]);
+    const ordered = (await listAdminPromotions()).map((row) => row.id);
+    expect(ordered.slice(0, 2)).toEqual([second.promotion.id, first.promotion.id]);
 
-    const admin = await listAdminPromotions();
-    expect(admin[0]?.target).toBeNull();
-    expect(admin[0]?.status).toBe("live");
+    const deleted = await deletePromotion(first.promotion.id);
+    expect(deleted?.id).toBe(first.promotion.id);
+    const [remaining] = await db
+      .select()
+      .from(promotions)
+      .where(eq(promotions.id, second.promotion.id));
+    expect(remaining?.id).toBe(second.promotion.id);
   });
 });

@@ -4,22 +4,15 @@ export type PromotionWindow = {
   endsAt: Date | string | null;
 };
 
-export const PROMOTION_TARGET_TYPES = ["category", "collection", "product"] as const;
-export type PromotionTargetType = (typeof PROMOTION_TARGET_TYPES)[number];
+export const PROMOTION_ROW_KINDS = ["category", "collection", "products"] as const;
+export type PromotionRowKind = (typeof PROMOTION_ROW_KINDS)[number];
 
-export function isPromotionTargetType(value: string): value is PromotionTargetType {
-  return (PROMOTION_TARGET_TYPES as readonly string[]).includes(value);
+export function isPromotionRowKind(value: string): value is PromotionRowKind {
+  return (PROMOTION_ROW_KINDS as readonly string[]).includes(value);
 }
 
-export function promotionTargetPath(type: PromotionTargetType, slug: string): string {
-  switch (type) {
-    case "category":
-      return `/category/${slug}`;
-    case "collection":
-      return `/collections/${slug}`;
-    case "product":
-      return `/products/${slug}`;
-  }
+export function promotionPagePath(slug: string): string {
+  return `/promotions/${slug}`;
 }
 
 function instant(value: Date | string | null): number | null {

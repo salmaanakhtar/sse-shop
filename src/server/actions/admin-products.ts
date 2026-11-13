@@ -6,6 +6,7 @@ import { and, asc, eq, inArray } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { parseMoney } from "@/lib/money";
+import { collectSubtreeVariantIds, flattenVariantTree } from "@/lib/variants";
 import { requireAdminAction } from "../auth/guard";
 import { db } from "../db/client";
 import {
@@ -13,12 +14,20 @@ import {
   productOptionValues,
   productOptions,
   products,
-  variantOptionValues,
+  variantNodes,
   variants,
 } from "../db/schema";
 import { storeProductImage, uploadsRoot } from "../media/storage";
 import { slugify } from "../services/catalog";
-import { generateMissingVariants } from "../services/variants";
+import {
+  copyVariantChildren,
+  createDefaultVariant,
+  createLeafVariant,
+  createVariantBranches,
+  deleteVariantNode,
+  getVariantTree,
+  updateVariantNode,
+} from "../services/variant-tree";
 
 function backToProduct(productId: string, error?: string, anchor?: string): never {
   const query = error ? `?error=${encodeURIComponent(error)}` : "";
@@ -30,6 +39,19 @@ function requireText(value: FormDataEntryValue | null, label: string): string {
   const text = String(value ?? "").trim();
   if (text.length === 0) throw new Error(`${label} is required.`);
   return text;
+}
+
+function readOptionalMoney(formData: FormData, name: string): number | null | "invalid" {
+  const raw = String(formData.get(name) ?? "").trim();
+  if (raw === "") return null;
+  return parseMoney(raw) ?? "invalid";
+}
+
+function readOptionalStock(formData: FormData, name: string): number | null | "invalid" {
+  const raw = String(formData.get(name) ?? "").trim();
+  if (raw === "") return null;
+  const value = Number(raw);
+  return Number.isInteger(value) && value >= 0 ? value : "invalid";
 }
 
 export async function createProductAction(formData: FormData): Promise<void> {
@@ -70,7 +92,7 @@ export async function updateProductAction(formData: FormData): Promise<void> {
 
   const id = requireText(formData.get("id"), "Product id");
   const title = String(formData.get("title") ?? "").trim();
-  if (title.length < 2) backToProduct(id, "Give the product a name");
+  if (title.length < 2) backToProduct(id, "Give the product a name", "details");
 
   const slugInput = String(formData.get("slug") ?? "").trim();
   const slug = slugify(slugInput) || slugify(title);
@@ -86,7 +108,7 @@ export async function updateProductAction(formData: FormData): Promise<void> {
     .where(eq(products.slug, slug))
     .limit(1);
 
-  if (clash && clash.id !== id) backToProduct(id, "That URL slug is already taken");
+  if (clash && clash.id !== id) backToProduct(id, "That URL slug is already taken", "details");
 
   await db
     .update(products)
@@ -113,7 +135,7 @@ export async function updateProductAction(formData: FormData): Promise<void> {
   revalidatePath(`/admin/products/${id}`);
   revalidatePath("/");
   revalidatePath(`/products/${slug}`);
-  backToProduct(id);
+  backToProduct(id, undefined, "details");
 }
 
 export async function addOptionAction(formData: FormData): Promise<void> {
@@ -121,16 +143,17 @@ export async function addOptionAction(formData: FormData): Promise<void> {
 
   const productId = requireText(formData.get("productId"), "Product id");
   const name = String(formData.get("name") ?? "").trim();
-  if (name.length === 0) backToProduct(productId, "Name the option", "options");
+  if (name.length === 0) backToProduct(productId, "Name the level", "options");
+
+  const tree = await getVariantTree(productId);
+  if (tree.length > 0) {
+    backToProduct(productId, "Clear the variant tree before adding a level", "options");
+  }
 
   const existing = await db
     .select({ id: productOptions.id, position: productOptions.position })
     .from(productOptions)
     .where(eq(productOptions.productId, productId));
-
-  if (existing.length >= 3) {
-    backToProduct(productId, "Three options is the practical limit", "options");
-  }
 
   const nextPosition = existing.reduce((max, option) => Math.max(max, option.position), -1) + 1;
 
@@ -149,6 +172,11 @@ export async function moveOptionAction(formData: FormData): Promise<void> {
   const productId = requireText(formData.get("productId"), "Product id");
   const optionId = requireText(formData.get("optionId"), "Option id");
   const direction = formData.get("direction") === "up" ? "up" : "down";
+
+  const tree = await getVariantTree(productId);
+  if (tree.length > 0) {
+    backToProduct(productId, "Clear the variant tree before reordering levels", "options");
+  }
 
   await db.transaction(async (tx) => {
     const options = await tx
@@ -197,7 +225,7 @@ export async function addOptionValueAction(formData: FormData): Promise<void> {
     .where(and(eq(productOptions.id, optionId), eq(productOptions.productId, productId)))
     .limit(1);
 
-  if (!option) backToProduct(productId, "That option is not on this product", "options");
+  if (!option) backToProduct(productId, "That level is not on this product", "options");
 
   const existing = await db
     .select({ id: productOptionValues.id, position: productOptionValues.position })
@@ -215,28 +243,34 @@ export async function addOptionValueAction(formData: FormData): Promise<void> {
   backToProduct(productId, undefined, "options");
 }
 
+async function deleteVariantSubtrees(
+  productId: string,
+  matches: (node: ReturnType<typeof flattenVariantTree>[number]) => boolean,
+): Promise<void> {
+  const tree = await getVariantTree(productId);
+  const nodes = flattenVariantTree(tree);
+  const variantIds = [
+    ...new Set(
+      nodes.filter(matches).flatMap((node) => collectSubtreeVariantIds(node)),
+    ),
+  ];
+
+  if (variantIds.length > 0) {
+    await db.delete(variants).where(inArray(variants.id, variantIds));
+  }
+}
+
 export async function deleteOptionAction(formData: FormData): Promise<void> {
   await requireAdminAction();
 
   const productId = requireText(formData.get("productId"), "Product id");
   const optionId = requireText(formData.get("optionId"), "Option id");
 
-  const linked = await db
-    .select({ variantId: variantOptionValues.variantId })
-    .from(variantOptionValues)
-    .innerJoin(variants, eq(variantOptionValues.variantId, variants.id))
-    .where(and(eq(variantOptionValues.optionId, optionId), eq(variants.productId, productId)));
+  await deleteVariantSubtrees(productId, (node) => node.optionId === optionId);
 
-  const variantIds = [...new Set(linked.map((row) => row.variantId))];
-
-  await db.transaction(async (tx) => {
-    if (variantIds.length > 0) {
-      await tx.delete(variants).where(inArray(variants.id, variantIds));
-    }
-    await tx
-      .delete(productOptions)
-      .where(and(eq(productOptions.id, optionId), eq(productOptions.productId, productId)));
-  });
+  await db
+    .delete(productOptions)
+    .where(and(eq(productOptions.id, optionId), eq(productOptions.productId, productId)));
 
   revalidatePath("/");
   backToProduct(productId, undefined, "options");
@@ -248,57 +282,162 @@ export async function deleteOptionValueAction(formData: FormData): Promise<void>
   const productId = requireText(formData.get("productId"), "Product id");
   const valueId = requireText(formData.get("valueId"), "Value id");
 
-  const linked = await db
-    .select({ variantId: variantOptionValues.variantId })
-    .from(variantOptionValues)
-    .where(eq(variantOptionValues.optionValueId, valueId));
+  await deleteVariantSubtrees(productId, (node) => node.optionValueId === valueId);
 
-  const variantIds = [...new Set(linked.map((row) => row.variantId))];
-
-  await db.transaction(async (tx) => {
-    if (variantIds.length > 0) {
-      await tx.delete(variants).where(inArray(variants.id, variantIds));
-    }
-    await tx.delete(productOptionValues).where(eq(productOptionValues.id, valueId));
-  });
+  await db.delete(productOptionValues).where(eq(productOptionValues.id, valueId));
 
   revalidatePath("/");
   backToProduct(productId, undefined, "options");
 }
 
-export async function generateVariantsAction(formData: FormData): Promise<void> {
+export async function addVariantBranchesAction(formData: FormData): Promise<void> {
   await requireAdminAction();
 
   const productId = requireText(formData.get("productId"), "Product id");
-  const price = parseMoney(String(formData.get("price") ?? ""));
-  const stockRaw = Number(formData.get("stock") ?? 0);
+  const parentRaw = String(formData.get("parentId") ?? "").trim();
+  const parentId = parentRaw || null;
+  const optionValueIds = formData
+    .getAll("optionValueIds")
+    .map((value) => String(value))
+    .filter(Boolean);
 
-  if (price === null) backToProduct(productId, "Enter a valid price", "variants");
-  if (!Number.isInteger(stockRaw) || stockRaw < 0) {
-    backToProduct(productId, "Enter a valid stock count", "variants");
-  }
+  const priceMinor = readOptionalMoney(formData, "price");
+  if (priceMinor === "invalid") backToProduct(productId, "Enter a valid price", "variants");
 
-  let result;
-  try {
-    result = await generateMissingVariants({ productId, priceMinor: price, stockQty: stockRaw });
-  } catch (error) {
-    console.error("generateVariantsAction failed", error);
-    backToProduct(
-      productId,
-      error instanceof Error ? error.message : "Could not generate variants",
-      "variants",
-    );
-  }
+  const stockQty = readOptionalStock(formData, "stock");
+  if (stockQty === "invalid") backToProduct(productId, "Enter a valid stock count", "variants");
+
+  const result = await createVariantBranches({
+    productId,
+    parentId,
+    optionValueIds,
+    priceMinor,
+    stockQty,
+  });
+
+  if (!result.ok) backToProduct(productId, result.error, "variants");
 
   revalidatePath(`/admin/products/${productId}`);
   revalidatePath("/");
+  backToProduct(productId, undefined, "variants");
+}
+
+export async function updateVariantNodeAction(formData: FormData): Promise<void> {
+  await requireAdminAction();
+
+  const productId = requireText(formData.get("productId"), "Product id");
+  const nodeId = requireText(formData.get("nodeId"), "Branch id");
+
+  const defaultPriceMinor = readOptionalMoney(formData, "defaultPrice");
+  if (defaultPriceMinor === "invalid") {
+    backToProduct(productId, "Enter a valid default price", "variants");
+  }
+
+  const defaultStockQty = readOptionalStock(formData, "defaultStock");
+  if (defaultStockQty === "invalid") {
+    backToProduct(productId, "Enter a valid default stock count", "variants");
+  }
+
+  const result = await updateVariantNode({
+    productId,
+    nodeId,
+    active: formData.get("active") === "on",
+    defaultPriceMinor,
+    defaultStockQty,
+  });
 
   if (!result.ok) backToProduct(productId, result.error, "variants");
-  backToProduct(
+
+  revalidatePath(`/admin/products/${productId}`);
+  revalidatePath("/");
+  backToProduct(productId, undefined, "variants");
+}
+
+export async function deleteVariantNodeAction(formData: FormData): Promise<void> {
+  await requireAdminAction();
+
+  const productId = requireText(formData.get("productId"), "Product id");
+  const nodeId = requireText(formData.get("nodeId"), "Branch id");
+
+  const result = await deleteVariantNode({ productId, nodeId });
+  if (!result.ok) backToProduct(productId, result.error, "variants");
+
+  revalidatePath(`/admin/products/${productId}`);
+  revalidatePath("/");
+  backToProduct(productId, undefined, "variants");
+}
+
+export async function copyVariantChildrenAction(formData: FormData): Promise<void> {
+  await requireAdminAction();
+
+  const productId = requireText(formData.get("productId"), "Product id");
+  const sourceNodeId = requireText(formData.get("sourceNodeId"), "Source branch");
+  const targetNodeId = requireText(formData.get("targetNodeId"), "Target branch");
+
+  const result = await copyVariantChildren({ productId, sourceNodeId, targetNodeId });
+  if (!result.ok) backToProduct(productId, result.error, "variants");
+
+  revalidatePath(`/admin/products/${productId}`);
+  revalidatePath("/");
+  backToProduct(productId, undefined, "variants");
+}
+
+export async function createLeafVariantAction(formData: FormData): Promise<void> {
+  await requireAdminAction();
+
+  const productId = requireText(formData.get("productId"), "Product id");
+  const nodeId = requireText(formData.get("nodeId"), "Branch id");
+  const priceMinor = readOptionalMoney(formData, "price");
+  const stockQty = readOptionalStock(formData, "stock");
+
+  if (priceMinor === null || priceMinor === "invalid") {
+    backToProduct(productId, "Enter a valid price", "variants");
+  }
+  if (stockQty === null || stockQty === "invalid") {
+    backToProduct(productId, "Enter a valid stock count", "variants");
+  }
+
+  const result = await createLeafVariant({
     productId,
-    result.created === 0 ? "No new variants to add" : undefined,
-    "variants",
-  );
+    nodeId,
+    priceMinor,
+    stockQty,
+    sku: String(formData.get("sku") ?? "").trim(),
+  });
+
+  if (!result.ok) backToProduct(productId, result.error, "variants");
+
+  revalidatePath(`/admin/products/${productId}`);
+  revalidatePath("/");
+  backToProduct(productId, undefined, "variants");
+}
+
+export async function createDefaultVariantAction(formData: FormData): Promise<void> {
+  await requireAdminAction();
+
+  const productId = requireText(formData.get("productId"), "Product id");
+  const priceMinor = readOptionalMoney(formData, "price");
+  const stockQty = readOptionalStock(formData, "stock");
+
+  if (priceMinor === null || priceMinor === "invalid") {
+    backToProduct(productId, "Enter a valid price", "variants");
+  }
+  if (stockQty === null || stockQty === "invalid") {
+    backToProduct(productId, "Enter a valid stock count", "variants");
+  }
+
+  const result = await createDefaultVariant({
+    productId,
+    priceMinor,
+    stockQty,
+    sku: String(formData.get("sku") ?? "").trim(),
+  });
+
+  if (!result.ok) backToProduct(productId, result.error, "variants");
+
+  revalidatePath(`/admin/products/${productId}`);
+  revalidatePath("/");
+  backToProduct(productId, undefined, "variants");
 }
 
 export async function updateVariantAction(formData: FormData): Promise<void> {
@@ -319,18 +458,110 @@ export async function updateVariantAction(formData: FormData): Promise<void> {
   if (sku.length === 0) backToProduct(productId, "SKU is required", "variants");
 
   const title = String(formData.get("title") ?? "").trim();
+  const active = formData.get("active") === "on";
+
+  try {
+    await db.transaction(async (tx) => {
+      await tx
+        .update(variants)
+        .set({
+          priceMinor: price,
+          stockQty: stock,
+          sku,
+          title: title || "Default",
+          active,
+          updatedAt: new Date(),
+        })
+        .where(and(eq(variants.id, variantId), eq(variants.productId, productId)));
+
+      await tx
+        .update(variantNodes)
+        .set({ active, updatedAt: new Date() })
+        .where(
+          and(eq(variantNodes.productId, productId), eq(variantNodes.variantId, variantId)),
+        );
+    });
+  } catch (error) {
+    console.error("updateVariantAction failed", error);
+    backToProduct(productId, "Could not save the variant. Is the SKU unique?", "variants");
+  }
+
+  revalidatePath(`/admin/products/${productId}`);
+  revalidatePath("/");
+  backToProduct(productId, undefined, "variants");
+}
+
+export async function uploadNodeImageAction(formData: FormData): Promise<void> {
+  await requireAdminAction();
+
+  const productId = requireText(formData.get("productId"), "Product id");
+  const nodeId = requireText(formData.get("nodeId"), "Branch id");
+  const file = formData.get("image");
+
+  if (!(file instanceof File) || file.size === 0) {
+    backToProduct(productId, "Choose an image file", "variants");
+  }
+
+  const [node] = await db
+    .select()
+    .from(variantNodes)
+    .where(and(eq(variantNodes.id, nodeId), eq(variantNodes.productId, productId)))
+    .limit(1);
+
+  if (!node) backToProduct(productId, "That branch could not be found", "variants");
+
+  let stored;
+  try {
+    stored = await storeProductImage(file);
+  } catch (error) {
+    backToProduct(
+      productId,
+      error instanceof Error ? error.message : "Upload failed",
+      "variants",
+    );
+  }
 
   await db
-    .update(variants)
+    .update(variantNodes)
     .set({
-      priceMinor: price,
-      stockQty: stock,
-      sku,
-      title: title || "Default",
-      active: formData.get("active") === "on",
+      imageKey: stored.storageKey,
+      imageAlt: String(formData.get("alt") ?? "").trim(),
       updatedAt: new Date(),
     })
-    .where(and(eq(variants.id, variantId), eq(variants.productId, productId)));
+    .where(eq(variantNodes.id, nodeId));
+
+  if (node.imageKey && node.imageKey !== stored.storageKey) {
+    await unlink(path.join(uploadsRoot(), node.imageKey)).catch(() => {
+      // A missing file is already the desired state.
+    });
+  }
+
+  revalidatePath(`/admin/products/${productId}`);
+  revalidatePath("/");
+  backToProduct(productId, undefined, "variants");
+}
+
+export async function deleteNodeImageAction(formData: FormData): Promise<void> {
+  await requireAdminAction();
+
+  const productId = requireText(formData.get("productId"), "Product id");
+  const nodeId = requireText(formData.get("nodeId"), "Branch id");
+
+  const [node] = await db
+    .select()
+    .from(variantNodes)
+    .where(and(eq(variantNodes.id, nodeId), eq(variantNodes.productId, productId)))
+    .limit(1);
+
+  if (node?.imageKey) {
+    await db
+      .update(variantNodes)
+      .set({ imageKey: null, imageAlt: "", updatedAt: new Date() })
+      .where(eq(variantNodes.id, nodeId));
+    await unlink(path.join(uploadsRoot(), node.imageKey)).catch(() => {
+      // A missing file is already the desired state.
+    });
+  }
 
   revalidatePath(`/admin/products/${productId}`);
   revalidatePath("/");

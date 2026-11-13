@@ -1,27 +1,20 @@
 import Image from "next/image";
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { VariantTreeEditor } from "@/components/admin/variant-tree";
 import { Button, buttonClass } from "@/components/ui/button";
 import { Input, Label, Textarea } from "@/components/ui/field";
-import { formatMoney } from "@/lib/money";
-import { buildCombinations, combinationKey, describeVariant } from "@/lib/variants";
 import {
   addOptionAction,
   addOptionValueAction,
   deleteImageAction,
   deleteOptionAction,
   deleteOptionValueAction,
-  generateVariantsAction,
   moveOptionAction,
   updateProductAction,
-  updateVariantAction,
   uploadImageAction,
 } from "@/server/actions/admin-products";
 import { getProductForAdmin } from "@/server/services/catalog";
-
-function moneyInput(minor: number): string {
-  return (minor / 100).toFixed(2);
-}
 
 export default async function EditProductPage({
   params,
@@ -35,15 +28,7 @@ export default async function EditProductPage({
 
   if (!product) notFound();
 
-  const hasOptions = product.options.length > 0;
-  const optionsComplete =
-    hasOptions && product.options.every((option) => option.values.length > 0);
-  const combinations = optionsComplete ? buildCombinations(product.options) : [];
-  const existingKeys = new Set(
-    product.variants.map((variant) => combinationKey(variant.optionValueIds)),
-  );
-  const missing = combinations.filter((combination) => !existingKeys.has(combination.key));
-  const activeVariants = product.variants.filter((variant) => variant.active).length;
+  const hasTree = product.nodes.length > 0;
 
   return (
     <div className="space-y-8">
@@ -78,7 +63,7 @@ export default async function EditProductPage({
       ) : null}
 
       {/* ── details ─────────────────────────────────────────────── */}
-      <section className="rounded-xl border border-line bg-surface p-6">
+      <section id="details" className="scroll-mt-6 rounded-xl border border-line bg-surface p-6">
         <h2 className="mb-4 text-sm font-semibold">Details</h2>
 
         <form action={updateProductAction} className="space-y-4">
@@ -97,7 +82,12 @@ export default async function EditProductPage({
 
           <div>
             <Label htmlFor="description">Description</Label>
-            <Textarea id="description" name="description" rows={5} defaultValue={product.description} />
+            <Textarea
+              id="description"
+              name="description"
+              rows={5}
+              defaultValue={product.description}
+            />
           </div>
 
           <div>
@@ -121,7 +111,7 @@ export default async function EditProductPage({
       </section>
 
       {/* ── media ───────────────────────────────────────────────── */}
-      <section id="images" className="rounded-xl border border-line bg-surface p-6">
+      <section id="images" className="scroll-mt-6 rounded-xl border border-line bg-surface p-6">
         <h2 className="mb-1 text-sm font-semibold">Images</h2>
         <p className="mb-4 text-xs text-muted">
           Re-encoded to WebP, 1600px wide, metadata stripped. The first image is the main one.
@@ -174,25 +164,25 @@ export default async function EditProductPage({
             <Label htmlFor="alt">Alt text</Label>
             <Input id="alt" name="alt" placeholder="Black tee, front" />
           </div>
-          <Button type="submit" size="sm" variant="secondary">
+          <Button type="submit" size="sm" variant="secondary" data-testid="upload-product-image">
             Upload
           </Button>
         </form>
       </section>
 
-      {/* ── options ─────────────────────────────────────────────── */}
+      {/* ── levels ──────────────────────────────────────────────── */}
       <section id="options" className="scroll-mt-6 rounded-xl border border-line bg-surface p-6">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
-            <h2 className="text-sm font-semibold">Options</h2>
+            <h2 className="text-sm font-semibold">Levels and values</h2>
             <p className="mt-1 max-w-2xl text-xs text-muted">
-              Options are the choices a shopper picks, in order. Each value combines with every
-              value in the other options to make a variant. Removing an option or value removes the
-              variants built from it; past orders keep their snapshots.
+              Define the levels in the order shoppers choose them. The tree below creates only the
+              branches you add. Removing a level or value removes its branches; past orders keep
+              their snapshots.
             </p>
           </div>
           <span className="rounded-full bg-page px-2.5 py-1 text-xs text-muted">
-            {product.options.length} of 3 options
+            {product.options.length} levels
           </span>
         </div>
 
@@ -202,7 +192,7 @@ export default async function EditProductPage({
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <div>
                   <p className="text-[11px] font-semibold tracking-wide text-muted uppercase">
-                    Option {index + 1}
+                    Level {index + 1}
                   </p>
                   <p className="text-sm font-semibold">{option.name}</p>
                 </div>
@@ -214,7 +204,7 @@ export default async function EditProductPage({
                     <input type="hidden" name="direction" value="up" />
                     <button
                       type="submit"
-                      disabled={index === 0}
+                      disabled={hasTree || index === 0}
                       aria-label={`Move ${option.name} up`}
                       className="flex size-8 items-center justify-center rounded-md border border-line text-sm text-muted hover:text-ink disabled:cursor-not-allowed disabled:opacity-30"
                     >
@@ -227,7 +217,7 @@ export default async function EditProductPage({
                     <input type="hidden" name="direction" value="down" />
                     <button
                       type="submit"
-                      disabled={index === product.options.length - 1}
+                      disabled={hasTree || index === product.options.length - 1}
                       aria-label={`Move ${option.name} down`}
                       className="flex size-8 items-center justify-center rounded-md border border-line text-sm text-muted hover:text-ink disabled:cursor-not-allowed disabled:opacity-30"
                     >
@@ -260,7 +250,7 @@ export default async function EditProductPage({
                 ))}
                 {option.values.length === 0 ? (
                   <p className="text-xs text-amber-700">
-                    Add at least one value to use this option.
+                    Add at least one value to use this level.
                   </p>
                 ) : null}
               </div>
@@ -289,292 +279,56 @@ export default async function EditProductPage({
 
           {product.options.length === 0 ? (
             <div className="rounded-xl border border-dashed border-line px-4 py-6 text-sm text-muted">
-              No options yet. Add the first choice, such as Spec or Colour.
+              No levels yet. Add the first choice, such as Colour or Size.
             </div>
           ) : null}
         </div>
 
-        {product.options.length < 3 ? (
+        {!hasTree ? (
           <div className="mt-5 rounded-xl border border-dashed border-line p-4">
-            <p className="text-sm font-medium">Add another option</p>
+            <p className="text-sm font-medium">Add another level</p>
             <p className="mt-1 text-xs text-muted">
-              The order above is the order the storefront shows. Put the choice you want first at
-              the top.
+              Levels are shared names; each parent can still choose its own values in the tree.
+              Reorder levels before you add branches.
             </p>
             <form action={addOptionAction} className="mt-3 flex gap-2">
               <input type="hidden" name="productId" value={product.id} />
               <Input
                 name="name"
-                placeholder="e.g. Colour"
-                aria-label="New option name"
+                placeholder="e.g. Size"
+                aria-label="New level name"
                 className="max-w-56"
                 data-testid="add-option-name"
               />
               <Button type="submit" size="sm" variant="secondary" data-testid="add-option">
-                Add option
+                Add level
               </Button>
             </form>
           </div>
         ) : (
-          <p className="mt-5 text-xs text-muted">Three options is the practical limit.</p>
+          <p className="mt-5 rounded-lg bg-page px-4 py-3 text-xs text-muted">
+            Levels are locked while the tree has branches. Delete branches in the tree below to
+            change the level order or add a level.
+          </p>
         )}
       </section>
 
-      {/* ── variants ────────────────────────────────────────────── */}
+      {/* ── variant tree ────────────────────────────────────────── */}
       <section id="variants" className="scroll-mt-6 rounded-xl border border-line bg-surface p-6">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
-            <h2 className="text-sm font-semibold">Variants</h2>
+            <h2 className="text-sm font-semibold">Variant tree</h2>
             <p className="mt-1 max-w-2xl text-xs text-muted">
-              One variant per combination of option values. SKU, price, stock, and active state
-              belong to the variant, not to the product. Uncheck Active to hide a combination
-              without deleting it.
+              Add a branch only when it exists. Parents can hold images and defaults; leaves own the
+              real SKU, price, and stock. A missing combination is never created.
             </p>
           </div>
           <span className="rounded-full bg-page px-2.5 py-1 text-xs text-muted">
-            {product.variants.length} variants · {activeVariants} active
+            {product.nodes.length} branches
           </span>
         </div>
 
-        {!hasOptions ? (
-          <div className="mt-5 rounded-xl border border-dashed border-line px-4 py-6 text-sm text-muted">
-            Add an option above first. Variants are built from the option values.
-          </div>
-        ) : !optionsComplete ? (
-          <p className="mt-5 rounded-lg bg-amber-50 px-4 py-3 text-sm text-amber-800">
-            Add a value to every option to see the combinations.
-          </p>
-        ) : (
-          <>
-            <div className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-              <div className="rounded-lg border border-line p-3">
-                <p className="text-[11px] font-semibold tracking-wide text-muted uppercase">
-                  Options
-                </p>
-                <p className="mt-1 text-lg font-semibold tabular-nums">
-                  {product.options.length}
-                </p>
-              </div>
-              <div className="rounded-lg border border-line p-3">
-                <p className="text-[11px] font-semibold tracking-wide text-muted uppercase">
-                  Combinations
-                </p>
-                <p className="mt-1 text-lg font-semibold tabular-nums">
-                  {combinations.length}
-                </p>
-              </div>
-              <div className="rounded-lg border border-line p-3">
-                <p className="text-[11px] font-semibold tracking-wide text-muted uppercase">
-                  Generated
-                </p>
-                <p className="mt-1 text-lg font-semibold tabular-nums">
-                  {product.variants.length}
-                </p>
-              </div>
-              <div
-                className={`rounded-lg border p-3 ${
-                  missing.length > 0
-                    ? "border-amber-200 bg-amber-50"
-                    : "border-emerald-200 bg-emerald-50"
-                }`}
-              >
-                <p className="text-[11px] font-semibold tracking-wide text-muted uppercase">
-                  Missing
-                </p>
-                <p
-                  className={`mt-1 text-lg font-semibold tabular-nums ${
-                    missing.length > 0 ? "text-amber-800" : "text-emerald-700"
-                  }`}
-                >
-                  {missing.length}
-                </p>
-              </div>
-            </div>
-
-            {missing.length > 0 ? (
-              <div className="mt-5 rounded-xl border border-amber-200 bg-amber-50/60 p-4">
-                <p className="text-sm font-semibold">
-                  Create {missing.length} missing variant{missing.length === 1 ? "" : "s"}
-                </p>
-                <p className="mt-1 text-xs text-muted">
-                  Base price and stock for the new rows. Existing variants are left untouched.
-                </p>
-
-                <form
-                  action={generateVariantsAction}
-                  className="mt-3 flex flex-wrap items-end gap-3"
-                >
-                  <input type="hidden" name="productId" value={product.id} />
-                  <div className="w-32">
-                    <Label htmlFor="price">Price (AED)</Label>
-                    <Input
-                      id="price"
-                      name="price"
-                      inputMode="decimal"
-                      placeholder="120.00"
-                      required
-                      data-testid="generate-price"
-                    />
-                  </div>
-                  <div className="w-28">
-                    <Label htmlFor="stock">Stock</Label>
-                    <Input
-                      id="stock"
-                      name="stock"
-                      type="number"
-                      min={0}
-                      defaultValue={10}
-                      required
-                      data-testid="generate-stock"
-                    />
-                  </div>
-                  <Button
-                    type="submit"
-                    size="sm"
-                    variant="secondary"
-                    data-testid="generate-variants"
-                  >
-                    Generate missing variants
-                  </Button>
-                </form>
-
-                {missing.length <= 12 ? (
-                  <div className="mt-3 flex flex-wrap gap-1.5">
-                    {missing.map((combination) => (
-                      <span
-                        key={combination.key}
-                        className="rounded-full border border-amber-200 bg-surface px-2 py-0.5 text-xs text-amber-800"
-                      >
-                        {combination.labels.join(" / ")}
-                      </span>
-                    ))}
-                  </div>
-                ) : null}
-              </div>
-            ) : (
-              <p className="mt-5 rounded-lg bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
-                Every combination has a variant.
-              </p>
-            )}
-
-            {product.variants.length === 0 ? (
-              <p className="mt-4 text-sm text-muted">
-                No variants yet. Generate the missing combinations above.
-              </p>
-            ) : (
-              <div className="mt-5">
-                <div className="hidden gap-3 px-3 pb-2 text-[11px] font-semibold tracking-wide text-muted uppercase lg:grid lg:grid-cols-[minmax(0,1.8fr)_9rem_9rem_7rem_6rem_auto]">
-                  <span>Combination</span>
-                  <span>SKU</span>
-                  <span>Price</span>
-                  <span>Stock</span>
-                  <span>Active</span>
-                  <span />
-                </div>
-
-                <div className="space-y-3">
-                  {product.variants.map((variant) => {
-                    const labels = describeVariant(product.options, variant.optionValueIds);
-
-                    return (
-                      <form
-                        key={variant.id}
-                        action={updateVariantAction}
-                        className="grid gap-3 rounded-xl border border-line p-3 lg:grid-cols-[minmax(0,1.8fr)_9rem_9rem_7rem_6rem_auto] lg:items-start"
-                      >
-                        <input type="hidden" name="productId" value={product.id} />
-                        <input type="hidden" name="variantId" value={variant.id} />
-
-                        <div>
-                          <Label className="lg:hidden">Combination</Label>
-                          <div className="flex flex-wrap gap-1.5">
-                            {labels.length > 0 ? (
-                              labels.map((label) => (
-                                <span
-                                  key={label}
-                                  className="rounded-full bg-page px-2 py-0.5 text-xs"
-                                >
-                                  {label}
-                                </span>
-                              ))
-                            ) : (
-                              <span className="text-xs text-muted">No options</span>
-                            )}
-                          </div>
-
-                          <div className="mt-2">
-                            <Label htmlFor={`variant-title-${variant.id}`}>Order title</Label>
-                            <Input
-                              id={`variant-title-${variant.id}`}
-                              name="title"
-                              defaultValue={variant.title}
-                            />
-                            <p className="mt-1 text-[11px] text-muted">Shown on order lines.</p>
-                          </div>
-                        </div>
-
-                        <div>
-                          <Label htmlFor={`variant-sku-${variant.id}`}>SKU</Label>
-                          <Input
-                            id={`variant-sku-${variant.id}`}
-                            name="sku"
-                            defaultValue={variant.sku}
-                          />
-                        </div>
-
-                        <div>
-                          <Label htmlFor={`variant-price-${variant.id}`}>Price (AED)</Label>
-                          <Input
-                            id={`variant-price-${variant.id}`}
-                            name="price"
-                            inputMode="decimal"
-                            defaultValue={moneyInput(variant.priceMinor)}
-                            data-testid="variant-price"
-                          />
-                          <p className="mt-1 text-[11px] text-muted">
-                            {formatMoney(variant.priceMinor)}
-                          </p>
-                        </div>
-
-                        <div>
-                          <Label htmlFor={`variant-stock-${variant.id}`}>Stock</Label>
-                          <Input
-                            id={`variant-stock-${variant.id}`}
-                            name="stock"
-                            type="number"
-                            min={0}
-                            defaultValue={variant.stockQty}
-                          />
-                        </div>
-
-                        <label className="flex h-10 items-center gap-2 text-sm lg:mt-5">
-                          <input
-                            type="checkbox"
-                            name="active"
-                            defaultChecked={variant.active}
-                            className="size-4"
-                          />
-                          Active
-                        </label>
-
-                        <div className="lg:mt-5">
-                          <Button
-                            type="submit"
-                            size="sm"
-                            variant="secondary"
-                            data-testid="variant-save"
-                          >
-                            Save
-                          </Button>
-                        </div>
-                      </form>
-                    );
-                  })}
-                </div>
-              </div>
-            )}
-          </>
-        )}
+        <VariantTreeEditor productId={product.id} levels={product.options} nodes={product.nodes} />
       </section>
     </div>
   );

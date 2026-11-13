@@ -1,60 +1,149 @@
-export type VariantOption = {
+export type VariantLeaf = {
   id: string;
-  name: string;
-  values: { id: string; value: string }[];
-};
-
-export type VariantCombination = {
-  key: string;
-  optionValueIds: string[];
-  labels: string[];
+  title: string;
+  sku: string;
+  priceMinor: number;
+  stockQty: number;
+  active: boolean;
 };
 
 /**
- * A stable key for a set of option values. Order does not matter: the same
- * combination reached by two code paths must collide.
+ * One node in the product's variant tree. It is either a group (has children)
+ * or a sellable leaf (has a variant). The tree is explicit: a path exists only
+ * because the merchant created it.
  */
-export function combinationKey(valueIds: readonly string[]): string {
-  return [...valueIds].sort().join("|");
+export type VariantNodeView = {
+  id: string;
+  parentId: string | null;
+  optionId: string | null;
+  optionValueId: string | null;
+  label: string;
+  position: number;
+  active: boolean;
+  imageKey: string | null;
+  imageAlt: string;
+  defaultPriceMinor: number | null;
+  defaultStockQty: number | null;
+  variant: VariantLeaf | null;
+};
+
+export type VariantTreeNode = VariantNodeView & {
+  children: VariantTreeNode[];
+};
+
+function byPosition(a: VariantNodeView, b: VariantNodeView): number {
+  return a.position - b.position || a.label.localeCompare(b.label);
 }
 
-/**
- * The full Cartesian product of the product's options. Returns an empty list
- * when there are no options or when any option is still missing values, so the
- * admin UI can show a complete "not ready yet" state instead of a partial one.
- */
-export function buildCombinations(options: readonly VariantOption[]): VariantCombination[] {
-  if (options.length === 0) return [];
-  if (options.some((option) => option.values.length === 0)) return [];
+/** Turn a flat node list into a sorted tree. */
+export function buildVariantTree(nodes: readonly VariantNodeView[]): VariantTreeNode[] {
+  const byId = new Map<string, VariantTreeNode>();
+  for (const node of nodes) byId.set(node.id, { ...node, children: [] });
 
-  let combinations: { optionValueIds: string[]; labels: string[] }[] = [
-    { optionValueIds: [], labels: [] },
-  ];
-
-  for (const option of options) {
-    combinations = combinations.flatMap((combination) =>
-      option.values.map((value) => ({
-        optionValueIds: [...combination.optionValueIds, value.id],
-        labels: [...combination.labels, value.value],
-      })),
-    );
+  const roots: VariantTreeNode[] = [];
+  for (const node of byId.values()) {
+    const parent = node.parentId ? byId.get(node.parentId) : undefined;
+    if (parent) parent.children.push(node);
+    else roots.push(node);
   }
 
-  return combinations.map((combination) => ({
-    ...combination,
-    key: combinationKey(combination.optionValueIds),
-  }));
+  const sort = (list: VariantTreeNode[]) => {
+    list.sort(byPosition);
+    for (const node of list) sort(node.children);
+  };
+  sort(roots);
+
+  return roots;
 }
 
-/** Human labels for one variant, in the product's option order. */
-export function describeVariant(
-  options: readonly VariantOption[],
-  optionValueIds: readonly string[],
-): string[] {
-  return options
-    .map((option) => {
-      const value = option.values.find((candidate) => optionValueIds.includes(candidate.id));
-      return value ? `${option.name}: ${value.value}` : null;
-    })
-    .filter((label): label is string => Boolean(label));
+export function flattenVariantTree(nodes: readonly VariantTreeNode[]): VariantTreeNode[] {
+  return nodes.flatMap((node) => [node, ...flattenVariantTree(node.children)]);
+}
+
+/** Root-to-node path for a node id, or an empty path. */
+export function pathToNode(
+  nodes: readonly VariantTreeNode[],
+  nodeId: string,
+  trail: VariantTreeNode[] = [],
+): VariantTreeNode[] {
+  for (const node of nodes) {
+    const path = [...trail, node];
+    if (node.id === nodeId) return path;
+    const found = pathToNode(node.children, nodeId, path);
+    if (found.length > 0) return found;
+  }
+  return [];
+}
+
+/** The first leaf with stock in this branch, respecting active flags. */
+export function firstAvailableLeaf(node: VariantTreeNode): VariantTreeNode | null {
+  if (!node.active) return null;
+
+  if (node.children.length === 0) {
+    return node.variant && node.variant.active && node.variant.stockQty > 0 ? node : null;
+  }
+
+  for (const child of node.children) {
+    const found = firstAvailableLeaf(child);
+    if (found) return found;
+  }
+  return null;
+}
+
+/** The first leaf even when sold out, so the picker can explain the state. */
+export function firstLeaf(node: VariantTreeNode): VariantTreeNode | null {
+  if (!node.active) return null;
+  if (node.children.length === 0) return node.variant ? node : null;
+
+  for (const child of node.children) {
+    const found = firstLeaf(child);
+    if (found) return found;
+  }
+  return null;
+}
+
+export function firstAvailableLeafInTree(nodes: readonly VariantTreeNode[]): VariantTreeNode | null {
+  for (const node of nodes) {
+    const found = firstAvailableLeaf(node);
+    if (found) return found;
+  }
+  return null;
+}
+
+export function collectSubtreeVariantIds(node: VariantTreeNode): string[] {
+  const ids = node.variant ? [node.variant.id] : [];
+  for (const child of node.children) ids.push(...collectSubtreeVariantIds(child));
+  return ids;
+}
+
+export function collectSubtreeNodeIds(node: VariantTreeNode): string[] {
+  const ids = [node.id];
+  for (const child of node.children) ids.push(...collectSubtreeNodeIds(child));
+  return ids;
+}
+
+function skuPart(label: string, index: number): string {
+  const ascii = label
+    .normalize("NFKD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-z0-9]/gi, "")
+    .toUpperCase();
+
+  return ascii.slice(0, 4) || `V${index + 1}`;
+}
+
+/** A readable SKU from the product slug and the branch labels, de-duplicated. */
+export function generateVariantSku(
+  productSlug: string,
+  labels: readonly string[],
+  taken: ReadonlySet<string>,
+): string {
+  const prefix = productSlug.replace(/[^a-z0-9]/gi, "").slice(0, 8).toUpperCase() || "SKU";
+  const base = [prefix, ...labels.map(skuPart)].join("-").slice(0, 48);
+
+  if (!taken.has(base)) return base;
+
+  let suffix = 2;
+  while (taken.has(`${base}-${suffix}`)) suffix += 1;
+  return `${base}-${suffix}`;
 }

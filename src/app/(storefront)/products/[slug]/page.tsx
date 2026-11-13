@@ -65,7 +65,7 @@ export default async function ProductPage({
           ) : null}
 
           <div className="mt-8">
-            <ProductOptions options={product.options} variants={product.variants} />
+            <ProductOptions options={product.options} nodes={product.nodes} />
           </div>
         </div>
       </div>

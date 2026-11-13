@@ -14,23 +14,26 @@ The private back office on its own subdomain, used to run the store without a de
 _Avoid_: Backend, dashboard, CMS
 
 **Product**:
-A merchandised thing for sale, with one or more variants.
+A merchandised thing for sale, with zero or more variant branches.
 _Avoid_: Item, article, listing
 
 **Variant**:
-The unit that is actually priced, stocked, and bought — a specific size, colour, or pack.
+The sellable leaf at the end of a branch. It is the unit that is actually priced, stocked, and
+bought.
 _Avoid_: Option, SKU, variation
 
 **SKU**:
 The merchant's own unique code for one variant.
 _Avoid_: Product code, item number
 
-**Product option**:
-A named choice a product offers, such as Size or Colour.
+**Level**:
+A named choice dimension, such as Colour or Size. Levels are ordered; the order is the order
+shoppers pick in. Stored as `product_options`.
 _Avoid_: Attribute, property, dimension
 
-**Option value**:
-One choice within a product option, such as Large or Black.
+**Level value**:
+One choice within a level, such as Black or Large. Values are shared names; each parent branch
+chooses which of them exist under it. Stored as `product_option_values`.
 _Avoid_: Variant, attribute value
 
 **Stock**:
@@ -76,13 +79,38 @@ The orders linked to a customer account, newest first.
 ## Variations
 
 **Variation**:
-The shopper-facing idea of choosing a spec, colour, or other option. In the data model it is
-expressed as product options, option values, and one variant per final combination.
+The shopper-facing idea of choosing a path through the variant tree, such as Colour → Size. The
+data model uses levels, branches, and leaves; "variation" is not a database term.
 _Avoid_: Sub-variation as a database term
 
-**Variant image**:
-An image attached to one variant. When a variant has no image, the storefront falls back to the
-nearest parent value, then to the product gallery.
+**Variant tree**:
+The explicit hierarchy of branches for a product. A path exists only because the merchant created
+it; there is no Cartesian product creating phantom combinations.
+_Avoid_: Variant matrix, option grid
+
+**Branch**:
+One node in the variant tree: a level value under a parent, or a root. A branch with children is a
+group; a branch without children is a leaf.
+_Avoid_: Sub-variant as a node type
+
+**Group**:
+A branch with children. It can carry images and default price/stock, but it is not sold directly.
+_Avoid_: Parent variant, bundle
+
+**Leaf**:
+A branch with no children. It owns one variant, SKU, price, and stock, and is the only sellable
+node in the tree.
+_Avoid_: End variant, final option
+
+**Parent defaults**:
+Default price and stock on a group, used to pre-fill and create its children. Changing them does
+not rewrite leaves that already exist.
+_Avoid_: Base price, inherited price
+
+**Branch image**:
+An image attached to any branch. A leaf without its own image uses the nearest ancestor branch
+image, then the product gallery.
+_Avoid_: Variant image only
 
 ## Merchandising
 

@@ -20,7 +20,7 @@ const TRUNCATE_ORDER = [
   "cart_items",
   "carts",
   "customer_addresses",
-  "variant_option_values",
+  "variant_nodes",
   "product_option_values",
   "product_options",
   "product_media",

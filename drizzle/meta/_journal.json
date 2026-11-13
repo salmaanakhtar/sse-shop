@@ -22,6 +22,20 @@
       "when": 1794547409914,
       "tag": "0002_bouncy_moonstone",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1794553153394,
+      "tag": "0003_variant_tree",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1794553197798,
+      "tag": "0004_drop_variant_option_values",
+      "breakpoints": true
     }
   ]
 }

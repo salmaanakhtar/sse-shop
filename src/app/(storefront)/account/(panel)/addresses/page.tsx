@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { deleteAddressAction } from "@/app/(storefront)/account/addresses/actions";
-import { ConfirmSubmitButton } from "@/components/storefront/confirm-submit-button";
+import { ConfirmSubmitButton } from "@/components/ui/confirm-submit-button";
 import { buttonClass } from "@/components/ui/button";
 import { formatAddress } from "@/lib/address";
 import { requireUserPage } from "@/server/auth/guard";

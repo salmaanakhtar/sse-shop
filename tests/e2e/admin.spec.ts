@@ -22,18 +22,19 @@ test("admin creates, illustrates, and publishes a product", async ({ page }) => 
   await page.getByTestId("add-option-value-submit").click();
   await expect(page.getByRole("button", { name: "M ×" })).toBeVisible();
 
-  await page.getByTestId("generate-price").fill("199.00");
-  await page.getByTestId("generate-stock").fill("5");
-  await page.getByTestId("generate-variants").click();
+  await page.locator("#root-price").fill("199.00");
+  await page.locator("#root-stock").fill("5");
+  await page.getByRole("button", { name: "Add roots" }).click();
   await expect(page.getByTestId("variant-price")).toHaveValue("199.00");
 
-  await page.setInputFiles('input[type="file"]', "tests/e2e/fixtures/product.png");
-  await page.getByRole("button", { name: "Upload" }).click();
+  await page.setInputFiles("#image", "tests/e2e/fixtures/product.png");
+  await page.getByTestId("upload-product-image").click();
   await expect(page.locator('img[src*="media"]').first()).toBeVisible();
 
   await page.getByLabel("Status").selectOption("active");
   await page.getByRole("button", { name: "Save details" }).click();
-  await expect(page.getByText(/Published|active/i).first()).toBeVisible();
+  await expect(page).toHaveURL(/#details$/);
+  await expect(page.getByText("active", { exact: true })).toBeVisible();
 
   await page.goto(`/products/${SLUG}`);
   await expect(page.getByRole("heading", { level: 1 })).toHaveText("Playwright Hoodie");

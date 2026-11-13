@@ -6,7 +6,7 @@ import {
   products,
   settings,
   users,
-  variantOptionValues,
+  variantNodes,
   variants,
 } from "../src/server/db/schema";
 
@@ -51,8 +51,8 @@ async function seedDemoProduct() {
   if (!product) throw new Error("failed to insert the demo product");
 
   const optionSpec = [
-    { name: "Size", values: ["S", "M"] },
     { name: "Colour", values: ["Black", "White"] },
+    { name: "Size", values: ["S", "M"] },
   ] as const;
 
   const optionIds: { id: string; name: string }[] = [];
@@ -80,10 +80,34 @@ async function seedDemoProduct() {
   const colourOption = optionIds.find((option) => option.name === "Colour");
   if (!sizeOption || !colourOption) throw new Error("demo options are incomplete");
 
-  for (const [position, size] of ["S", "M"].entries()) {
-    for (const [colourIndex, colour] of ["Black", "White"].entries()) {
+  for (const [colourIndex, colour] of ["Black", "White"].entries()) {
+    const colourValue = valueIds.find((v) => v.optionName === "Colour" && v.value === colour);
+    if (!colourValue) throw new Error("demo colour values are incomplete");
+
+    const priceMinor = colour === "Black" ? 12_000 : 12_500;
+
+    const [root] = await db
+      .insert(variantNodes)
+      .values({
+        productId: product.id,
+        parentId: null,
+        optionId: colourOption.id,
+        optionValueId: colourValue.id,
+        label: colour,
+        position: colourIndex,
+        active: true,
+        defaultPriceMinor: priceMinor,
+        defaultStockQty: 25,
+      })
+      .returning({ id: variantNodes.id });
+
+    if (!root) throw new Error(`failed to insert the ${colour} branch`);
+
+    for (const [sizeIndex, size] of ["S", "M"].entries()) {
+      const sizeValue = valueIds.find((v) => v.optionName === "Size" && v.value === size);
+      if (!sizeValue) throw new Error("demo size values are incomplete");
+
       const sku = `TEE-${colour.slice(0, 3).toUpperCase()}-${size}`;
-      const priceMinor = colour === "Black" ? 12_000 : 12_500;
 
       const [variant] = await db
         .insert(variants)
@@ -93,23 +117,28 @@ async function seedDemoProduct() {
           title: `${colour} / ${size}`,
           priceMinor,
           stockQty: 25,
-          position: position * 2 + colourIndex,
+          position: colourIndex * 2 + sizeIndex,
         })
         .returning({ id: variants.id });
+
       if (!variant) throw new Error(`failed to insert variant ${sku}`);
 
-      const sizeValue = valueIds.find((v) => v.optionName === "Size" && v.value === size);
-      const colourValue = valueIds.find((v) => v.optionName === "Colour" && v.value === colour);
-      if (!sizeValue || !colourValue) throw new Error("demo option values are incomplete");
-
-      await db.insert(variantOptionValues).values([
-        { variantId: variant.id, optionId: sizeOption.id, optionValueId: sizeValue.id },
-        { variantId: variant.id, optionId: colourOption.id, optionValueId: colourValue.id },
-      ]);
+      await db.insert(variantNodes).values({
+        productId: product.id,
+        parentId: root.id,
+        optionId: sizeOption.id,
+        optionValueId: sizeValue.id,
+        label: size,
+        position: sizeIndex,
+        active: true,
+        defaultPriceMinor: priceMinor,
+        defaultStockQty: 25,
+        variantId: variant.id,
+      });
     }
   }
 
-  console.info(`seeded ${DEMO_SLUG}: ${optionSpec.length} options, 4 variants`);
+  console.info(`seeded ${DEMO_SLUG}: ${optionSpec.length} levels, 4 leaf variants`);
 }
 
 async function seedLowStockProduct() {
@@ -128,12 +157,30 @@ async function seedLowStockProduct() {
 
   if (!product) throw new Error("failed to insert the low-stock product");
 
-  await db.insert(variants).values({
+  const [variant] = await db
+    .insert(variants)
+    .values({
+      productId: product.id,
+      sku: "CAP-ONE",
+      title: "Default",
+      priceMinor: 4_500,
+      stockQty: 2,
+    })
+    .returning({ id: variants.id });
+
+  if (!variant) throw new Error("failed to insert the low-stock variant");
+
+  await db.insert(variantNodes).values({
     productId: product.id,
-    sku: "CAP-ONE",
-    title: "Default",
-    priceMinor: 4_500,
-    stockQty: 2,
+    parentId: null,
+    optionId: null,
+    optionValueId: null,
+    label: "Default",
+    position: 0,
+    active: true,
+    defaultPriceMinor: 4_500,
+    defaultStockQty: 2,
+    variantId: variant.id,
   });
 }
 

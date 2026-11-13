@@ -5,9 +5,9 @@ import {
   productOptionValues,
   productOptions,
   products,
-  variantOptionValues,
   variants,
 } from "../db/schema";
+import { listVariantNodes, type VariantNodeView } from "./variant-tree";
 
 export type CatalogCard = {
   id: string;
@@ -26,15 +26,6 @@ export type ProductOptionView = {
   values: { id: string; value: string }[];
 };
 
-export type ProductVariantView = {
-  id: string;
-  title: string;
-  sku: string;
-  priceMinor: number;
-  stockQty: number;
-  optionValueIds: string[];
-};
-
 export type ProductMediaView = {
   storageKey: string;
   alt: string;
@@ -48,7 +39,7 @@ export type ProductDetail = {
   title: string;
   description: string;
   options: ProductOptionView[];
-  variants: ProductVariantView[];
+  nodes: VariantNodeView[];
   media: ProductMediaView[];
   priceFromMinor: number;
   inStock: boolean;
@@ -128,23 +119,16 @@ export async function getProductDetail(slug: string): Promise<ProductDetail | nu
   ]);
 
   const optionIds = optionRows.map((option) => option.id);
-  const valueRows =
+  const [valueRows, nodes] = await Promise.all([
     optionIds.length > 0
-      ? await db
+      ? db
           .select()
           .from(productOptionValues)
           .where(inArray(productOptionValues.optionId, optionIds))
           .orderBy(asc(productOptionValues.position))
-      : [];
-
-  const variantIds = variantRows.map((variant) => variant.id);
-  const links =
-    variantIds.length > 0
-      ? await db
-          .select()
-          .from(variantOptionValues)
-          .where(inArray(variantOptionValues.variantId, variantIds))
-      : [];
+      : Promise.resolve([]),
+    listVariantNodes(product.id),
+  ]);
 
   return {
     id: product.id,
@@ -158,16 +142,7 @@ export async function getProductDetail(slug: string): Promise<ProductDetail | nu
         .filter((value) => value.optionId === option.id)
         .map((value) => ({ id: value.id, value: value.value })),
     })),
-    variants: variantRows.map((variant) => ({
-      id: variant.id,
-      title: variant.title,
-      sku: variant.sku,
-      priceMinor: variant.priceMinor,
-      stockQty: variant.stockQty,
-      optionValueIds: links
-        .filter((link) => link.variantId === variant.id)
-        .map((link) => link.optionValueId),
-    })),
+    nodes,
     media: mediaRows.map((row) => ({
       storageKey: row.storageKey,
       alt: row.alt,
@@ -209,15 +184,7 @@ export type AdminProductDetail = {
   description: string;
   status: "draft" | "active" | "archived";
   options: ProductOptionView[];
-  variants: {
-    id: string;
-    title: string;
-    sku: string;
-    priceMinor: number;
-    stockQty: number;
-    active: boolean;
-    optionValueIds: string[];
-  }[];
+  nodes: VariantNodeView[];
   media: { id: string; storageKey: string; alt: string }[];
 };
 
@@ -246,17 +213,12 @@ export async function getProductForAdmin(id: string): Promise<AdminProductDetail
   const [product] = await db.select().from(products).where(eq(products.id, id)).limit(1);
   if (!product) return null;
 
-  const [optionRows, variantRows, mediaRows] = await Promise.all([
+  const [optionRows, mediaRows] = await Promise.all([
     db
       .select()
       .from(productOptions)
       .where(eq(productOptions.productId, product.id))
       .orderBy(asc(productOptions.position)),
-    db
-      .select()
-      .from(variants)
-      .where(eq(variants.productId, product.id))
-      .orderBy(asc(variants.position), asc(variants.sku)),
     db
       .select()
       .from(productMedia)
@@ -265,23 +227,16 @@ export async function getProductForAdmin(id: string): Promise<AdminProductDetail
   ]);
 
   const optionIds = optionRows.map((option) => option.id);
-  const valueRows =
+  const [valueRows, nodes] = await Promise.all([
     optionIds.length > 0
-      ? await db
+      ? db
           .select()
           .from(productOptionValues)
           .where(inArray(productOptionValues.optionId, optionIds))
           .orderBy(asc(productOptionValues.position))
-      : [];
-
-  const variantIds = variantRows.map((variant) => variant.id);
-  const links =
-    variantIds.length > 0
-      ? await db
-          .select()
-          .from(variantOptionValues)
-          .where(inArray(variantOptionValues.variantId, variantIds))
-      : [];
+      : Promise.resolve([]),
+    listVariantNodes(product.id),
+  ]);
 
   return {
     id: product.id,
@@ -296,17 +251,7 @@ export async function getProductForAdmin(id: string): Promise<AdminProductDetail
         .filter((value) => value.optionId === option.id)
         .map((value) => ({ id: value.id, value: value.value })),
     })),
-    variants: variantRows.map((variant) => ({
-      id: variant.id,
-      title: variant.title,
-      sku: variant.sku,
-      priceMinor: variant.priceMinor,
-      stockQty: variant.stockQty,
-      active: variant.active,
-      optionValueIds: links
-        .filter((link) => link.variantId === variant.id)
-        .map((link) => link.optionValueId),
-    })),
+    nodes,
     media: mediaRows.map((row) => ({
       id: row.id,
       storageKey: row.storageKey,

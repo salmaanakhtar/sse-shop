@@ -1,53 +1,91 @@
 import { describe, expect, it } from "vitest";
-import { buildCombinations, combinationKey, describeVariant } from "@/lib/variants";
+import {
+  buildVariantTree,
+  firstAvailableLeaf,
+  firstAvailableLeafInTree,
+  generateVariantSku,
+  pathToNode,
+  type VariantNodeView,
+} from "@/lib/variants";
 
-const colour = {
-  id: "colour",
-  name: "Colour",
-  values: [
-    { id: "black", value: "Black" },
-    { id: "white", value: "White" },
-  ],
+const leaf = (id: string, label: string, stockQty: number): VariantNodeView => ({
+  id,
+  parentId: "blue",
+  optionId: "size",
+  optionValueId: `size-${id}`,
+  label,
+  position: label === "S" ? 0 : 1,
+  active: true,
+  imageKey: null,
+  imageAlt: "",
+  defaultPriceMinor: null,
+  defaultStockQty: null,
+  variant: {
+    id: `variant-${id}`,
+    title: `Blue / ${label}`,
+    sku: `TEE-BLU-${label}`,
+    priceMinor: 12_000,
+    stockQty,
+    active: true,
+  },
+});
+
+const blue: VariantNodeView = {
+  id: "blue",
+  parentId: null,
+  optionId: "colour",
+  optionValueId: "colour-blue",
+  label: "Blue",
+  position: 0,
+  active: true,
+  imageKey: null,
+  imageAlt: "",
+  defaultPriceMinor: 12_000,
+  defaultStockQty: 10,
+  variant: null,
 };
 
-const spec = {
-  id: "spec",
-  name: "Spec",
-  values: [
-    { id: "4060", value: "RTX 4060" },
-    { id: "4070", value: "RTX 4070" },
-    { id: "4080", value: "RTX 4080" },
-  ],
+const red: VariantNodeView = {
+  ...blue,
+  id: "red",
+  optionValueId: "colour-red",
+  label: "Red",
+  position: 1,
 };
 
-describe("buildCombinations", () => {
-  it("builds the full Cartesian product in option order", () => {
-    const combinations = buildCombinations([colour, spec]);
+const redSmall = leaf("red-s", "S", 1);
+redSmall.parentId = "red";
+redSmall.optionValueId = "size-red-s";
 
-    expect(combinations).toHaveLength(6);
-    expect(combinations[0]?.labels).toEqual(["Black", "RTX 4060"]);
-    expect(combinations[5]?.labels).toEqual(["White", "RTX 4080"]);
+describe("buildVariantTree", () => {
+  it("nests children under their parent and keeps position order", () => {
+    const tree = buildVariantTree([blue, red, leaf("blue-m", "M", 0), leaf("blue-s", "S", 5), redSmall]);
+
+    expect(tree.map((node) => node.label)).toEqual(["Blue", "Red"]);
+    expect(tree[0]?.children.map((node) => node.label)).toEqual(["S", "M"]);
+    expect(tree[1]?.children.map((node) => node.label)).toEqual(["S"]);
   });
 
-  it("gives each combination a stable order-independent key", () => {
-    const combinations = buildCombinations([colour, spec]);
-    const keys = new Set(combinations.map((combination) => combination.key));
-
-    expect(keys.size).toBe(6);
-    expect(combinationKey(["white", "4070"])).toBe(combinationKey(["4070", "white"]));
+  it("returns root-to-leaf paths", () => {
+    const tree = buildVariantTree([blue, red, redSmall]);
+    expect(pathToNode(tree, "red-s").map((node) => node.label)).toEqual(["Red", "S"]);
   });
 
-  it("returns nothing until every option has at least one value", () => {
-    expect(buildCombinations([])).toEqual([]);
-    expect(buildCombinations([colour, { ...spec, values: [] }])).toEqual([]);
+  it("finds the first available leaf and skips sold-out branches", () => {
+    const tree = buildVariantTree([blue, red, leaf("blue-m", "M", 0), redSmall]);
+    expect(firstAvailableLeaf(tree[1]!)?.id).toBe("red-s");
+    expect(firstAvailableLeafInTree(tree)?.id).toBe("red-s");
   });
 });
 
-describe("describeVariant", () => {
-  it("labels a variant in the product's option order", () => {
-    expect(describeVariant([colour, spec], ["white", "4070"])).toEqual([
-      "Colour: White",
-      "Spec: RTX 4070",
-    ]);
+describe("generateVariantSku", () => {
+  it("builds a readable path SKU", () => {
+    expect(generateVariantSku("essential-tee", ["Blue", "M"], new Set())).toBe("ESSENTIA-BLUE-M");
+  });
+
+  it("de-duplicates with a numeric suffix", () => {
+    expect(
+      generateVariantSku("essential-tee", ["Blue", "M"], new Set(["ESSENTIA-BLUE-M"])),
+    ).toBe("ESSENTIA-BLUE-M-2");
   });
 });

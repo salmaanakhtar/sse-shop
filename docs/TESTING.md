@@ -25,12 +25,13 @@ runtime we actually ship.
 These are the paths that must exist and stay green. Add a spec per feature; never delete one
 without replacing it.
 
-1. **Browse and buy** — home → product → variant selected → add to cart → cart shows correct total
-   → checkout with a UAE address → mock payment → confirmation page with an order number.
+1. **Browse and buy** — home → product → choose a parent branch and its child → add to cart → cart
+   shows correct total → checkout with a UAE address → mock payment → confirmation page with an
+   order number.
 2. **Cart survives a reload** — add, reload, cart still there.
 3. **Stock limit** — adding more than stock is refused with a readable message.
-4. **Admin creates and publishes a product** — sign in with 2FA, create product and variant, upload
-   an image, publish, product appears on the storefront.
+4. **Admin creates and publishes a product** — sign in, create product, add levels, add a root and
+   its children, edit the leaf, upload an image, publish, product appears on the storefront.
 5. **Admin edits a product** — price change appears on the storefront without a deploy.
 6. **Guest order lookup** — the confirmation link works, an expired link does not.
 7. **Customer account** — sign up, save a delivery address, check out with pre-filled details and a
@@ -40,6 +41,8 @@ without replacing it.
    into order history.
 10. **Account deletion** — delete with a password confirmation, then a sign-in attempt fails.
 11. **Admin customer list** — the panel lists customers and opens their detail.
+12. **Variant tree selection** — selecting a parent updates the children and price; the cart label
+    is the chosen path, not a phantom combination.
 
 ## Vitest setup
 
@@ -126,6 +129,10 @@ beforeAll(async () => {
 Account tests own the important rules: a saved address is user-scoped, the first address is both
 defaults, deleting a default promotes another, a guest order is claimable only with its token, an
 order already claimed cannot move, and deletion anonymises the profile while keeping the order.
+
+Variant-tree tests own the catalog rules: per-parent children never create a phantom combination,
+children inherit parent defaults, copying a sibling creates new SKUs on the target path, deleting a
+branch removes its variants, and the migration backfills existing variants into leaves.
 
 Rules that keep unit tests honest:
 

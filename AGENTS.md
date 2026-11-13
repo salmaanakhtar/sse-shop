@@ -52,10 +52,10 @@ src/
   app/                routes: (storefront), account, admin, api
   components/ui/      shadcn primitives, edited in place
   components/storefront/  storefront sections and account forms
-  components/admin/       admin screens
+  components/admin/       admin screens, including the variant tree builder
   server/
     db/               schema.ts, client.ts, migrations/
-    services/         catalog, cart, orders, settings, variants, addresses, customers, payments/, mail/
+    services/         catalog, cart, orders, settings, variant-tree, addresses, customers, payments/, mail/
     auth/             better-auth config, session helpers, guards
   lib/                money, slugs, result, dates — pure, importable anywhere
 tests/

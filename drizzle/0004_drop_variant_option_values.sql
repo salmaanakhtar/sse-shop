@@ -1,0 +1,1 @@
+DROP TABLE "variant_option_values" CASCADE;

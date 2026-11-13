@@ -56,10 +56,10 @@ Nineteen tables, deliberately narrow. Every table carries `created_at`; most car
 | `verifications` | Short-lived tokens | Email verification, password reset |
 | `two_factors` | TOTP secret, backup codes | Required for admin |
 | `products` | Merchandised product | `slug` unique, `status` is `draft`/`active`/`archived` |
-| `variants` | Priced, stocked unit | `sku` unique, `price_minor`, `stock_qty` |
-| `product_options` | A named choice a product offers | e.g. `Size`, `Colour`; ordered by `position` |
-| `product_option_values` | The choices within an option | e.g. `S`, `M`, `L` |
-| `variant_option_values` | Which values a variant represents | join row; unique on `(variant_id, option_id)` |
+| `variants` | Sellable leaf | `sku` globally unique, `price_minor`, `stock_qty` |
+| `product_options` | A named level | e.g. `Colour`, `Size`; ordered by `position` |
+| `product_option_values` | The values within a level | e.g. `Black`, `S`, `M` |
+| `variant_nodes` | Explicit variant tree | group or leaf; parent defaults and images; leaf links one `variants` row |
 | `product_media` | Ordered images per product | `storage_key`, `alt`, `position` |
 | `customer_addresses` | Saved delivery and billing addresses | one default of each per customer, partial unique indexes |
 | `carts` | One basket per shopper token | Token hashed; `expires_at`; `user_id` links a signed-in cart |
@@ -76,8 +76,17 @@ Nineteen tables, deliberately narrow. Every table carries `created_at`; most car
   order from yesterday.
 - `orders.number` is drawn once, inside the placement transaction, and never reused.
 - `variants.stock_qty` never goes negative; decrements take a row lock.
-- A product with options has exactly one option value per option on every variant. A variant missing
-  a value is not sellable, and the admin refuses to publish it.
+- The variant tree is explicit. A path exists only because the merchant created it; the admin never
+  generates the full Cartesian product.
+- A branch with children is a group and is not sellable. A branch without children is a leaf and
+  owns exactly one `variants` row; one variant belongs to at most one leaf.
+- A group's default price/stock is a creation-time convenience. Changing it never rewrites leaves
+  that already exist.
+- Every variant SKU is globally unique. Auto-generated SKUs come from the product slug and branch
+  path, and remain editable.
+- Deleting a branch deletes its descendants and their variants. Orders keep their line and address
+  snapshots.
+- Existing Cartesian variants were migrated into leaves; the old join table is gone.
 - Stored order totals must be reproducible from their lines. If they disagree, the bug is in
   placement, not in the display.
 - A cart is consumed when its order is placed; it never becomes the same cart again.
@@ -129,6 +138,37 @@ paying for shipping.
 The rule lives in `src/lib/shipping.ts` as a pure function taking `(subtotalMinor, settings)` and
 returning a minor amount, which makes it unit-testable without a database. Per-emirate tables and
 carrier rates replace it behind the same function signature.
+
+## Variants and the tree
+
+A product's variant structure is an explicit tree, not a Cartesian product.
+
+- A **level** (`product_options`) is a named choice dimension, ordered by `position`: Colour, then
+  Size, then Fit.
+- A **level value** (`product_option_values`) is one choice in that level. Values are shared names;
+  each parent branch decides which of them exist underneath it.
+- A **branch** (`variant_nodes`) is one value under a parent, or a root. A branch with children is a
+  group; a branch without children is a leaf.
+- A **leaf** points at one `variants` row. The variant owns the real SKU, price, stock, and active
+  flag. A group can carry an image and default price/stock, but it is never sold.
+- A group's defaults pre-fill the add-child form. They are not live inheritance: an existing leaf
+  keeps the price/stock it was created with until edited.
+- The admin tree builder adds roots and children, copies a sibling's subtree, edits leaf details,
+  and deletes a branch with its descendants. It never fills in combinations the merchant did not
+  choose.
+- Levels are locked while the tree has branches. Removing a level or value removes the branches
+  built from it. Past orders keep their snapshots.
+- Auto-generated SKUs come from the product slug and the branch labels, then a numeric suffix if
+  the SKU is already taken. The admin can edit every SKU.
+- The storefront shows the tree parent first: choose Colour, then only that colour's existing sizes.
+  Sold-out branches stay visible but disabled; the picker initially selects the first available
+  leaf. A leaf image falls back to the nearest ancestor branch image, then the product gallery.
+- Cart and order labels come from the leaf's path, so a cart line reads “Black / M” without joining
+  through a separate option-value table.
+
+The pre-launch migration created a tree from every existing variant, then dropped
+`variant_option_values`. New products start with a default single variant when they have no levels,
+and with whichever branches the merchant adds when they do.
 
 ## Cart and checkout
 
@@ -242,6 +282,10 @@ addresses, order history, and faster checkout.
 The panel also lists customers: name, email, phone, order count, spend, and last order, with a
 detail page for saved addresses and order history. Customers never reach this host.
 
+The product editor defines levels and values, then builds the variant tree: add roots and children,
+copy a sibling's subtree, set parent defaults and images, and edit each leaf's SKU, price, stock, and
+active flag. Nothing is generated from a Cartesian product.
+
 A no-code boundary is intentional: admin edits `settings` and content rows, never code. Anything
 that would require a deploy belongs in this repo, not in the admin UI.
 
@@ -250,6 +294,9 @@ that would require a deploy belongs in this repo, not in the admin UI.
 Uploads are streamed to a temporary file, validated by magic bytes (not by filename or MIME
 header), capped at 10 MB, and re-encoded with `sharp` into AVIF and WebP at 480/960/1600 px wide.
 EXIF is stripped. Output lands at `/data/uploads/<yyyy>/<mm>/<uuid>-<width>.<ext>`.
+
+The same pipeline serves product gallery images and branch images. A leaf with no image uses the
+nearest ancestor branch image, then the product gallery.
 
 Caddy serves `/media/*` from that volume with long cache lifetimes and immutable filenames. Product
 images are public by design; there is nothing to authorize.

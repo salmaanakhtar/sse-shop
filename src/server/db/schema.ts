@@ -7,7 +7,6 @@ import {
   jsonb,
   pgEnum,
   pgTable,
-  primaryKey,
   text,
   timestamp,
   uniqueIndex,
@@ -191,36 +190,57 @@ export const productOptionValues = pgTable(
 );
 
 /**
- * Which option values a variant represents. The unique index on
- * (variant_id, option_id) enforces "one value per option", which is what makes
- * a variant addressable on the storefront.
+ * One node in a product's variant tree. A root node is a value of the first
+ * level (for example Colour: Blue). Its children are values of the next level
+ * (for example Size: S, M). A node with children is a group; a node without
+ * children is a sellable leaf and points at a `variants` row.
+ *
+ * Parent nodes can carry images and default price/stock, which pre-fill the
+ * child-creation form. The leaf's `variants` row owns the real SKU, price, and
+ * stock. Only the branches the admin creates exist, so there is no phantom
+ * "Red / L" row to deactivate.
  */
-export const variantOptionValues = pgTable(
-  "variant_option_values",
+export const variantNodes = pgTable(
+  "variant_nodes",
   {
-    variantId: text("variant_id").notNull(),
-    optionId: text("option_id").notNull(),
-    optionValueId: text("option_value_id").notNull(),
+    id: id(),
+    productId: text("product_id")
+      .notNull()
+      .references(() => products.id, { onDelete: "cascade" }),
+    parentId: text("parent_id"),
+    /** Null only for a product's single default leaf. */
+    optionId: text("option_id").references(() => productOptions.id, { onDelete: "cascade" }),
+    optionValueId: text("option_value_id").references(() => productOptionValues.id, {
+      onDelete: "cascade",
+    }),
+    label: text("label").notNull(),
+    position: integer("position").notNull().default(0),
+    active: boolean("active").notNull().default(true),
+    imageKey: text("image_key"),
+    imageAlt: text("image_alt").notNull().default(""),
+    defaultPriceMinor: integer("default_price_minor"),
+    defaultStockQty: integer("default_stock_qty"),
+    variantId: text("variant_id").references(() => variants.id, { onDelete: "cascade" }),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
   },
   (table) => [
-    primaryKey({ columns: [table.variantId, table.optionId] }),
-    index("variant_option_values_value_idx").on(table.optionValueId),
-    // Named explicitly: the generated names exceed Postgres's 63-character
-    // identifier limit and would be silently truncated.
+    index("variant_nodes_product_id_idx").on(table.productId),
+    index("variant_nodes_parent_id_idx").on(table.parentId),
+    uniqueIndex("variant_nodes_variant_id_uq").on(table.variantId),
+    uniqueIndex("variant_nodes_root_uq")
+      .on(table.productId, table.optionId, table.optionValueId)
+      .where(sql`${table.parentId} is null`),
+    uniqueIndex("variant_nodes_default_uq")
+      .on(table.productId)
+      .where(sql`${table.parentId} is null and ${table.optionId} is null`),
+    uniqueIndex("variant_nodes_child_uq")
+      .on(table.parentId, table.optionValueId)
+      .where(sql`${table.parentId} is not null`),
     foreignKey({
-      name: "variant_option_values_variant_fk",
-      columns: [table.variantId],
-      foreignColumns: [variants.id],
-    }).onDelete("cascade"),
-    foreignKey({
-      name: "variant_option_values_option_fk",
-      columns: [table.optionId],
-      foreignColumns: [productOptions.id],
-    }).onDelete("cascade"),
-    foreignKey({
-      name: "variant_option_values_value_fk",
-      columns: [table.optionValueId],
-      foreignColumns: [productOptionValues.id],
+      name: "variant_nodes_parent_fk",
+      columns: [table.parentId],
+      foreignColumns: [table.id],
     }).onDelete("cascade"),
   ],
 );
@@ -416,11 +436,15 @@ export const productsRelations = relations(products, ({ many }) => ({
   variants: many(variants),
   options: many(productOptions),
   media: many(productMedia),
+  variantNodes: many(variantNodes),
 }));
 
-export const variantsRelations = relations(variants, ({ one, many }) => ({
+export const variantsRelations = relations(variants, ({ one }) => ({
   product: one(products, { fields: [variants.productId], references: [products.id] }),
-  optionValues: many(variantOptionValues),
+  node: one(variantNodes, {
+    fields: [variants.id],
+    references: [variantNodes.variantId],
+  }),
 }));
 
 export const productOptionsRelations = relations(productOptions, ({ one, many }) => ({

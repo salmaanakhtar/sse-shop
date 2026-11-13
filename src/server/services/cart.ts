@@ -9,13 +9,11 @@ import {
   cartItems,
   carts,
   productMedia,
-  productOptionValues,
-  productOptions,
   products,
-  variantOptionValues,
   variants,
 } from "../db/schema";
 import { getStoreSettings } from "./settings";
+import { getVariantPathLabels } from "./variant-tree";
 
 export const CART_COOKIE = "sse_cart";
 const CART_TTL_SECONDS = 60 * 60 * 24 * 30;
@@ -265,27 +263,10 @@ export async function loadCart(cartId: string): Promise<CartView> {
     .where(eq(cartItems.cartId, cartId))
     .orderBy(asc(cartItems.createdAt));
 
-  const variantIds = rows.map((row) => row.variantId);
   const productIds = [...new Set(rows.map((row) => row.productId))];
 
-  const [labelRows, mediaRows] = await Promise.all([
-    variantIds.length > 0
-      ? db
-          .select({
-            variantId: variantOptionValues.variantId,
-            optionName: productOptions.name,
-            value: productOptionValues.value,
-            position: productOptions.position,
-          })
-          .from(variantOptionValues)
-          .innerJoin(productOptions, eq(variantOptionValues.optionId, productOptions.id))
-          .innerJoin(
-            productOptionValues,
-            eq(variantOptionValues.optionValueId, productOptionValues.id),
-          )
-          .where(inArray(variantOptionValues.variantId, variantIds))
-          .orderBy(asc(productOptions.position))
-      : Promise.resolve([]),
+  const [labelsByVariant, mediaRows] = await Promise.all([
+    getVariantPathLabels(productIds),
     productIds.length > 0
       ? db
           .select()
@@ -294,13 +275,6 @@ export async function loadCart(cartId: string): Promise<CartView> {
           .orderBy(asc(productMedia.position))
       : Promise.resolve([]),
   ]);
-
-  const labelsByVariant = new Map<string, string[]>();
-  for (const label of labelRows) {
-    const list = labelsByVariant.get(label.variantId) ?? [];
-    list.push(label.value);
-    labelsByVariant.set(label.variantId, list);
-  }
 
   const imageByProduct = new Map<string, string>();
   for (const media of mediaRows) {

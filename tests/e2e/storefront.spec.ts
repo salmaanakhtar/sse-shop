@@ -45,6 +45,23 @@ test("the cart survives a reload", async ({ page }) => {
   await expect(page.getByTestId("cart-quantity")).toHaveText("1");
 });
 
+test("a shopper selects a parent branch and then its child", async ({ page }) => {
+  await page.goto("/products/essential-tee");
+
+  await expect(page.getByText("Selected: Black / S")).toBeVisible();
+  await page.getByRole("button", { name: "White" }).click();
+  await page.getByRole("button", { name: "M" }).click();
+
+  await expect(page.getByText("Selected: White / M")).toBeVisible();
+  await expect(page.getByText(/AED\s125\.00/)).toBeVisible();
+
+  await page.getByTestId("add-to-cart").click();
+  await expect(page.getByRole("status")).toHaveText("Added to cart.");
+
+  await page.getByRole("link", { name: /^Cart/ }).click();
+  await expect(page.getByText("White / M")).toBeVisible();
+});
+
 test("the stock limit is enforced server-side", async ({ page }) => {
   await page.goto("/products/sample-cap");
 

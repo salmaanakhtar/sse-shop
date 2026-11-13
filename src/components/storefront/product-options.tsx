@@ -1,11 +1,20 @@
 "use client";
 
+import Image from "next/image";
 import { useRouter } from "next/navigation";
-import { useState, useTransition } from "react";
+import { useMemo, useState, useTransition } from "react";
 import { addToCartAction } from "@/app/(storefront)/cart-actions";
 import { Button } from "@/components/ui/button";
 import { formatMoney } from "@/lib/money";
 import { cn } from "@/lib/utils";
+import {
+  buildVariantTree,
+  firstAvailableLeaf,
+  firstLeaf,
+  pathToNode,
+  type VariantNodeView,
+  type VariantTreeNode,
+} from "@/lib/variants";
 
 type OptionGroup = {
   id: string;
@@ -13,67 +22,63 @@ type OptionGroup = {
   values: { id: string; value: string }[];
 };
 
-type Variant = {
-  id: string;
-  title: string;
-  priceMinor: number;
-  stockQty: number;
-  optionValueIds: string[];
-};
-
 type Props = {
   options: OptionGroup[];
-  variants: Variant[];
+  nodes: VariantNodeView[];
 };
 
-export function ProductOptions({ options, variants }: Props) {
+function initialPath(tree: VariantTreeNode[]): string[] {
+  for (const root of tree) {
+    const leaf = firstAvailableLeaf(root) ?? firstLeaf(root);
+    if (leaf) return pathToNode(tree, leaf.id).map((node) => node.id);
+  }
+  return [];
+}
+
+export function ProductOptions({ options, nodes }: Props) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [message, setMessage] = useState<{ kind: "ok" | "error"; text: string } | null>(null);
 
-  const [selected, setSelected] = useState<Record<string, string>>(() => {
-    const first = variants.find((candidate) => candidate.stockQty > 0) ?? variants[0];
-    const initial: Record<string, string> = {};
-    for (const option of options) {
-      const value = option.values.find((candidate) => first?.optionValueIds.includes(candidate.id));
-      if (value) initial[option.id] = value.id;
-    }
-    return initial;
-  });
+  const tree = useMemo(() => buildVariantTree(nodes), [nodes]);
+  const [selectedIds, setSelectedIds] = useState<string[]>(() => initialPath(tree));
 
-  const variant =
-    options.length === 0
-      ? (variants.find((candidate) => candidate.stockQty > 0) ?? variants[0])
-      : variants.find(
-          (candidate) =>
-            options.every((option) => candidate.optionValueIds.includes(selected[option.id] ?? "")),
-        );
+  const path = selectedIds.length
+    ? pathToNode(tree, selectedIds[selectedIds.length - 1] ?? "")
+    : [];
+  const selectedNode = path[path.length - 1];
+  const variant = selectedNode?.variant ?? null;
+  const soldOut = !variant || !variant.active || !selectedNode?.active || variant.stockQty === 0;
 
-  const soldOut = !variant || variant.stockQty === 0;
+  const groups: { level: OptionGroup; siblings: VariantTreeNode[]; selectedId?: string }[] = [];
+  let parent: VariantTreeNode | undefined;
+  for (let depth = 0; depth < options.length; depth += 1) {
+    const siblings = (parent ? parent.children : tree).filter((node) => node.active);
+    if (siblings.length === 0) break;
 
-  function isValueAvailable(optionId: string, valueId: string): boolean {
-    return variants.some((candidate) => {
-      if (candidate.stockQty <= 0) return false;
-      if (!candidate.optionValueIds.includes(valueId)) return false;
-
-      return options.every((option) => {
-        if (option.id === optionId) return true;
-        const selectedValueId = selected[option.id];
-        return selectedValueId ? candidate.optionValueIds.includes(selectedValueId) : true;
-      });
-    });
+    const selected = path[depth];
+    const level = options[depth];
+    if (!level) break;
+    groups.push({ level, siblings, selectedId: selected?.id });
+    parent = selected;
+    if (!parent || parent.children.length === 0) break;
   }
 
-  const selectedLabel = options
-    .map((option) => option.values.find((value) => value.id === selected[option.id])?.value)
-    .filter(Boolean)
-    .join(" / ");
-
+  const selectedLabel =
+    options.length > 0 ? path.map((node) => node.label).join(" / ") : "";
+  const imageNode = [...path].reverse().find((node) => node.imageKey);
   const statusText = !variant
     ? "Not available in this combination"
-    : variant.stockQty === 0
+    : !variant.active || variant.stockQty === 0
       ? "Sold out"
       : `${variant.stockQty} in stock`;
+
+  function choose(node: VariantTreeNode) {
+    const leaf = firstAvailableLeaf(node) ?? firstLeaf(node) ?? node;
+    const next = pathToNode(tree, leaf.id).map((item) => item.id);
+    setSelectedIds(next.length > 0 ? next : [node.id]);
+    setMessage(null);
+  }
 
   function add() {
     if (!variant) return;
@@ -92,26 +97,24 @@ export function ProductOptions({ options, variants }: Props) {
   return (
     <div className="space-y-6">
       <div className="space-y-4">
-        {options.map((option) => (
-          <fieldset key={option.id}>
+        {groups.map(({ level, siblings, selectedId }) => (
+          <fieldset key={level.id}>
             <legend className="mb-2 text-xs font-semibold tracking-wide text-muted uppercase">
-              {option.name}
+              {level.name}
             </legend>
             <div className="flex flex-wrap gap-2">
-              {option.values.map((value) => {
-                const active = selected[option.id] === value.id;
-                const available = isValueAvailable(option.id, value.id);
+              {siblings.map((node) => {
+                const active = node.id === selectedId;
+                const available = firstAvailableLeaf(node) !== null;
+
                 return (
                   <button
-                    key={value.id}
+                    key={node.id}
                     type="button"
                     aria-pressed={active}
                     disabled={!active && !available}
                     title={!active && !available ? "Not available with this selection" : undefined}
-                    onClick={() => {
-                      setSelected((current) => ({ ...current, [option.id]: value.id }));
-                      setMessage(null);
-                    }}
+                    onClick={() => choose(node)}
                     className={cn(
                       "h-9 rounded-lg border px-3 text-sm transition-colors",
                       active
@@ -121,7 +124,7 @@ export function ProductOptions({ options, variants }: Props) {
                           : "cursor-not-allowed border-line bg-page text-muted line-through",
                     )}
                   >
-                    {value.value}
+                    {node.label}
                   </button>
                 );
               })}
@@ -132,18 +135,34 @@ export function ProductOptions({ options, variants }: Props) {
 
       {selectedLabel ? <p className="text-xs text-muted">Selected: {selectedLabel}</p> : null}
 
-      <div className="flex items-baseline justify-between border-t border-line pt-5">
-        <div>
-          <p className="text-xl font-semibold tabular-nums">
-            {variant ? formatMoney(variant.priceMinor) : "—"}
-          </p>
-          <p className="mt-1 text-xs text-muted">{statusText}</p>
+      <div className="flex items-center justify-between gap-4 border-t border-line pt-5">
+        <div className="flex items-center gap-3">
+          {imageNode?.imageKey ? (
+            <Image
+              src={`/media/${imageNode.imageKey}`}
+              alt={imageNode.imageAlt || selectedLabel}
+              width={64}
+              height={64}
+              className="h-16 w-16 rounded-lg border border-line object-cover"
+            />
+          ) : null}
+          <div>
+            <p className="text-xl font-semibold tabular-nums">
+              {variant ? formatMoney(variant.priceMinor) : "—"}
+            </p>
+            <p className="mt-1 text-xs text-muted">{statusText}</p>
+          </div>
         </div>
         <p className="text-xs text-muted">VAT included</p>
       </div>
 
       <div className="space-y-3">
-        <Button onClick={add} disabled={pending || soldOut} className="w-full" data-testid="add-to-cart">
+        <Button
+          onClick={add}
+          disabled={pending || soldOut}
+          className="w-full"
+          data-testid="add-to-cart"
+        >
           {soldOut ? "Sold out" : pending ? "Adding…" : "Add to cart"}
         </Button>
 

@@ -3,8 +3,7 @@
 Sequenced so every phase leaves a working store. A phase is done when its completion criteria
 hold, not when the code is written.
 
-**Current:** Phase 2 complete. Phase 3 next. No-code control is a continuous background stream,
-not a numbered phase.
+**Current:** Phase 2 complete. Phase 3 in progress — the explicit variant tree has shipped. No-code control is a continuous background stream, not a numbered phase.
 
 ## Phase 0 — Foundation
 
@@ -50,15 +49,31 @@ methods, marketing consent, and the map address picker. Address entry is manual 
 
 ## Phase 3 — Catalog depth
 
-- Keep the current model: one variant per final combination (for example 3 specs × 3 colours = 9
-  variants), each with its own SKU, price, and stock.
-- Admin selector improvements: ordered options, clear combination labels, and deactivating
-  combinations that are not sold.
-- Per-variant images, falling back to the nearest parent value and then the product gallery.
-- Better variant editing at scale: bulk price/stock edits and a filter for missing images.
+**Status: in progress.** The explicit variant tree is complete; bulk editing and the full gallery
+swap remain.
 
-**Done when** a product with multiple specs and colours can be published with per-variant images,
-prices, and stock, and an invalid combination cannot be bought.
+- Replace the Cartesian product with an explicit tree of levels, branches, groups, and leaves.
+  Depth is whatever the admin configures: Colour → Size → Fit, and deeper.
+- Each parent defines its own child values. Blue can have S/M/L while Red has S/M only; there is no
+  phantom Red/L row.
+- Tree builder: add roots and children, copy a sibling's subtree, parent defaults and images, leaf
+  SKU/price/stock, and branch deletion with its descendants.
+- Leaves own the real SKU, price, and stock. Parent defaults pre-fill child creation but do not
+  rewrite existing leaves. SKUs are generated from the path and remain editable.
+- Storefront selects parent first, filters to existing children, disables sold-out branches, and
+  shows the selected leaf image with nearest-ancestor fallback.
+- Migration backfills every existing variant into a leaf and drops the old join table.
+
+**Remaining in this phase**
+
+- Bulk price/stock edits across selected leaves.
+- A filter for branches missing images.
+- Swap the main product gallery to the selected leaf/ancestor image; the picker already shows the
+  selected image, but the large gallery still uses the product gallery.
+
+**Done when** an asymmetric catalog (for example Blue S/M/L, Red S/M) can be built and published
+without creating impossible rows, the storefront never offers a combination the admin did not
+create, and the tree survives the migration.
 
 ## Phase 4 — Merchandising
 
@@ -156,13 +171,11 @@ These shape upcoming work. Answers land in `CONTEXT.md`, an ADR, or this file.
    category? Navbar ordering and SEO URLs need an answer.
 6. **Collection automation.** Best Selling stays manual until the order volume justifies a rule.
    Which other collections should become automatic?
-7. **Variant image fallback.** Confirm “nearest parent” means option value, then product, and
-   whether a variant can have its own gallery.
-8. **Arabic content.** When do product titles, descriptions, categories, and emails become
+7. **Arabic content.** When do product titles, descriptions, categories, and emails become
    bilingual?
-9. **Payment provider.** Stripe is the working assumption; confirm before Phase 7.
-10. **Returns.** Is there a returns window that must be stated on the storefront, and are refunds
-    handled here or outside?
+8. **Payment provider.** Stripe is the working assumption; confirm before Phase 7.
+9. **Returns.** Is there a returns window that must be stated on the storefront, and are refunds
+   handled here or outside?
 
 ## Answered
 
@@ -172,9 +185,11 @@ These shape upcoming work. Answers land in `CONTEXT.md`, an ADR, or this file.
   later.
 - **Account scope:** saved addresses, order history, admin customer list, cart merge on sign-in,
   and self-service deletion. No marketing opt-in in this phase.
-- **Variations:** one variant per final option combination; no per-option price modifiers and no
-  nested option sets yet.
-- **Variant images:** per variant, with fallback to the nearest parent value.
+- **Variations:** an explicit variant tree with configurable depth, per-parent child sets, copy,
+  parent defaults and images, and one sellable leaf variant per created path. No Cartesian product
+  and no per-option price modifiers.
+- **Variant images:** branch images with nearest-ancestor fallback, then the product gallery. The
+  picker shows the selected image; swapping the large gallery is the remaining polish.
 - **Categories, collections, badges:** three separate systems. Categories are a tree; collections
   are curated rows; badges are card labels. Manual first.
 - **Sales:** per-variant sale price with a schedule; the lowest active price wins.

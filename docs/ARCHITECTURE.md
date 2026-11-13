@@ -282,9 +282,9 @@ addresses, order history, and faster checkout.
 The panel also lists customers: name, email, phone, order count, spend, and last order, with a
 detail page for saved addresses and order history. Customers never reach this host.
 
-The product editor defines levels and values, then builds the variant tree: add roots and children,
-copy a sibling's subtree, set parent defaults and images, and edit each leaf's SKU, price, stock, and
-active flag. Nothing is generated from a Cartesian product.
+The product editor defines levels and values, then builds the variant tree. The tree is a compact
+table: groups expand inline, the selected branch opens in a side inspector, and a single “Add
+branches” form creates only the ticked values. Nothing is generated from a Cartesian product.
 
 A no-code boundary is intentional: admin edits `settings` and content rows, never code. Anything
 that would require a deploy belongs in this repo, not in the admin UI.

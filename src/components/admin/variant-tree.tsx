@@ -1,4 +1,7 @@
+"use client";
+
 import Image from "next/image";
+import { Fragment, useMemo, useState } from "react";
 import {
   addVariantBranchesAction,
   copyVariantChildrenAction,
@@ -17,6 +20,7 @@ import { formatMoney } from "@/lib/money";
 import {
   buildVariantTree,
   flattenVariantTree,
+  pathToNode,
   type VariantNodeView,
   type VariantTreeNode,
 } from "@/lib/variants";
@@ -27,13 +31,38 @@ type Level = {
   values: { id: string; value: string }[];
 };
 
-function moneyInput(minor: number | null): string {
-  return minor === null ? "" : (minor / 100).toFixed(2);
+function moneyInput(minor: number | null | undefined): string {
+  return minor === null || minor === undefined ? "" : (minor / 100).toFixed(2);
 }
 
-function ValueCheckboxes({ values }: { values: { id: string; value: string }[] }) {
+function pathLabels(tree: VariantTreeNode[], node: VariantTreeNode): string[] {
+  return pathToNode(tree, node.id).map((item) => item.label);
+}
+
+function StatusBadge({ status }: { status: "Active" | "Inactive" | "Sold out" | "Empty" }) {
+  const style =
+    status === "Active"
+      ? "bg-emerald-50 text-emerald-700"
+      : status === "Sold out"
+        ? "bg-amber-50 text-amber-700"
+        : "bg-zinc-100 text-zinc-600";
+
   return (
-    <div className="flex flex-wrap gap-x-4 gap-y-2 text-sm">
+    <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold tracking-wide uppercase ${style}`}>
+      {status}
+    </span>
+  );
+}
+
+function ValueCheckboxes({
+  values,
+  resetKey,
+}: {
+  values: { id: string; value: string }[];
+  resetKey: string;
+}) {
+  return (
+    <div key={resetKey} className="flex flex-wrap gap-x-4 gap-y-2 text-sm">
       {values.map((value) => (
         <label key={value.id} className="flex items-center gap-2">
           <input
@@ -50,344 +79,341 @@ function ValueCheckboxes({ values }: { values: { id: string; value: string }[] }
   );
 }
 
-function NodeCard({
+function TreeRows({
+  nodes,
+  depth,
+  expanded,
+  onToggle,
+  selectedId,
+  onSelect,
+  tree,
+}: {
+  nodes: VariantTreeNode[];
+  depth: number;
+  expanded: Set<string>;
+  onToggle: (id: string) => void;
+  selectedId: string | null;
+  onSelect: (id: string) => void;
+  tree: VariantTreeNode[];
+}) {
+  return (
+    <>
+      {nodes.map((node) => {
+        const path = pathToNode(tree, node.id);
+        const labels = path.map((item) => item.label);
+        const isGroup = node.children.length > 0;
+        const variant = node.variant;
+        const imageNode = [...path].reverse().find((item) => item.imageKey);
+        const status: "Active" | "Inactive" | "Sold out" | "Empty" = isGroup
+          ? node.active
+            ? "Active"
+            : "Inactive"
+          : !variant
+            ? "Empty"
+            : !node.active || !variant.active
+              ? "Inactive"
+              : variant.stockQty === 0
+                ? "Sold out"
+                : "Active";
+
+        return (
+          <Fragment key={node.id}>
+            <tr
+              className={`border-b border-line last:border-0 ${
+                selectedId === node.id ? "bg-brand-soft/40" : "hover:bg-page/60"
+              }`}
+            >
+              <td className="px-4 py-3">
+                <div className="flex items-start" style={{ paddingLeft: depth * 18 }}>
+                  {isGroup ? (
+                    <button
+                      type="button"
+                      onClick={() => onToggle(node.id)}
+                      aria-label={expanded.has(node.id) ? `Collapse ${node.label}` : `Expand ${node.label}`}
+                      className="mr-1 flex size-5 shrink-0 items-center justify-center rounded text-muted hover:bg-page hover:text-ink"
+                    >
+                      {expanded.has(node.id) ? "▾" : "▸"}
+                    </button>
+                  ) : (
+                    <span className="mr-1 inline-block w-5 shrink-0" />
+                  )}
+                  <div className="min-w-0">
+                    <p className="font-medium">{node.label}</p>
+                    <p className="truncate text-[11px] text-muted">{labels.join(" / ")}</p>
+                  </div>
+                </div>
+              </td>
+              <td className="px-4 py-3 text-xs text-muted">
+                {isGroup ? "Group" : variant ? "Variant" : "Empty"}
+              </td>
+              <td className="px-4 py-3 text-xs text-muted">{variant?.sku ?? "—"}</td>
+              <td className="px-4 py-3 text-sm tabular-nums">
+                {variant ? formatMoney(variant.priceMinor) : "—"}
+              </td>
+              <td className="px-4 py-3 text-sm tabular-nums">{variant?.stockQty ?? "—"}</td>
+              <td className="px-4 py-3">
+                <StatusBadge status={status} />
+              </td>
+              <td className="px-4 py-3">
+                {imageNode?.imageKey ? (
+                  <Image
+                    src={`/media/${imageNode.imageKey}`}
+                    alt={imageNode.imageAlt || node.label}
+                    width={36}
+                    height={36}
+                    className="h-9 w-9 rounded-md border border-line object-cover"
+                  />
+                ) : (
+                  <span className="text-xs text-muted">—</span>
+                )}
+              </td>
+              <td className="px-4 py-3 text-right">
+                <button
+                  type="button"
+                  onClick={() => onSelect(node.id)}
+                  className="text-xs text-muted underline-offset-4 hover:text-ink hover:underline"
+                >
+                  Edit
+                </button>
+              </td>
+            </tr>
+
+            {isGroup && expanded.has(node.id) ? (
+              <TreeRows
+                nodes={node.children}
+                depth={depth + 1}
+                expanded={expanded}
+                onToggle={onToggle}
+                selectedId={selectedId}
+                onSelect={onSelect}
+                tree={tree}
+              />
+            ) : null}
+          </Fragment>
+        );
+      })}
+    </>
+  );
+}
+
+function BranchImageForm({
   productId,
   node,
-  levels,
-  levelIndexById,
-  siblings,
-  parentPath,
 }: {
   productId: string;
   node: VariantTreeNode;
+}) {
+  return (
+    <div className="space-y-3">
+      <div className="flex items-center gap-3">
+        {node.imageKey ? (
+          <Image
+            src={`/media/${node.imageKey}`}
+            alt={node.imageAlt || node.label}
+            width={72}
+            height={72}
+            className="h-16 w-16 rounded-lg border border-line object-cover"
+          />
+        ) : (
+          <div className="flex h-16 w-16 items-center justify-center rounded-lg border border-dashed border-line text-[11px] text-muted">
+            No image
+          </div>
+        )}
+        {node.imageKey ? (
+          <form action={deleteNodeImageAction}>
+            <input type="hidden" name="productId" value={productId} />
+            <input type="hidden" name="nodeId" value={node.id} />
+            <ConfirmSubmitButton
+              type="submit"
+              message="Remove this branch image?"
+              className="text-xs text-muted hover:text-red-600"
+            >
+              Remove image
+            </ConfirmSubmitButton>
+          </form>
+        ) : null}
+      </div>
+
+      <form action={uploadNodeImageAction} className="space-y-2">
+        <input type="hidden" name="productId" value={productId} />
+        <input type="hidden" name="nodeId" value={node.id} />
+        <input
+          name="image"
+          type="file"
+          accept="image/jpeg,image/png,image/webp,image/avif"
+          required
+          className="block w-full text-xs file:mr-2 file:rounded-md file:border file:border-line file:bg-page file:px-2 file:py-1"
+        />
+        <div>
+          <Label htmlFor={`inspector-alt-${node.id}`}>Alt text</Label>
+          <Input id={`inspector-alt-${node.id}`} name="alt" placeholder={node.label} />
+        </div>
+        <Button type="submit" size="sm" variant="secondary">
+          Upload image
+        </Button>
+      </form>
+    </div>
+  );
+}
+
+function BranchInspector({
+  productId,
+  node,
+  tree,
+  levels,
+  levelIndexById,
+  siblings,
+  onAddChildren,
+  onClose,
+}: {
+  productId: string;
+  node: VariantTreeNode;
+  tree: VariantTreeNode[];
   levels: Level[];
   levelIndexById: Map<string, number>;
   siblings: VariantTreeNode[];
-  parentPath: string[];
+  onAddChildren: (id: string) => void;
+  onClose: () => void;
 }) {
-  const levelIndex = node.optionId ? (levelIndexById.get(node.optionId) ?? 0) : 0;
-  const level = levels[levelIndex];
-  const nextLevel = levels[levelIndex + 1];
-  const path = [...parentPath, node.label];
+  const path = pathToNode(tree, node.id);
+  const levelIndex = node.optionId ? (levelIndexById.get(node.optionId) ?? -1) : -1;
+  const nextLevel = levelIndex >= 0 ? levels[levelIndex + 1] : undefined;
   const isGroup = node.children.length > 0;
-  const availableChildValues = nextLevel
-    ? nextLevel.values.filter(
-        (value) => !node.children.some((child) => child.optionValueId === value.id),
-      )
-    : [];
   const copySources = siblings.filter(
     (sibling) => sibling.id !== node.id && sibling.children.length > 0,
   );
-  const childrenAreLeaves = nextLevel ? !levels[levelIndex + 2] : true;
 
   return (
-    <div className="rounded-xl border border-line p-4">
-      <div className="flex flex-wrap items-start justify-between gap-3">
+    <aside className="h-fit rounded-xl border border-line bg-surface p-5 xl:sticky xl:top-6">
+      <div className="flex items-start justify-between gap-3">
         <div>
           <p className="text-[11px] font-semibold tracking-wide text-muted uppercase">
-            {level ? `${level.name} · level ${levelIndex + 1}` : "Default"}
+            {isGroup ? "Group" : node.variant ? "Variant" : "Branch"}
           </p>
-          <p className="text-sm font-semibold">{node.label}</p>
-          <p className="mt-0.5 text-[11px] text-muted">{path.join(" / ")}</p>
-
-          <div className="mt-2 flex flex-wrap gap-1.5 text-[10px] font-semibold tracking-wide uppercase">
-            {isGroup ? (
-              <span className="rounded-full bg-page px-2 py-0.5 text-muted">Group</span>
-            ) : null}
-            {node.variant ? (
-              <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-emerald-700">
-                Sellable
-              </span>
-            ) : null}
-            {!isGroup && !node.variant ? (
-              <span className="rounded-full bg-amber-50 px-2 py-0.5 text-amber-700">
-                No variant yet
-              </span>
-            ) : null}
-            {!node.active ? (
-              <span className="rounded-full bg-zinc-100 px-2 py-0.5 text-zinc-600">Inactive</span>
-            ) : null}
-          </div>
+          <h3 className="mt-1 text-base font-semibold">{node.label}</h3>
+          <p className="mt-0.5 text-[11px] text-muted">{path.map((item) => item.label).join(" / ")}</p>
         </div>
-
-        <form action={deleteVariantNodeAction}>
-          <input type="hidden" name="productId" value={productId} />
-          <input type="hidden" name="nodeId" value={node.id} />
-          <ConfirmSubmitButton
-            type="submit"
-            message={`Delete ${path.join(" / ")} and all its children?`}
-            className="text-xs text-muted underline-offset-4 hover:text-red-600 hover:underline"
-          >
-            Delete branch
-          </ConfirmSubmitButton>
-        </form>
-      </div>
-
-      <div className="mt-4 flex flex-wrap items-start gap-4 rounded-lg bg-page/60 p-3">
-        <div className="flex items-center gap-3">
-          {node.imageKey ? (
-            <Image
-              src={`/media/${node.imageKey}`}
-              alt={node.imageAlt || node.label}
-              width={80}
-              height={80}
-              className="h-20 w-20 rounded-lg border border-line object-cover"
-            />
-          ) : (
-            <div className="flex h-20 w-20 items-center justify-center rounded-lg border border-dashed border-line text-[11px] text-muted">
-              No image
-            </div>
-          )}
-          {node.imageKey ? (
-            <form action={deleteNodeImageAction}>
-              <input type="hidden" name="productId" value={productId} />
-              <input type="hidden" name="nodeId" value={node.id} />
-              <ConfirmSubmitButton
-                type="submit"
-                message="Remove this branch image?"
-                className="text-xs text-muted hover:text-red-600"
-              >
-                Remove image
-              </ConfirmSubmitButton>
-            </form>
-          ) : null}
-        </div>
-
-        <form
-          action={uploadNodeImageAction}
-          className="flex flex-wrap items-end gap-2 text-sm"
+        <button
+          type="button"
+          onClick={onClose}
+          className="text-xs text-muted underline-offset-4 hover:text-ink hover:underline"
         >
-          <input type="hidden" name="productId" value={productId} />
-          <input type="hidden" name="nodeId" value={node.id} />
-          <div>
-            <Label htmlFor={`node-image-${node.id}`}>Branch image</Label>
-            <input
-              id={`node-image-${node.id}`}
-              name="image"
-              type="file"
-              accept="image/jpeg,image/png,image/webp,image/avif"
-              required
-              className="block text-xs file:mr-2 file:rounded-md file:border file:border-line file:bg-page file:px-2 file:py-1"
-            />
-          </div>
-          <div className="w-40">
-            <Label htmlFor={`node-alt-${node.id}`}>Alt text</Label>
-            <Input id={`node-alt-${node.id}`} name="alt" placeholder={node.label} />
-          </div>
-          <Button type="submit" size="sm" variant="secondary">
-            Upload
-          </Button>
-        </form>
+          Close
+        </button>
       </div>
 
       {isGroup ? (
-        <form
-          action={updateVariantNodeAction}
-          className="mt-4 flex flex-wrap items-end gap-3 rounded-lg border border-line p-3"
-        >
-          <input type="hidden" name="productId" value={productId} />
-          <input type="hidden" name="nodeId" value={node.id} />
-          <div className="w-32">
-            <Label htmlFor={`node-price-${node.id}`}>Default price</Label>
-            <Input
-              id={`node-price-${node.id}`}
-              name="defaultPrice"
-              inputMode="decimal"
-              placeholder="120.00"
-              defaultValue={moneyInput(node.defaultPriceMinor)}
-            />
-          </div>
-          <div className="w-28">
-            <Label htmlFor={`node-stock-${node.id}`}>Default stock</Label>
-            <Input
-              id={`node-stock-${node.id}`}
-              name="defaultStock"
-              type="number"
-              min={0}
-              defaultValue={node.defaultStockQty ?? ""}
-            />
-          </div>
-          <label className="flex h-10 items-center gap-2 text-sm">
-            <input type="checkbox" name="active" defaultChecked={node.active} className="size-4" />
-            Active branch
-          </label>
-          <Button type="submit" size="sm" variant="secondary">
-            Save branch
-          </Button>
-        </form>
-      ) : null}
+        <div className="mt-5 space-y-5">
+          <form action={updateVariantNodeAction} className="space-y-3">
+            <input type="hidden" name="productId" value={productId} />
+            <input type="hidden" name="nodeId" value={node.id} />
+            <div>
+              <Label htmlFor={`inspector-default-price-${node.id}`}>Default price</Label>
+              <Input
+                id={`inspector-default-price-${node.id}`}
+                name="defaultPrice"
+                inputMode="decimal"
+                placeholder="120.00"
+                defaultValue={moneyInput(node.defaultPriceMinor)}
+              />
+            </div>
+            <div>
+              <Label htmlFor={`inspector-default-stock-${node.id}`}>Default stock</Label>
+              <Input
+                id={`inspector-default-stock-${node.id}`}
+                name="defaultStock"
+                type="number"
+                min={0}
+                defaultValue={node.defaultStockQty ?? ""}
+              />
+            </div>
+            <label className="flex items-center gap-2 text-sm">
+              <input type="checkbox" name="active" defaultChecked={node.active} className="size-4" />
+              Active branch
+            </label>
+            <Button type="submit" size="sm" variant="secondary">
+              Save branch
+            </Button>
+          </form>
 
-      {!node.variant && nextLevel ? (
-        <div className="mt-4 rounded-lg border border-dashed border-line p-3">
-          <p className="text-xs font-medium">
-            Add {nextLevel.name} values under {node.label}
-          </p>
-          <p className="mt-1 text-[11px] text-muted">
-            Only the values you tick become children of this branch.
-          </p>
-
-          {availableChildValues.length > 0 ? (
-            <form action={addVariantBranchesAction} className="mt-3 space-y-3">
-              <input type="hidden" name="productId" value={productId} />
-              <input type="hidden" name="parentId" value={node.id} />
-              <ValueCheckboxes values={availableChildValues} />
-              <div className="flex flex-wrap items-end gap-3">
-                <div className="w-32">
-                  <Label htmlFor={`child-price-${node.id}`}>
-                    {childrenAreLeaves ? "Price (AED)" : "Default price"}
-                  </Label>
-                  <Input
-                    id={`child-price-${node.id}`}
-                    name="price"
-                    inputMode="decimal"
-                    placeholder="120.00"
-                    required={childrenAreLeaves}
-                    defaultValue={moneyInput(node.defaultPriceMinor)}
-                  />
-                </div>
-                <div className="w-28">
-                  <Label htmlFor={`child-stock-${node.id}`}>
-                    {childrenAreLeaves ? "Stock" : "Default stock"}
-                  </Label>
-                  <Input
-                    id={`child-stock-${node.id}`}
-                    name="stock"
-                    type="number"
-                    min={0}
-                    placeholder={childrenAreLeaves ? "10" : ""}
-                    required={childrenAreLeaves}
-                    defaultValue={node.defaultStockQty ?? ""}
-                  />
-                </div>
-                <Button type="submit" size="sm" variant="secondary">
-                  Add children
-                </Button>
-              </div>
-            </form>
-          ) : (
-            <p className="mt-2 text-xs text-muted">
-              Every {nextLevel.name} value is already under this branch.
-            </p>
-          )}
-        </div>
-      ) : null}
-
-      {!node.variant && !nextLevel ? (
-        <form
-          action={createLeafVariantAction}
-          className="mt-4 flex flex-wrap items-end gap-3 rounded-lg border border-dashed border-line p-3"
-        >
-          <input type="hidden" name="productId" value={productId} />
-          <input type="hidden" name="nodeId" value={node.id} />
-          <div className="w-32">
-            <Label htmlFor={`leaf-price-${node.id}`}>Price (AED)</Label>
-            <Input
-              id={`leaf-price-${node.id}`}
-              name="price"
-              inputMode="decimal"
-              placeholder="120.00"
-              required
-              defaultValue={moneyInput(node.defaultPriceMinor)}
-            />
-          </div>
-          <div className="w-28">
-            <Label htmlFor={`leaf-stock-${node.id}`}>Stock</Label>
-            <Input
-              id={`leaf-stock-${node.id}`}
-              name="stock"
-              type="number"
-              min={0}
-              required
-              defaultValue={node.defaultStockQty ?? 10}
-            />
-          </div>
-          <div className="w-40">
-            <Label htmlFor={`leaf-sku-${node.id}`}>SKU (optional)</Label>
-            <Input id={`leaf-sku-${node.id}`} name="sku" placeholder="Auto from path" />
-          </div>
-          <Button type="submit" size="sm" variant="secondary">
-            Create variant
-          </Button>
-        </form>
-      ) : null}
-
-      {isGroup && copySources.length > 0 && !node.variant ? (
-        <form
-          action={copyVariantChildrenAction}
-          className="mt-4 flex flex-wrap items-end gap-3 rounded-lg border border-line p-3"
-        >
-          <input type="hidden" name="productId" value={productId} />
-          <input type="hidden" name="targetNodeId" value={node.id} />
-          <div className="w-56">
-            <Label htmlFor={`copy-source-${node.id}`}>Copy children from</Label>
-            <select
-              id={`copy-source-${node.id}`}
-              name="sourceNodeId"
-              required
-              className="w-full rounded-lg border border-line bg-surface px-3 py-2 text-sm"
+          <div className="border-t border-line pt-4">
+            <Button
+              type="button"
+              size="sm"
+              variant="secondary"
+              onClick={() => onAddChildren(node.id)}
             >
-              <option value="">Choose a sibling</option>
-              {copySources.map((sibling) => (
-                <option key={sibling.id} value={sibling.id}>
-                  {sibling.label}
-                </option>
-              ))}
-            </select>
+              Add children
+            </Button>
           </div>
-          <Button type="submit" size="sm" variant="secondary">
-            Copy children
-          </Button>
-        </form>
-      ) : null}
 
-      {node.variant ? (
-        <form
-          action={updateVariantAction}
-          className="mt-4 grid gap-3 rounded-lg border border-line p-3 lg:grid-cols-[minmax(0,1.4fr)_9rem_9rem_7rem_6rem_auto] lg:items-start"
-        >
+          {copySources.length > 0 ? (
+            <form action={copyVariantChildrenAction} className="space-y-2 border-t border-line pt-4">
+              <input type="hidden" name="productId" value={productId} />
+              <input type="hidden" name="targetNodeId" value={node.id} />
+              <Label htmlFor={`inspector-copy-${node.id}`}>Copy children from</Label>
+              <select
+                id={`inspector-copy-${node.id}`}
+                name="sourceNodeId"
+                required
+                className="w-full rounded-lg border border-line bg-surface px-3 py-2 text-sm"
+              >
+                <option value="">Choose a sibling</option>
+                {copySources.map((sibling) => (
+                  <option key={sibling.id} value={sibling.id}>
+                    {sibling.label}
+                  </option>
+                ))}
+              </select>
+              <Button type="submit" size="sm" variant="secondary">
+                Copy children
+              </Button>
+            </form>
+          ) : null}
+        </div>
+      ) : node.variant ? (
+        <form action={updateVariantAction} className="mt-5 space-y-3">
           <input type="hidden" name="productId" value={productId} />
           <input type="hidden" name="variantId" value={node.variant.id} />
           <div>
-            <Label htmlFor={`variant-title-${node.variant.id}`}>Order title</Label>
+            <Label htmlFor={`inspector-title-${node.variant.id}`}>Order title</Label>
             <Input
-              id={`variant-title-${node.variant.id}`}
+              id={`inspector-title-${node.variant.id}`}
               name="title"
               defaultValue={node.variant.title}
             />
-            <p className="mt-1 text-[11px] text-muted">Shown on order lines.</p>
           </div>
           <div>
-            <Label htmlFor={`variant-sku-${node.variant.id}`}>SKU</Label>
+            <Label htmlFor={`inspector-sku-${node.variant.id}`}>SKU</Label>
             <Input
-              id={`variant-sku-${node.variant.id}`}
+              id={`inspector-sku-${node.variant.id}`}
               name="sku"
               defaultValue={node.variant.sku}
             />
           </div>
-          <div>
-            <Label htmlFor={`variant-price-${node.variant.id}`}>Price (AED)</Label>
-            <Input
-              id={`variant-price-${node.variant.id}`}
-              name="price"
-              inputMode="decimal"
-              defaultValue={(node.variant.priceMinor / 100).toFixed(2)}
-              data-testid="variant-price"
-            />
-            <p className="mt-1 text-[11px] text-muted">
-              {formatMoney(node.variant.priceMinor)}
-            </p>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <Label htmlFor={`inspector-price-${node.variant.id}`}>Price (AED)</Label>
+              <Input
+                id={`inspector-price-${node.variant.id}`}
+                name="price"
+                inputMode="decimal"
+                defaultValue={(node.variant.priceMinor / 100).toFixed(2)}
+                data-testid="variant-price"
+              />
+            </div>
+            <div>
+              <Label htmlFor={`inspector-stock-${node.variant.id}`}>Stock</Label>
+              <Input
+                id={`inspector-stock-${node.variant.id}`}
+                name="stock"
+                type="number"
+                min={0}
+                defaultValue={node.variant.stockQty}
+              />
+            </div>
           </div>
-          <div>
-            <Label htmlFor={`variant-stock-${node.variant.id}`}>Stock</Label>
-            <Input
-              id={`variant-stock-${node.variant.id}`}
-              name="stock"
-              type="number"
-              min={0}
-              defaultValue={node.variant.stockQty}
-            />
-          </div>
-          <label className="flex h-10 items-center gap-2 text-sm lg:mt-5">
+          <label className="flex items-center gap-2 text-sm">
             <input
               type="checkbox"
               name="active"
@@ -396,30 +422,66 @@ function NodeCard({
             />
             Active
           </label>
-          <div className="lg:mt-5">
-            <Button type="submit" size="sm" variant="secondary" data-testid="variant-save">
-              Save
-            </Button>
-          </div>
+          <Button type="submit" size="sm" variant="secondary" data-testid="variant-save">
+            Save variant
+          </Button>
         </form>
-      ) : null}
-
-      {node.children.length > 0 ? (
-        <div className="mt-4 space-y-3 border-l-2 border-line pl-4">
-          {node.children.map((child) => (
-            <NodeCard
-              key={child.id}
-              productId={productId}
-              node={child}
-              levels={levels}
-              levelIndexById={levelIndexById}
-              siblings={node.children}
-              parentPath={path}
+      ) : nextLevel ? (
+        <p className="mt-5 rounded-lg bg-page px-3 py-3 text-sm text-muted">
+          This branch has no children yet. Use Add children above to build it.
+        </p>
+      ) : (
+        <form action={createLeafVariantAction} className="mt-5 space-y-3">
+          <input type="hidden" name="productId" value={productId} />
+          <input type="hidden" name="nodeId" value={node.id} />
+          <div>
+            <Label htmlFor={`inspector-leaf-price-${node.id}`}>Price (AED)</Label>
+            <Input
+              id={`inspector-leaf-price-${node.id}`}
+              name="price"
+              inputMode="decimal"
+              placeholder="120.00"
+              required
+              defaultValue={moneyInput(node.defaultPriceMinor)}
             />
-          ))}
-        </div>
-      ) : null}
-    </div>
+          </div>
+          <div>
+            <Label htmlFor={`inspector-leaf-stock-${node.id}`}>Stock</Label>
+            <Input
+              id={`inspector-leaf-stock-${node.id}`}
+              name="stock"
+              type="number"
+              min={0}
+              required
+              defaultValue={node.defaultStockQty ?? 10}
+            />
+          </div>
+          <div>
+            <Label htmlFor={`inspector-leaf-sku-${node.id}`}>SKU (optional)</Label>
+            <Input id={`inspector-leaf-sku-${node.id}`} name="sku" placeholder="Auto from path" />
+          </div>
+          <Button type="submit" size="sm" variant="secondary">
+            Create variant
+          </Button>
+        </form>
+      )}
+
+      <div className="mt-5 border-t border-line pt-4">
+        <BranchImageForm productId={productId} node={node} />
+      </div>
+
+      <form action={deleteVariantNodeAction} className="mt-5 border-t border-line pt-4">
+        <input type="hidden" name="productId" value={productId} />
+        <input type="hidden" name="nodeId" value={node.id} />
+        <ConfirmSubmitButton
+          type="submit"
+          message={`Delete ${path.map((item) => item.label).join(" / ")} and all its children?`}
+          className="text-xs text-muted underline-offset-4 hover:text-red-600 hover:underline"
+        >
+          Delete branch
+        </ConfirmSubmitButton>
+      </form>
+    </aside>
   );
 }
 
@@ -432,169 +494,271 @@ export function VariantTreeEditor({
   levels: Level[];
   nodes: VariantNodeView[];
 }) {
-  const tree = buildVariantTree(nodes);
-  const all = flattenVariantTree(tree);
-  const sellable = all.filter((node) => node.children.length === 0 && node.variant);
-  const activeSellable = sellable.filter(
+  const tree = useMemo(() => buildVariantTree(nodes), [nodes]);
+  const all = useMemo(() => flattenVariantTree(tree), [tree]);
+  const levelIndexById = useMemo(
+    () => new Map(levels.map((level, index) => [level.id, index])),
+    [levels],
+  );
+
+  const groups = all.filter((node) => node.children.length > 0);
+  const leaves = all.filter((node) => node.children.length === 0);
+  const sellable = leaves.filter((node) => node.variant);
+  const activeInStock = sellable.filter(
     (node) => node.active && node.variant?.active && (node.variant?.stockQty ?? 0) > 0,
   );
-  const levelIndexById = new Map(levels.map((level, index) => [level.id, index]));
-  const firstLevel = levels[0];
-  const rootValues = firstLevel
-    ? firstLevel.values.filter(
-        (value) => !tree.some((node) => node.optionValueId === value.id),
+
+  const [expanded, setExpanded] = useState<Set<string>>(
+    () => new Set(groups.map((node) => node.id)),
+  );
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [addParentId, setAddParentId] = useState<string>(() => {
+    const firstLevel = levels[0];
+    const rootsUsed = new Set(tree.map((node) => node.optionValueId));
+    const rootAvailable = firstLevel?.values.some((value) => !rootsUsed.has(value.id));
+    if (rootAvailable) return "";
+
+    const candidate = all.find((node) => {
+      const index = node.optionId ? (levelIndexById.get(node.optionId) ?? -1) : -1;
+      return !node.variant && index >= 0 && index < levels.length - 1;
+    });
+    return candidate?.id ?? "";
+  });
+
+  const selected = selectedId ? (all.find((node) => node.id === selectedId) ?? null) : null;
+  const addParent = addParentId ? (all.find((node) => node.id === addParentId) ?? null) : null;
+  const addLevelIndex = addParent?.optionId
+    ? (levelIndexById.get(addParent.optionId) ?? 0)
+    : 0;
+  const addNextLevel = addParent ? levels[addLevelIndex + 1] : levels[0];
+  const addExisting = addParent ? addParent.children : tree;
+  const addAvailableValues = addNextLevel
+    ? addNextLevel.values.filter(
+        (value) => !addExisting.some((child) => child.optionValueId === value.id),
       )
     : [];
-  const rootIsLeaf = levels.length === 1;
+  const addChildrenAreLeaves = addParent
+    ? addLevelIndex === levels.length - 2
+    : levels.length === 1;
 
-  if (levels.length === 0) {
-    if (tree.length === 0) {
-      return (
-        <form
-          action={createDefaultVariantAction}
-          className="mt-5 flex flex-wrap items-end gap-3 rounded-xl border border-dashed border-line p-4"
-        >
-          <input type="hidden" name="productId" value={productId} />
-          <div className="w-32">
-            <Label htmlFor="default-price">Price (AED)</Label>
-            <Input
-              id="default-price"
-              name="price"
-              inputMode="decimal"
-              placeholder="120.00"
-              required
-            />
-          </div>
-          <div className="w-28">
-            <Label htmlFor="default-stock">Stock</Label>
-            <Input
-              id="default-stock"
-              name="stock"
-              type="number"
-              min={0}
-              placeholder="10"
-              required
-            />
-          </div>
-          <div className="w-40">
-            <Label htmlFor="default-sku">SKU (optional)</Label>
-            <Input id="default-sku" name="sku" placeholder="Auto from product" />
-          </div>
-          <Button type="submit" size="sm" variant="secondary">
-            Create default variant
-          </Button>
-        </form>
-      );
-    }
+  const parentChoices = all.filter((node) => {
+    if (node.variant) return false;
+    const index = node.optionId ? (levelIndexById.get(node.optionId) ?? -1) : -1;
+    return index >= 0 && index < levels.length - 1;
+  });
 
+  const canAddRoot =
+    !!levels[0] &&
+    levels[0].values.some(
+      (value) => !tree.some((node) => node.optionValueId === value.id),
+    );
+  const addParentOptions = [
+    ...(canAddRoot ? [{ id: "", label: `Root — ${levels[0]?.name ?? ""}` }] : []),
+    ...parentChoices.map((node) => ({
+      id: node.id,
+      label: pathLabels(tree, node).join(" / "),
+    })),
+  ];
+
+  function toggle(id: string) {
+    setExpanded((current) => {
+      const next = new Set(current);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
+  function addChildrenTo(id: string) {
+    setAddParentId(id);
+    setSelectedId(id);
+  }
+
+  if (levels.length === 0 && tree.length === 0) {
     return (
-      <div className="mt-5 space-y-3">
-        {tree.map((node) => (
-          <NodeCard
-            key={node.id}
-            productId={productId}
-            node={node}
-            levels={[]}
-            levelIndexById={new Map()}
-            siblings={tree}
-            parentPath={[]}
+      <form
+        action={createDefaultVariantAction}
+        className="mt-5 flex flex-wrap items-end gap-3 rounded-xl border border-line bg-surface p-4"
+      >
+        <input type="hidden" name="productId" value={productId} />
+        <div className="w-36">
+          <Label htmlFor="default-price">Price (AED)</Label>
+          <Input
+            id="default-price"
+            name="price"
+            inputMode="decimal"
+            placeholder="120.00"
+            required
           />
-        ))}
-      </div>
+        </div>
+        <div className="w-28">
+          <Label htmlFor="default-stock">Stock</Label>
+          <Input id="default-stock" name="stock" type="number" min={0} placeholder="10" required />
+        </div>
+        <div className="w-44">
+          <Label htmlFor="default-sku">SKU (optional)</Label>
+          <Input id="default-sku" name="sku" placeholder="Auto from product" />
+        </div>
+        <Button type="submit" size="sm" variant="secondary">
+          Create default variant
+        </Button>
+      </form>
     );
   }
 
   return (
     <div className="mt-5 space-y-5">
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-        <div className="rounded-lg border border-line p-3">
-          <p className="text-[11px] font-semibold tracking-wide text-muted uppercase">Levels</p>
-          <p className="mt-1 text-lg font-semibold tabular-nums">{levels.length}</p>
-        </div>
-        <div className="rounded-lg border border-line p-3">
-          <p className="text-[11px] font-semibold tracking-wide text-muted uppercase">Branches</p>
-          <p className="mt-1 text-lg font-semibold tabular-nums">{all.length}</p>
-        </div>
-        <div className="rounded-lg border border-line p-3">
-          <p className="text-[11px] font-semibold tracking-wide text-muted uppercase">
-            Sellable leaves
-          </p>
-          <p className="mt-1 text-lg font-semibold tabular-nums">{sellable.length}</p>
-        </div>
-        <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-3">
-          <p className="text-[11px] font-semibold tracking-wide text-muted uppercase">
-            Active and in stock
-          </p>
-          <p className="mt-1 text-lg font-semibold tabular-nums text-emerald-700">
-            {activeSellable.length}
-          </p>
-        </div>
+      <div className="flex flex-wrap gap-2 text-xs">
+        <span className="rounded-full bg-page px-2.5 py-1 text-muted">{levels.length} levels</span>
+        <span className="rounded-full bg-page px-2.5 py-1 text-muted">{groups.length} groups</span>
+        <span className="rounded-full bg-page px-2.5 py-1 text-muted">{sellable.length} variants</span>
+        <span className="rounded-full bg-emerald-50 px-2.5 py-1 text-emerald-700">
+          {activeInStock.length} active and in stock
+        </span>
       </div>
 
-      {firstLevel && rootValues.length > 0 ? (
-        <div className="rounded-xl border border-dashed border-line p-4">
-          <p className="text-sm font-medium">
-            Add top-level {firstLevel.name.toLowerCase()} branches
-          </p>
-          <p className="mt-1 text-xs text-muted">
-            Only ticked values become roots. Children are added inside each branch below.
-          </p>
+      {levels.length > 0 && addParentOptions.length > 0 ? (
+        <div className="rounded-xl border border-line bg-surface p-4">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <h3 className="text-sm font-semibold">Add branches</h3>
+              <p className="mt-1 text-xs text-muted">
+                Pick a parent, tick only the values that exist, then add. Children never appear by
+                accident.
+              </p>
+            </div>
+          </div>
+
           <form action={addVariantBranchesAction} className="mt-3 space-y-3">
             <input type="hidden" name="productId" value={productId} />
-            <ValueCheckboxes values={rootValues} />
-            <div className="flex flex-wrap items-end gap-3">
-              <div className="w-32">
-                <Label htmlFor="root-price">
-                  {rootIsLeaf ? "Price (AED)" : "Default price"}
-                </Label>
-                <Input
-                  id="root-price"
-                  name="price"
-                  inputMode="decimal"
-                  placeholder="120.00"
-                  required={rootIsLeaf}
-                />
+            <div className="grid gap-3 sm:grid-cols-[minmax(0,18rem)_auto] sm:items-end">
+              <div>
+                <Label htmlFor="add-parent">Parent</Label>
+                <select
+                  id="add-parent"
+                  name="parentId"
+                  value={addParentId}
+                  onChange={(event) => setAddParentId(event.target.value)}
+                  className="w-full rounded-lg border border-line bg-surface px-3 py-2 text-sm"
+                >
+                  {addParentOptions.map((option) => (
+                    <option key={option.id || "root"} value={option.id}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
               </div>
-              <div className="w-28">
-                <Label htmlFor="root-stock">
-                  {rootIsLeaf ? "Stock" : "Default stock"}
-                </Label>
-                <Input
-                  id="root-stock"
-                  name="stock"
-                  type="number"
-                  min={0}
-                  placeholder={rootIsLeaf ? "10" : ""}
-                  required={rootIsLeaf}
-                />
-              </div>
-              <Button type="submit" size="sm" variant="secondary">
-                Add roots
-              </Button>
+              <p className="text-xs text-muted">
+                {addNextLevel
+                  ? `Adding ${addNextLevel.name.toLowerCase()} values`
+                  : "No next level for this parent."}
+              </p>
             </div>
+
+            {addAvailableValues.length > 0 ? (
+              <>
+                <ValueCheckboxes values={addAvailableValues} resetKey={addParentId} />
+                <div className="flex flex-wrap items-end gap-3">
+                  <div className="w-36">
+                    <Label htmlFor="add-price">
+                      {addChildrenAreLeaves ? "Price (AED)" : "Default price"}
+                    </Label>
+                    <Input
+                      key={`price-${addParentId}`}
+                      id="add-price"
+                      name="price"
+                      inputMode="decimal"
+                      placeholder="120.00"
+                      defaultValue={moneyInput(addParent?.defaultPriceMinor)}
+                    />
+                  </div>
+                  <div className="w-28">
+                    <Label htmlFor="add-stock">
+                      {addChildrenAreLeaves ? "Stock" : "Default stock"}
+                    </Label>
+                    <Input
+                      key={`stock-${addParentId}`}
+                      id="add-stock"
+                      name="stock"
+                      type="number"
+                      min={0}
+                      placeholder={addChildrenAreLeaves ? "10" : ""}
+                      defaultValue={addParent?.defaultStockQty ?? ""}
+                    />
+                  </div>
+                  <Button type="submit" size="sm" variant="secondary">
+                    Add branches
+                  </Button>
+                </div>
+              </>
+            ) : (
+              <p className="rounded-lg bg-page px-3 py-2 text-xs text-muted">
+                Every {addNextLevel?.name.toLowerCase() ?? "child"} value is already under this
+                parent.
+              </p>
+            )}
           </form>
         </div>
       ) : null}
 
-      {tree.length === 0 ? (
-        <p className="rounded-xl border border-dashed border-line px-4 py-6 text-sm text-muted">
-          No branches yet. Add a root above, then add its children.
-        </p>
-      ) : (
-        <div className="space-y-3">
-          {tree.map((node) => (
-            <NodeCard
-              key={node.id}
-              productId={productId}
-              node={node}
-              levels={levels}
-              levelIndexById={levelIndexById}
-              siblings={tree}
-              parentPath={[]}
-            />
-          ))}
+      <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_22rem]">
+        <div className="overflow-hidden rounded-xl border border-line bg-surface">
+          {tree.length === 0 ? (
+            <p className="px-4 py-8 text-sm text-muted">
+              No branches yet. Add a root above, then add its children.
+            </p>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead className="border-b border-line text-left text-[11px] tracking-wide text-muted uppercase">
+                  <tr>
+                    <th className="px-4 py-3 font-semibold">Branch</th>
+                    <th className="px-4 py-3 font-semibold">Type</th>
+                    <th className="px-4 py-3 font-semibold">SKU</th>
+                    <th className="px-4 py-3 font-semibold">Price</th>
+                    <th className="px-4 py-3 font-semibold">Stock</th>
+                    <th className="px-4 py-3 font-semibold">Status</th>
+                    <th className="px-4 py-3 font-semibold">Image</th>
+                    <th className="px-4 py-3" />
+                  </tr>
+                </thead>
+                <tbody>
+                  <TreeRows
+                    nodes={tree}
+                    depth={0}
+                    expanded={expanded}
+                    onToggle={toggle}
+                    selectedId={selectedId}
+                    onSelect={setSelectedId}
+                    tree={tree}
+                  />
+                </tbody>
+              </table>
+            </div>
+          )}
         </div>
-      )}
+
+        {selected ? (
+          <BranchInspector
+            productId={productId}
+            node={selected}
+            tree={tree}
+            levels={levels}
+            levelIndexById={levelIndexById}
+            siblings={
+              selected.parentId
+                ? (all.find((node) => node.id === selected.parentId)?.children ?? [])
+                : tree
+            }
+            onAddChildren={addChildrenTo}
+            onClose={() => setSelectedId(null)}
+          />
+        ) : (
+          <aside className="h-fit rounded-xl border border-dashed border-line p-5 text-sm text-muted xl:sticky xl:top-6">
+            Select a branch to edit its defaults, image, children, or leaf variant.
+          </aside>
+        )}
+      </div>
     </div>
   );
 }

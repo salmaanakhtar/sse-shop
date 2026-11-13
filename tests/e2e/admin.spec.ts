@@ -22,9 +22,11 @@ test("admin creates, illustrates, and publishes a product", async ({ page }) => 
   await page.getByTestId("add-option-value-submit").click();
   await expect(page.getByRole("button", { name: "M ×" })).toBeVisible();
 
-  await page.locator("#root-price").fill("199.00");
-  await page.locator("#root-stock").fill("5");
-  await page.getByRole("button", { name: "Add roots" }).click();
+  await page.locator("#add-price").fill("199.00");
+  await page.locator("#add-stock").fill("5");
+  await page.getByRole("button", { name: "Add branches" }).click();
+
+  await page.getByRole("button", { name: "Edit" }).first().click();
   await expect(page.getByTestId("variant-price")).toHaveValue("199.00");
 
   await page.setInputFiles("#image", "tests/e2e/fixtures/product.png");
@@ -45,6 +47,7 @@ test("a price change in admin reaches the storefront", async ({ page }) => {
   await page.goto("/admin/products");
   await page.getByRole("link", { name: "Playwright Hoodie" }).click();
 
+  await page.getByRole("button", { name: "Edit" }).first().click();
   await page.getByTestId("variant-price").first().fill("149.00");
   await page.getByTestId("variant-save").first().click();
   await expect(page.getByText(/AED\s149\.00/).first()).toBeVisible();

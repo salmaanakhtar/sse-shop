@@ -1,7 +1,8 @@
 "use client";
 
-import { twoFactorClient } from "better-auth/client/plugins";
+import { inferAdditionalFields, twoFactorClient } from "better-auth/client/plugins";
 import { createAuthClient } from "better-auth/react";
+import type { auth } from "@/server/auth";
 
 /**
  * The admin UI talks to Better Auth directly for sign-in and TOTP, because the
@@ -9,5 +10,5 @@ import { createAuthClient } from "better-auth/react";
  * through guarded server actions.
  */
 export const authClient = createAuthClient({
-  plugins: [twoFactorClient()],
+  plugins: [twoFactorClient(), inferAdditionalFields<typeof auth>()],
 });

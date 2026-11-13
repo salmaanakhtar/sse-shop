@@ -23,16 +23,47 @@ export const addressSchema = z.object({
   emirate: z.enum(EMIRATES),
   street: z.string().trim().min(3, "Enter the street").max(160),
   building: z.string().trim().min(1, "Enter the building or villa").max(120),
+  /** Neighbourhood or community, e.g. Jumeirah Lakes Towers. */
+  area: z.string().trim().max(120).optional().default(""),
   poBox: z.string().trim().max(20).optional().default(""),
   notes: z.string().trim().max(500).optional().default(""),
 });
 
 export type Address = z.infer<typeof addressSchema>;
 
-export function formatAddress(address: Address): string[] {
+/** Parse a checkout or account address form. Field names may carry a prefix. */
+export function addressFromFormData(formData: FormData, prefix = "") {
+  const field = (name: string) =>
+    prefix ? `${prefix}${name.charAt(0).toUpperCase()}${name.slice(1)}` : name;
+
+  return addressSchema.safeParse({
+    fullName: String(formData.get(field("fullName")) ?? ""),
+    phone: String(formData.get(field("phone")) ?? ""),
+    emirate: String(formData.get(field("emirate")) ?? ""),
+    street: String(formData.get(field("street")) ?? ""),
+    building: String(formData.get(field("building")) ?? ""),
+    area: String(formData.get(field("area")) ?? ""),
+    poBox: String(formData.get(field("poBox")) ?? ""),
+    notes: String(formData.get(field("notes")) ?? ""),
+  });
+}
+
+/** The parts of an address needed for display; saved rows and orders both fit. */
+export type AddressLines = {
+  fullName: string;
+  phone: string;
+  emirate: string;
+  street: string;
+  building: string;
+  area?: string;
+  poBox?: string;
+};
+
+export function formatAddress(address: AddressLines): string[] {
   return [
     address.fullName,
     `${address.building}, ${address.street}`,
+    address.area ?? "",
     address.emirate,
     address.poBox ? `PO Box ${address.poBox}` : "",
     address.phone,

@@ -1,6 +1,10 @@
 import react from "@vitejs/plugin-react";
+import { existsSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { defineConfig } from "vitest/config";
+
+// Integration tests read DATABASE_URL_TEST from the same local file the app uses.
+if (existsSync(".env.local")) process.loadEnvFile(".env.local");
 
 const src = fileURLToPath(new URL("./src", import.meta.url));
 
@@ -41,9 +45,6 @@ export default defineConfig({
           pool: "forks",
           fileParallelism: false,
           testTimeout: 20_000,
-          // The project is wired now so the first service test lands without a
-          // config detour. Remove this once a test exists here.
-          passWithNoTests: true,
         },
       },
     ],

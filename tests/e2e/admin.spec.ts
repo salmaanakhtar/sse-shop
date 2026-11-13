@@ -51,3 +51,9 @@ test("a price change in admin reaches the storefront", async ({ page }) => {
   await page.goto(`/products/${SLUG}`);
   await expect(page.getByText(/AED\s149\.00/)).toBeVisible();
 });
+
+test("admin can open the customer list", async ({ page }) => {
+  await page.goto("/admin/customers");
+  await expect(page.getByRole("heading", { name: "Customers" })).toBeVisible();
+  await expect(page.getByPlaceholder("Search name, email, or phone")).toBeVisible();
+});

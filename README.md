@@ -9,9 +9,11 @@ time. Every feature ships with a unit test and a Playwright journey.
 
 ## Status
 
-Phase 1 complete. A shopper can browse, add to cart, check out with a UAE address, and receive an
-order with a lookup link; an admin can sign in with TOTP and manage products, options, variants, and
-images. Payments are simulated behind a provider interface. See [`docs/ROADMAP.md`](docs/ROADMAP.md).
+Phase 2 complete. A shopper can browse, add to cart, check out with a UAE address, and receive an
+order with a lookup link. They can also create an account with saved delivery and billing
+addresses, see their order history, and claim a guest order with its lookup token. An admin can
+sign in with TOTP, manage products, options, variants, and images, and review customers and their
+orders. Payments are simulated behind a provider interface. See [`docs/ROADMAP.md`](docs/ROADMAP.md).
 
 ## Stack
 
@@ -38,7 +40,7 @@ Requires Node 24 (`nvm use`), pnpm, and Docker.
 
 ```bash
 pnpm install
-cp .env.example .env.local        # then set BETTER_AUTH_SECRET: openssl rand -base64 32
+cp .env.example .env.local        # then set BETTER_AUTH_SECRET and ADMIN_PASSWORD
 pnpm db:up                        # Postgres on 127.0.0.1:5433
 pnpm db:migrate
 pnpm db:seed                      # one demo product with two options and four variants
@@ -47,14 +49,20 @@ pnpm dev                          # http://localhost:3000
 
 | Command | What it does |
 | --- | --- |
-| `pnpm test` | Unit and component tests |
+| `pnpm test` | Unit, component, and integration tests |
 | `pnpm test:e2e` | Playwright, against a production build |
 | `pnpm db:generate` | Generate a migration after a schema change |
 | `pnpm db:studio` | Browse the database |
 | `pnpm db:down` | Stop the development database |
 
+Integration tests use `DATABASE_URL_TEST`. Create that disposable database once:
+
+```bash
+docker compose -f docker-compose.dev.yml exec db createdb -U sse_shop sse_shop_test
+```
+
 The admin sits on a second hostname. Locally, `admin.localhost` resolves to your machine on most
-systems; the rewrite lands with the admin screens.
+systems, and `src/proxy.ts` rewrites that host to the `/admin` route tree.
 
 ---
 

@@ -1,8 +1,9 @@
 import { createHash, randomBytes } from "node:crypto";
 import { cookies } from "next/headers";
-import { and, asc, eq, inArray, sql } from "drizzle-orm";
+import { and, asc, desc, eq, gt, inArray, sql } from "drizzle-orm";
 import { priceCart, type CartTotals } from "@/lib/pricing";
 import { fail, ok, type Result } from "@/lib/result";
+import { getAuthSession } from "../auth/guard";
 import { db } from "../db/client";
 import {
   cartItems,
@@ -75,21 +76,37 @@ async function requireCartId(): Promise<string | null> {
   return cart?.id ?? null;
 }
 
+async function currentUserId(): Promise<string | null> {
+  const session = await getAuthSession();
+  return session?.user.id ?? null;
+}
+
 /**
  * Creates the cart on first mutation. Pages never call this: a server component
  * cannot set a cookie, and an empty cookie-less cart is just "no cart".
  */
 async function ensureCartId(): Promise<string> {
+  const userId = await currentUserId();
   const token = await readToken();
   if (token) {
     const existing = await findLiveCart(token);
-    if (existing) return existing.id;
+    if (existing) {
+      // A shopper can add to cart before signing in, then sign in on the same
+      // browser. The cart becomes theirs without losing its contents.
+      if (userId && !existing.userId) {
+        await db
+          .update(carts)
+          .set({ userId, updatedAt: new Date() })
+          .where(eq(carts.id, existing.id));
+      }
+      return existing.id;
+    }
   }
 
   const newToken = randomBytes(32).toString("base64url");
   const [created] = await db
     .insert(carts)
-    .values({ tokenHash: hashToken(newToken), expiresAt: expiresAt() })
+    .values({ tokenHash: hashToken(newToken), userId, expiresAt: expiresAt() })
     .returning({ id: carts.id });
 
   if (!created) throw new Error("could not create a cart");
@@ -106,6 +123,117 @@ async function ensureCartId(): Promise<string> {
   });
 
   return created.id;
+}
+
+/**
+ * After sign-in, the browser's anonymous cart becomes the customer's cart. If
+ * they already have a cart from another device, the two are merged by variant,
+ * capped at current stock, and the browser keeps one cookie for the result.
+ */
+export async function mergeCartOnSignIn(userId: string): Promise<void> {
+  const token = await readToken();
+  const liveCart = token ? await findLiveCart(token) : null;
+
+  // A cart already owned by a different account is not ours to merge. Expire it
+  // and let the next add-to-cart start a fresh anonymous cart.
+  if (liveCart?.userId && liveCart.userId !== userId) {
+    await db
+      .update(carts)
+      .set({ expiresAt: new Date(0) })
+      .where(eq(carts.id, liveCart.id));
+    (await cookies()).delete(CART_COOKIE);
+    return;
+  }
+
+  const anonymousCart = liveCart;
+  const userCarts = await db
+    .select()
+    .from(carts)
+    .where(and(eq(carts.userId, userId), gt(carts.expiresAt, new Date())))
+    .orderBy(desc(carts.updatedAt));
+
+  const otherUserCarts = userCarts.filter((cart) => cart.id !== anonymousCart?.id);
+
+  if (!anonymousCart && otherUserCarts.length === 0) return;
+
+  // Keep the anonymous cart when there is one: its raw token is already in the
+  // cookie. Otherwise adopt the most recently used account cart and rotate its
+  // token so this browser can address it.
+  const target = anonymousCart ?? otherUserCarts[0];
+  if (!target) return;
+
+  const mergedSources = anonymousCart ? otherUserCarts : otherUserCarts.slice(1);
+  const keptToken = anonymousCart ? token : randomBytes(32).toString("base64url");
+  if (!keptToken) return;
+
+  await db.transaction(async (tx) => {
+    const sourceIds = [target.id, ...mergedSources.map((cart) => cart.id)];
+    const items = await tx
+      .select()
+      .from(cartItems)
+      .where(inArray(cartItems.cartId, sourceIds));
+
+    const quantityByVariant = new Map<string, number>();
+    for (const item of items) {
+      const current = quantityByVariant.get(item.variantId) ?? 0;
+      quantityByVariant.set(item.variantId, current + item.quantity);
+    }
+
+    const variantIds = [...quantityByVariant.keys()];
+    const variantRows =
+      variantIds.length > 0
+        ? await tx
+            .select({ id: variants.id, stockQty: variants.stockQty })
+            .from(variants)
+            .where(inArray(variants.id, variantIds))
+        : [];
+
+    const stockByVariant = new Map(variantRows.map((row) => [row.id, row.stockQty]));
+
+    await tx.delete(cartItems).where(inArray(cartItems.cartId, sourceIds));
+
+    const merged = [...quantityByVariant.entries()]
+      .map(([variantId, quantity]) => ({
+        cartId: target.id,
+        variantId,
+        quantity: Math.min(quantity, stockByVariant.get(variantId) ?? 0, MAX_LINE_QUANTITY),
+      }))
+      .filter((row) => row.quantity > 0);
+
+    if (merged.length > 0) {
+      await tx.insert(cartItems).values(merged);
+    }
+
+    if (mergedSources.length > 0) {
+      await tx
+        .update(carts)
+        .set({ expiresAt: new Date(0), updatedAt: new Date() })
+        .where(inArray(carts.id, mergedSources.map((cart) => cart.id)));
+    }
+
+    await tx
+      .update(carts)
+      .set({
+        userId,
+        tokenHash: anonymousCart ? target.tokenHash : hashToken(keptToken),
+        expiresAt: expiresAt(),
+        updatedAt: new Date(),
+      })
+      .where(eq(carts.id, target.id));
+  });
+
+  if (!anonymousCart) {
+    const store = await cookies();
+    store.set({
+      name: CART_COOKIE,
+      value: keptToken,
+      httpOnly: true,
+      sameSite: "lax",
+      secure: process.env.NODE_ENV === "production",
+      path: "/",
+      maxAge: CART_TTL_SECONDS,
+    });
+  }
 }
 
 export async function getCartView(): Promise<CartView | null> {

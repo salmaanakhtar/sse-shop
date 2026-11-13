@@ -15,7 +15,7 @@ export default async function globalSetup() {
 
   const { db, sql } = await import("../../src/server/db/client");
   const schema = await import("../../src/server/db/schema");
-  const { like } = await import("drizzle-orm");
+  const { and, eq, like } = await import("drizzle-orm");
 
   await db.delete(schema.products).where(like(schema.products.slug, "playwright-%"));
   await db.delete(schema.sessions);
@@ -23,6 +23,12 @@ export default async function globalSetup() {
   await db.update(schema.users).set({ twoFactorEnabled: false });
   await db.delete(schema.orders);
   await db.delete(schema.carts);
+  await db
+    .delete(schema.users)
+    .where(
+      and(eq(schema.users.role, "customer"), like(schema.users.email, "customer-%@example.com")),
+    );
+  await db.delete(schema.users).where(like(schema.users.email, "deleted+%@deleted.invalid"));
 
   await sql.end({ timeout: 5 });
 }

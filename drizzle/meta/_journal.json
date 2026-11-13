@@ -15,6 +15,13 @@
       "when": 1794521230933,
       "tag": "0001_dry_bullseye",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1794547409914,
+      "tag": "0002_bouncy_moonstone",
+      "breakpoints": true
     }
   ]
 }

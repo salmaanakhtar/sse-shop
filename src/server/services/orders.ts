@@ -1,11 +1,12 @@
 import { createHash, randomBytes } from "node:crypto";
-import { and, asc, eq, inArray, sql } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, isNull, ne, sql } from "drizzle-orm";
 import { z } from "zod";
 import { addressSchema, type Address } from "@/lib/address";
 import { priceCart } from "@/lib/pricing";
 import { fail, ok, type Result } from "@/lib/result";
 import { db } from "../db/client";
 import {
+  auditLog,
   cartItems,
   carts,
   counters,
@@ -50,9 +51,21 @@ export type OrderView = {
   taxMinor: number;
   totalMinor: number;
   currency: string;
+  userId: string | null;
   shippingAddress: Address;
+  billingAddress: Address | null;
   notes: string | null;
   items: OrderLineView[];
+};
+
+export type CustomerOrderSummary = {
+  id: string;
+  number: string;
+  status: string;
+  paymentStatus: string;
+  placedAt: Date;
+  totalMinor: number;
+  itemCount: number;
 };
 
 class CheckoutError extends Error {
@@ -90,7 +103,10 @@ export function hashLookupToken(token: string): string {
 export async function placeOrder(input: {
   email: string;
   address: Address;
+  billingAddress?: Address | null;
   expectedTotalMinor: number;
+  /** Server-derived session user; never trust a client-supplied id. */
+  userId?: string | null;
 }): Promise<Result<PlacedOrder>> {
   const email = emailSchema.safeParse(input.email);
   if (!email.success) return fail(email.error.issues[0]?.message ?? "Enter a valid email address.");
@@ -98,6 +114,15 @@ export async function placeOrder(input: {
   const address = addressSchema.safeParse(input.address);
   if (!address.success) {
     return fail(address.error.issues[0]?.message ?? "Check the delivery address.");
+  }
+
+  let billingAddress: Address | null = null;
+  if (input.billingAddress) {
+    const billing = addressSchema.safeParse(input.billingAddress);
+    if (!billing.success) {
+      return fail(billing.error.issues[0]?.message ?? "Check the billing address.");
+    }
+    billingAddress = billing.data;
   }
 
   const cartId = await readCartIdForCheckout();
@@ -209,6 +234,7 @@ export async function placeOrder(input: {
           number,
           lookupTokenHash: lookup.hash,
           lookupExpiresAt: new Date(Date.now() + LOOKUP_TTL_DAYS * 24 * 60 * 60 * 1000),
+          userId: input.userId ?? null,
           email: email.data,
           status: "pending",
           paymentStatus: "unpaid",
@@ -220,6 +246,7 @@ export async function placeOrder(input: {
           taxRateBp: settings.taxRateBp,
           totalMinor: totals.totalMinor,
           shippingAddress: address.data,
+          billingAddress,
           notes: address.data.notes || null,
           placedAt: new Date(),
         })
@@ -320,6 +347,46 @@ export async function placeOrder(input: {
   });
 }
 
+function toOrderView(
+  order: typeof orders.$inferSelect,
+  items: (typeof orderItems.$inferSelect)[],
+): OrderView {
+  return {
+    number: order.number,
+    email: order.email,
+    status: order.status,
+    paymentStatus: order.paymentStatus,
+    placedAt: order.placedAt,
+    subtotalMinor: order.subtotalMinor,
+    shippingMinor: order.shippingMinor,
+    discountMinor: order.discountMinor,
+    taxMinor: order.taxMinor,
+    totalMinor: order.totalMinor,
+    currency: order.currency,
+    userId: order.userId,
+    shippingAddress: addressSchema.parse(order.shippingAddress),
+    billingAddress: order.billingAddress ? addressSchema.parse(order.billingAddress) : null,
+    notes: order.notes,
+    items: items.map((item) => ({
+      sku: item.sku,
+      title: item.title,
+      quantity: item.quantity,
+      unitPriceMinor: item.unitPriceMinor,
+      lineTotalMinor: item.lineTotalMinor,
+    })),
+  };
+}
+
+async function loadOrderView(order: typeof orders.$inferSelect): Promise<OrderView> {
+  const items = await db
+    .select()
+    .from(orderItems)
+    .where(eq(orderItems.orderId, order.id))
+    .orderBy(asc(orderItems.position));
+
+  return toOrderView(order, items);
+}
+
 export async function getOrderForGuest(
   number: string,
   token: string,
@@ -333,34 +400,109 @@ export async function getOrderForGuest(
   if (!order) return null;
   if (order.lookupExpiresAt.getTime() < Date.now()) return null;
 
-  const items = await db
-    .select()
-    .from(orderItems)
-    .where(eq(orderItems.orderId, order.id))
-    .orderBy(asc(orderItems.position));
+  return loadOrderView(order);
+}
 
-  return {
-    number: order.number,
-    email: order.email,
-    status: order.status,
-    paymentStatus: order.paymentStatus,
-    placedAt: order.placedAt,
-    subtotalMinor: order.subtotalMinor,
-    shippingMinor: order.shippingMinor,
-    discountMinor: order.discountMinor,
-    taxMinor: order.taxMinor,
-    totalMinor: order.totalMinor,
-    currency: order.currency,
-    shippingAddress: addressSchema.parse(order.shippingAddress),
-    notes: order.notes,
-    items: items.map((item) => ({
-      sku: item.sku,
-      title: item.title,
-      quantity: item.quantity,
-      unitPriceMinor: item.unitPriceMinor,
-      lineTotalMinor: item.lineTotalMinor,
-    })),
-  };
+export async function getOrderForCustomer(
+  number: string,
+  userId: string,
+): Promise<OrderView | null> {
+  const [order] = await db
+    .select()
+    .from(orders)
+    .where(and(eq(orders.number, number), eq(orders.userId, userId)))
+    .limit(1);
+
+  if (!order) return null;
+
+  return loadOrderView(order);
+}
+
+export async function listOrdersForCustomer(userId: string): Promise<CustomerOrderSummary[]> {
+  return db
+    .select({
+      id: orders.id,
+      number: orders.number,
+      status: orders.status,
+      paymentStatus: orders.paymentStatus,
+      placedAt: orders.placedAt,
+      totalMinor: orders.totalMinor,
+      itemCount: sql<number>`(
+        select count(*) from ${orderItems}
+        where ${orderItems.orderId} = ${orders.id}
+      )::int`,
+    })
+    .from(orders)
+    .where(eq(orders.userId, userId))
+    .orderBy(desc(orders.placedAt));
+}
+
+export async function getCustomerOrderStats(userId: string) {
+  const [row] = await db
+    .select({
+      orderCount: sql<number>`count(*)::int`,
+      totalSpentMinor: sql<number>`coalesce(sum(${orders.totalMinor}), 0)::int`,
+      lastOrderAt: sql<Date | string | null>`max(${orders.placedAt})`,
+    })
+    .from(orders)
+    .where(and(eq(orders.userId, userId), ne(orders.status, "cancelled")));
+
+  return row ?? { orderCount: 0, totalSpentMinor: 0, lastOrderAt: null };
+}
+
+/**
+ * Attaches a guest order to a signed-in customer. The lookup token is the
+ * proof of ownership: knowing an order number alone must never expose it.
+ */
+export async function claimOrder(input: {
+  number: string;
+  token: string;
+  userId: string;
+  ip?: string | null;
+}): Promise<Result<{ number: string }>> {
+  const [order] = await db
+    .select()
+    .from(orders)
+    .where(
+      and(
+        eq(orders.number, input.number),
+        eq(orders.lookupTokenHash, hashLookupToken(input.token)),
+      ),
+    )
+    .limit(1);
+
+  if (!order) return fail("That order number and token do not match.");
+  if (order.lookupExpiresAt.getTime() < Date.now()) {
+    return fail("That order link has expired.");
+  }
+  if (order.userId === input.userId) return ok({ number: order.number });
+  if (order.userId) return fail("That order is already linked to another account.");
+
+  const claimed = await db.transaction(async (tx) => {
+    const [updated] = await tx
+      .update(orders)
+      .set({ userId: input.userId, updatedAt: new Date() })
+      .where(and(eq(orders.id, order.id), isNull(orders.userId)))
+      .returning({ id: orders.id });
+
+    if (!updated) return false;
+
+    await tx.insert(auditLog).values({
+      actorUserId: input.userId,
+      action: "order.claim",
+      entity: "orders",
+      entityId: order.id,
+      before: { userId: null },
+      after: { userId: input.userId },
+      ip: input.ip ?? null,
+    });
+
+    return true;
+  });
+
+  if (!claimed) return fail("That order is already linked to another account.");
+
+  return ok({ number: order.number });
 }
 
 export async function listRecentOrdersForAdmin(limit = 50) {

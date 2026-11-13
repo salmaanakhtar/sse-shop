@@ -39,7 +39,11 @@ export const users = pgTable("users", {
   emailVerified: boolean("email_verified").notNull().default(false),
   image: text("image"),
   role: userRole("role").notNull().default("customer"),
+  /** E.164, e.g. +971501234567. Optional; delivery addresses carry their own. */
+  phone: text("phone"),
   twoFactorEnabled: boolean("two_factor_enabled").notNull().default(false),
+  /** Set when a customer deletes their account; the row is a tombstone for orders. */
+  deletedAt: timestamp("deleted_at", { withTimezone: true, mode: "date" }),
   createdAt: createdAt(),
   updatedAt: updatedAt(),
 });
@@ -238,6 +242,46 @@ export const productMedia = pgTable(
   (table) => [index("product_media_product_id_idx").on(table.productId)],
 );
 
+/* ─────────────────────────── customer addresses ─────────────────────────── */
+
+/**
+ * A customer's reusable address book. Delivery and billing can share a row;
+ * one default of each kind is enforced by partial unique indexes. Orders still
+ * snapshot the chosen address, so editing or deleting a saved row never changes
+ * an order's delivery record.
+ */
+export const customerAddresses = pgTable(
+  "customer_addresses",
+  {
+    id: id(),
+    userId: text("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    label: text("label").notNull().default(""),
+    fullName: text("full_name").notNull(),
+    phone: text("phone").notNull(),
+    emirate: text("emirate").notNull(),
+    street: text("street").notNull(),
+    building: text("building").notNull(),
+    area: text("area").notNull().default(""),
+    poBox: text("po_box").notNull().default(""),
+    notes: text("notes").notNull().default(""),
+    isDefaultShipping: boolean("is_default_shipping").notNull().default(false),
+    isDefaultBilling: boolean("is_default_billing").notNull().default(false),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (table) => [
+    index("customer_addresses_user_id_idx").on(table.userId),
+    uniqueIndex("customer_addresses_default_shipping_uq")
+      .on(table.userId)
+      .where(sql`${table.isDefaultShipping}`),
+    uniqueIndex("customer_addresses_default_billing_uq")
+      .on(table.userId)
+      .where(sql`${table.isDefaultBilling}`),
+  ],
+);
+
 /* ─────────────────────────── carts ─────────────────────────── */
 
 export const carts = pgTable(
@@ -295,12 +339,15 @@ export const orders = pgTable(
     taxRateBp: integer("tax_rate_bp").notNull().default(500),
     totalMinor: integer("total_minor").notNull(),
     shippingAddress: jsonb("shipping_address").notNull(),
+    /** Nullable: guest checkout collects a billing address too, but older orders have none. */
+    billingAddress: jsonb("billing_address"),
     notes: text("notes"),
     placedAt: timestamp("placed_at", { withTimezone: true, mode: "date" }).notNull().defaultNow(),
     createdAt: createdAt(),
     updatedAt: updatedAt(),
   },
   (table) => [
+    index("orders_user_id_idx").on(table.userId),
     index("orders_email_idx").on(table.email),
     index("orders_placed_at_idx").on(table.placedAt),
   ],
@@ -395,6 +442,10 @@ export const cartItemsRelations = relations(cartItems, ({ one }) => ({
 
 export const cartsRelations = relations(carts, ({ many }) => ({
   items: many(cartItems),
+}));
+
+export const customerAddressesRelations = relations(customerAddresses, ({ one }) => ({
+  user: one(users, { fields: [customerAddresses.userId], references: [users.id] }),
 }));
 
 export const ordersRelations = relations(orders, ({ many }) => ({

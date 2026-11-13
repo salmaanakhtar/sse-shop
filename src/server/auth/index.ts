@@ -70,6 +70,11 @@ export const auth = betterAuth({
         // Users cannot choose their own role; only the seed and admin UI set it.
         input: false,
       },
+      phone: {
+        type: "string",
+        required: false,
+        input: true,
+      },
     },
   },
   plugins: [twoFactor({ issuer: "sse-shop" })],

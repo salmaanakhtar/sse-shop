@@ -37,6 +37,7 @@ never treats the network as its only defence.
 | --- | --- | --- |
 | Server Component | Every read: catalog, cart, order, admin tables | Query through `src/server/services`, never the DB directly from a page |
 | Server action | Every user-initiated mutation | Zod-validate, authorize, call a service, revalidate |
+| Account page + action | Profile, saved addresses, order history, claim, deletion | Session-guarded; every row filtered by the session user id |
 | Route handler | Stripe webhooks, image uploads, `/api/health` | Signature-verified or session-verified; no business rules |
 | Caddy | Static media, caching | Serves `/media/*` from the uploads volume |
 
@@ -46,10 +47,10 @@ rules.
 
 ## Data model
 
-Eighteen tables, deliberately narrow. Every table carries `created_at`; most carry `updated_at`.
+Nineteen tables, deliberately narrow. Every table carries `created_at`; most carry `updated_at`.
 | Table | Holds | Notes |
 | --- | --- | --- |
-| `users` | Admin and customer identity | `role` is `admin` or `customer`; single admin in v1 |
+| `users` | Admin and customer identity | `role` is `admin` or `customer`; `phone`; `deleted_at` tombstones a deleted customer |
 | `sessions` | Session records | Token stored hashed, never raw |
 | `accounts` | Password credentials | Better Auth |
 | `verifications` | Short-lived tokens | Email verification, password reset |
@@ -60,11 +61,12 @@ Eighteen tables, deliberately narrow. Every table carries `created_at`; most car
 | `product_option_values` | The choices within an option | e.g. `S`, `M`, `L` |
 | `variant_option_values` | Which values a variant represents | join row; unique on `(variant_id, option_id)` |
 | `product_media` | Ordered images per product | `storage_key`, `alt`, `position` |
-| `carts` | One basket per shopper token | Token hashed; `expires_at` |
+| `customer_addresses` | Saved delivery and billing addresses | one default of each per customer, partial unique indexes |
+| `carts` | One basket per shopper token | Token hashed; `expires_at`; `user_id` links a signed-in cart |
 | `cart_items` | Variants in a cart | Unique on `(cart_id, variant_id)` |
-| `orders` | Placed order and its totals | `number` unique and sequential |
+| `orders` | Placed order and its totals | `number` unique and sequential; `user_id` links the owner; `billing_address` snapshot |
 | `order_items` | Snapshot of what was bought | Prices frozen at placement |
-| `audit_log` | Admin changes | Actor, action, before/after JSON, IP |
+| `audit_log` | Admin and account changes | Actor, action, before/after JSON, IP |
 | `settings` | Store configuration | Key → JSONB, changed in admin |
 | `counters` | Monotonic sequences | Order numbers come from here, inside the placement transaction |
 
@@ -80,6 +82,14 @@ Eighteen tables, deliberately narrow. Every table carries `created_at`; most car
   placement, not in the display.
 - A cart is consumed when its order is placed; it never becomes the same cart again.
 - `settings` is a typed key/value store with a Zod schema per key. Unknown keys are rejected.
+- A saved address is mutable; an order's shipping and billing addresses are snapshots. Editing or
+  deleting an address book row never changes an existing order.
+- A customer has at most one default delivery address and one default billing address, enforced by
+  partial unique indexes.
+- An order has at most one owning customer. Claiming a guest order requires its lookup token and
+  writes an audit entry; an email match alone is not proof.
+- A deleted customer is a tombstone row: credentials, sessions, carts, and saved addresses are
+  gone, while orders stay linked for accounting.
 
 ## Money, tax, currency
 
@@ -147,7 +157,7 @@ The cart is server-owned because a browser-owned cart means trusting a client wi
 in Postgres behind an httpOnly cookie so a mid-session restart does not lose it, and so stock can be
 checked against the same row the order will lock.
 
-All totals come from one function, `priceCart()` in `src/server/services/pricing.ts`: line totals
+All totals come from one function, `priceCart()` in `src/lib/pricing.ts`: line totals
 from stored prices, shipping from the pure rule, then the VAT component extracted from the
 inclusive total. The cart page renders its result; the checkout action recomputes it and compares
 the shopper's expected total with the fresh one. A mismatch fails the checkout with a "prices
@@ -159,6 +169,38 @@ and the placement transaction is the seam for it.
 
 UAE addresses collect: full name, phone (`+971`, validated), emirate (one of the seven), street,
 building/villa, optional PO box, optional notes. Postal codes are not used.
+
+## Customer accounts and addresses
+
+A customer account is optional. Guest checkout stays available, and an account adds saved
+addresses, order history, and faster checkout.
+
+- `users` holds name, email, phone, role, `email_verified`, and `deleted_at`. Better Auth owns the
+  credential rows in `accounts`.
+- `customer_addresses` holds reusable delivery and billing addresses. Both default to the first
+  saved row; later rows become a default only when the customer marks them. The flags are protected
+  by partial unique indexes, so two defaults cannot be written even by a race.
+- Checkout pre-fills the account email, name, phone, default delivery address, and default billing
+  address. A signed-in shopper can save a new delivery or billing address without leaving checkout.
+  “Same as delivery” is the default for billing.
+- Orders link to the customer through `orders.user_id`; the account never stores its own copy of an
+  order. Order history is a query, and order lines and addresses remain the immutable snapshots
+  taken at placement.
+- Billing is stored as `orders.billing_address` alongside the existing shipping snapshot. Old
+  orders may have no billing address; the column is nullable.
+- A guest order is claimed only with its order number and lookup token. The order page offers a
+  claim button, and the account has a manual order-number + token form. An order already owned by
+  another customer cannot be claimed; a successful claim writes an `order.claim` audit entry.
+- On sign-in, the browser's anonymous cart is attached to the customer. If the account already has
+  a cart, lines are merged by variant, capped at current stock, and the browser receives the token
+  for the surviving cart. A cart owned by a different account is expired rather than merged.
+- Account deletion is self-service with a password check. It removes credentials, sessions, carts,
+  and saved addresses, anonymises name/email/phone, and keeps the tombstone `users` row so orders
+  remain linked for accounting.
+- Admin sees a customer list and detail: profile, spend, orders, and saved addresses. Every query
+  is scoped by the customer id from the URL and the admin guard.
+- Address entry is manual for now. The map picker is deferred until a provider and key are chosen;
+  the stored address shape already tolerates an added pin later.
 
 ## Authentication and authorization
 
@@ -172,11 +214,18 @@ building/villa, optional PO box, optional notes. Postal codes are not used.
 - CSRF defence in depth: `SameSite=Lax` plus an Origin/Host check helper called by every mutating
   action.
 - Admin requires TOTP. A control is checked once per session to avoid prompting on every action.
+- Customer accounts use email + password. Email verification and self-service password reset are
+  deliberately deferred to Phase 7; until then, an unverified email never grants ownership of an
+  order or account data.
 - Rate limits, enforced in the database so they survive a restart: login 5 per 15 minutes per
   IP+email, checkout 10 per hour per IP, order lookup 5 per hour per IP.
-- Every admin mutation writes an audit entry with before and after state.
+- Every admin mutation writes an audit entry with before and after state. Order claims and account
+  deletions write audit entries too.
 - Guests retrieve their order through a link containing a 24-byte random token, stored only as a
-  SHA-256 hash and valid for 90 days. The order number alone is not enough to read an order.
+  SHA-256 hash and valid for 90 days. The order number alone is not enough to read an order. The
+  same token is the only way to claim a guest order into an account.
+- Account deletion requires the current password, removes the credential rows, and anonymises the
+  profile; it cannot be undone.
 
 ## Admin surface
 
@@ -186,6 +235,9 @@ building/villa, optional PO box, optional notes. Postal codes are not used.
 2. Session: a valid session bound to a `role = admin` user.
 3. Factor: TOTP verified for this session.
 4. Action: the individual action re-checks the role, not just the page.
+
+The panel also lists customers: name, email, phone, order count, spend, and last order, with a
+detail page for saved addresses and order history. Customers never reach this host.
 
 A no-code boundary is intentional: admin edits `settings` and content rows, never code. Anything
 that would require a deploy belongs in this repo, not in the admin UI.
@@ -227,6 +279,10 @@ Operationally:
 | --- | --- |
 | Card data theft | Stripe hosted checkout; card data never reaches this server (SAQ A) |
 | Price tampering | Totals recomputed server-side from database prices |
+| Order history takeover | Token-only claim; no email-based linking; ownership checks on every order read |
+| Address IDOR | Every address query filters by the session user id |
+| Account takeover by email | No verification shortcut; password check plus token proof for orders |
+| Deleted-account data | Profile anonymised, credentials removed, orders retained for accounting |
 | Overselling | `SELECT … FOR UPDATE` on variant rows inside the placement transaction |
 | Admin takeover | Proxy-level gate, 2FA, 8-hour sessions, audit log |
 | Credential stuffing | Rate limit + lockout, breached-password check on signup |

@@ -21,6 +21,26 @@ export async function requireAdminPage() {
   return session;
 }
 
+/** Page guard for a signed-in shopper. Any account role may shop. */
+export async function requireUserPage() {
+  const session = await getAuthSession();
+
+  if (!session) redirect("/account/sign-in");
+
+  return session;
+}
+
+/** Action guard for a signed-in shopper. */
+export async function requireUserAction() {
+  const session = await getAuthSession();
+
+  if (!session) {
+    throw new Error("Sign in to continue.");
+  }
+
+  return session;
+}
+
 /** Action guard: throws rather than redirects, so the action returns an error. */
 export async function requireAdminAction() {
   const session = await getAuthSession();

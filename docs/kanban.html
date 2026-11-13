@@ -235,7 +235,7 @@
     </div>
   </div>
   <div class="stamp">
-    <strong>Phase 1 complete · Phase 2 next</strong><br>
+    <strong>Phase 2 complete · Phase 3 next</strong><br>
     Updated 13 Nov 2026
   </div>
 </header>
@@ -287,9 +287,33 @@
     </article>
 
     <article class="card done">
-      <h2>Six Playwright journeys</h2>
-      <p>Browse and buy, cart survives reload, stock limit, admin creates and publishes, admin edits price, bad lookup link.</p>
-      <span class="tag">Phase 1</span>
+      <h2>Customer accounts</h2>
+      <p>Email/password sign-up and sign-in, profile name and phone, storefront account area, and a sign-out that clears the session.</p>
+      <span class="tag">Phase 2</span>
+    </article>
+
+    <article class="card done">
+      <h2>Saved addresses and checkout</h2>
+      <p>Delivery and billing address book with one default each, pre-filled checkout, same-as-delivery billing, and save-on-checkout.</p>
+      <span class="tag">Phase 2</span>
+    </article>
+
+    <article class="card done">
+      <h2>Order history and claiming</h2>
+      <p>Signed-in history by customer id, token-only guest claim from the order page or manual form, and an audit entry for every claim.</p>
+      <span class="tag">Phase 2</span>
+    </article>
+
+    <article class="card done">
+      <h2>Account lifecycle</h2>
+      <p>Anonymous cart merged at sign-in, admin customer list and detail, and self-service deletion that anonymises the profile but keeps orders.</p>
+      <span class="tag">Phase 2</span>
+    </article>
+
+    <article class="card done">
+      <h2>Eleven Playwright journeys</h2>
+      <p>Browse and buy, cart reload and merge, stock limit, admin create/edit, bad lookup link, account checkout, guest claim, deletion, and admin customers.</p>
+      <span class="tag">Phase 1–2</span>
     </article>
 
     <article class="card done">
@@ -300,7 +324,7 @@
 
     <article class="card done">
       <h2>Application scaffold</h2>
-      <p>Next 16, Tailwind 4, eighteen-table schema with migrations, Better Auth with TOTP, Vitest and Playwright.</p>
+      <p>Next 16, Tailwind 4, nineteen-table schema with migrations, Better Auth with TOTP, Vitest and Playwright.</p>
       <span class="tag">Phase 1</span>
     </article>
 
@@ -337,7 +361,11 @@
       <span class="count"></span>
     </div>
 
-    <div class="empty">Nothing in flight.</div>
+    <article class="card work">
+      <h2>No-code control</h2>
+      <p>Continuous background stream: typed settings, theme tokens, homepage sections, and draft/publish. Each feature adds its admin screen and audit entry.</p>
+      <span class="tag">Continuous</span>
+    </article>
   </section>
 
   <!-- ───────────── TODO ───────────── -->
@@ -349,21 +377,51 @@
     </div>
 
     <article class="card">
-      <h2>Stripe Checkout</h2>
-      <p>Real payments behind the existing provider interface: hosted checkout, webhook verification, idempotent handling.</p>
-      <span class="tag">Phase 2</span>
+      <h2>Variations and variant images</h2>
+      <p>Keep final option combinations, improve the admin selector, and attach images per variant with fallback to the nearest parent value.</p>
+      <span class="tag">Phase 3</span>
     </article>
 
     <article class="card">
-      <h2>Real transactional email</h2>
-      <p>Order confirmation and dispatch notices through a provider, replacing the console mailer.</p>
-      <span class="tag">Phase 2</span>
+      <h2>Sales and promotions</h2>
+      <p>Per-variant sale price and schedule, percentage/original/sale display and timer, plus a manually managed home carousel linked to sales.</p>
+      <span class="tag">Phase 4</span>
     </article>
 
     <article class="card">
-      <h2>Payment failure and refunds</h2>
-      <p>Declined payments leave no held stock; refunds are recorded against the order with an audit entry.</p>
-      <span class="tag">Phase 2</span>
+      <h2>Categories, collections, badges</h2>
+      <p>Hierarchical navbar categories, curated rows such as Best Selling and Featured, and reusable card labels. Manual first.</p>
+      <span class="tag">Phase 4</span>
+    </article>
+
+    <article class="card">
+      <h2>Wishlist and price-drop alerts</h2>
+      <p>Private named lists, one first-drop email per variant including sale prices, and dedupe across a customer's lists.</p>
+      <span class="tag">Phase 5</span>
+    </article>
+
+    <article class="card">
+      <h2>Dark mode</h2>
+      <p>Storefront follows the OS by default; the customer can override and the choice persists. Admin stays light.</p>
+      <span class="tag">Phase 6</span>
+    </article>
+
+    <article class="card">
+      <h2>Arabic RTL and numerals</h2>
+      <p>Interface-only Arabic with a language toggle, RTL layout, and per-customer Arabic-Indic or Latin price numerals.</p>
+      <span class="tag">Phase 6</span>
+    </article>
+
+    <article class="card">
+      <h2>Stripe and real email</h2>
+      <p>Hosted checkout, idempotent webhooks, real transactional mail, verification, password reset, and refunds.</p>
+      <span class="tag">Phase 7</span>
+    </article>
+
+    <article class="card">
+      <h2>Hardening</h2>
+      <p>Tailscale-only admin, rehearsed backups and restore, error tracking, uptime and certificate monitoring, load check.</p>
+      <span class="tag">Phase 8</span>
     </article>
   </section>
 

@@ -33,6 +33,13 @@ without replacing it.
    an image, publish, product appears on the storefront.
 5. **Admin edits a product** — price change appears on the storefront without a deploy.
 6. **Guest order lookup** — the confirmation link works, an expired link does not.
+7. **Customer account** — sign up, save a delivery address, check out with pre-filled details and a
+   billing address, then see the order in history.
+8. **Cart merge** — an anonymous cart survives sign-in and appears in the account's cart.
+9. **Guest order claim** — a guest order, a sign-in from its lookup link, and a claim that moves it
+   into order history.
+10. **Account deletion** — delete with a password confirmation, then a sign-in attempt fails.
+11. **Admin customer list** — the panel lists customers and opens their detail.
 
 ## Vitest setup
 
@@ -42,7 +49,11 @@ Two projects in one config so `pnpm test` runs both and CI can filter them.
 // vitest.config.mts
 import { defineConfig } from "vitest/config";
 import react from "@vitejs/plugin-react";
+import { existsSync } from "node:fs";
 import { fileURLToPath } from "node:url";
+
+// Integration tests read DATABASE_URL_TEST from the same file the app uses.
+if (existsSync(".env.local")) process.loadEnvFile(".env.local");
 
 const src = fileURLToPath(new URL("./src", import.meta.url));
 
@@ -85,29 +96,36 @@ export default defineConfig({
 });
 ```
 
-The integration project is registered and empty. Its `passWithNoTests` flag comes off with the
-first service test, which is also when the CI job gains a Postgres service container.
+The integration project runs against a real Postgres, not a mock. A mocked database proves the mock
+works. The CI verify job provides a disposable Postgres service; locally, `DATABASE_URL_TEST`
+points at the same container as the dev database but a separate database, and `vitest.config.mts`
+loads `.env.local` before the run.
 
-Integration tests use a real Postgres, not a mock. A mocked database proves the mock works. The
-`schema` module enforces serial execution because every test truncates and reseeds.
+The setup file switches `DATABASE_URL` to the test database at module load, before test files
+import the database client. It then migrates and truncates every table, so tests never touch dev
+data or each other's rows.
 
 ```ts
 // tests/setup/db.ts
-import { beforeAll } from "vitest";
 import { sql } from "drizzle-orm";
-import { db } from "@/server/db/client";
-import { migrate } from "drizzle-orm/postgres-js/migrator";
+import { afterAll, beforeAll } from "vitest";
+
+const testUrl = process.env.DATABASE_URL_TEST;
+if (!testUrl) throw new Error("DATABASE_URL_TEST must point at a disposable database");
+process.env.DATABASE_URL = testUrl;
 
 beforeAll(async () => {
-  if (!process.env.DATABASE_URL_TEST) {
-    throw new Error("DATABASE_URL_TEST must point at a disposable database");
-  }
-  await migrate(db, { migrationsFolder: "./drizzle" });
-  for (const table of ["order_items", "orders", "cart_items", "carts", "variants", "products"]) {
-    await db.execute(sql.raw(`truncate ${table} restart identity cascade`));
-  }
+  const client = await import("@/server/db/client");
+  const { migrate } = await import("drizzle-orm/postgres-js/migrator");
+
+  await migrate(client.db, { migrationsFolder: "./drizzle" });
+  await client.db.execute(sql.raw("truncate ... restart identity cascade"));
 });
 ```
+
+Account tests own the important rules: a saved address is user-scoped, the first address is both
+defaults, deleting a default promotes another, a guest order is claimable only with its token, an
+order already claimed cannot move, and deletion anonymises the profile while keeping the order.
 
 Rules that keep unit tests honest:
 
@@ -158,6 +176,10 @@ setup project that runs first. The setup signs in through the real form and enro
 codes with `otplib`; the file is gitignored. Do not sign in through the UI in every spec; that tests
 the form six times and makes flakes stack up.
 
+The account specs create customers with a unique `customer-…@example.com` address. Global setup
+deletes those customers, their carts, sessions, and addresses between runs, so a rerun starts clean
+without touching the seeded admin.
+
 Locator rules:
 
 - `getByRole`, `getByLabel`, `getByText` first. `data-testid` only where no accessible name exists.
@@ -180,9 +202,10 @@ Every pull request runs, in this order, and all must pass:
 | Dependency audit | `pnpm audit --audit-level=high` | 1 min |
 | Repo scan | Trivy: vulnerabilities, secrets, misconfiguration | 2 min |
 
-The end-to-end job runs against a Postgres service container and uploads the Playwright HTML report
-and traces on failure. A trace is the fastest way to explain a red build, so it is uploaded before
-any cleanup step runs.
+The verify job runs a Postgres 17 service container and sets `DATABASE_URL_TEST`; integration tests
+migrate and truncate that database. The end-to-end job runs its own Postgres service container and
+uploads the Playwright HTML report and traces on failure. A trace is the fastest way to explain a
+red build, so it is uploaded before any cleanup step runs.
 
 ## The CVE gate
 

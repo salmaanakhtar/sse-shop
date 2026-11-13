@@ -1,9 +1,14 @@
 import Link from "next/link";
+import { getAuthSession } from "@/server/auth/guard";
 import { getCartItemCount } from "@/server/services/cart";
 import { getStoreSettings } from "@/server/services/settings";
 
 export async function SiteHeader() {
-  const [cartCount, settings] = await Promise.all([getCartItemCount(), getStoreSettings()]);
+  const [cartCount, settings, session] = await Promise.all([
+    getCartItemCount(),
+    getStoreSettings(),
+    getAuthSession(),
+  ]);
 
   return (
     <header className="border-b border-line bg-surface">
@@ -15,6 +20,12 @@ export async function SiteHeader() {
         <nav className="flex items-center gap-6 text-sm">
           <Link href="/" className="text-muted transition-colors hover:text-ink">
             Shop
+          </Link>
+          <Link
+            href={session ? "/account" : "/account/sign-in"}
+            className="text-muted transition-colors hover:text-ink"
+          >
+            {session ? "Account" : "Sign in"}
           </Link>
           <Link
             href="/cart"

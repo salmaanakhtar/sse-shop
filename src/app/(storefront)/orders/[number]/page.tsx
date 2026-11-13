@@ -1,16 +1,10 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { ClaimOrderForm } from "@/components/storefront/claim-order-form";
+import { OrderDetail, ORDER_STATUS_LABEL } from "@/components/storefront/order-detail";
 import { buttonClass } from "@/components/ui/button";
-import { formatAddress } from "@/lib/address";
-import { formatMoney } from "@/lib/money";
+import { getAuthSession } from "@/server/auth/guard";
 import { getOrderForGuest } from "@/server/services/orders";
-
-const STATUS_LABEL: Record<string, string> = {
-  pending: "Awaiting payment",
-  confirmed: "Confirmed",
-  fulfilled: "On its way",
-  cancelled: "Cancelled",
-};
 
 export default async function OrderPage({
   params,
@@ -26,7 +20,11 @@ export default async function OrderPage({
   const order = await getOrderForGuest(number, t);
   if (!order) notFound();
 
-  const address = formatAddress(order.shippingAddress);
+  const session = await getAuthSession();
+  const claimable = order.userId === null;
+  const ownedByViewer = session?.user.id === order.userId;
+
+  const returnTo = `/orders/${encodeURIComponent(order.number)}?t=${encodeURIComponent(t)}`;
 
   return (
     <div className="mx-auto max-w-3xl px-6 py-12">
@@ -35,7 +33,7 @@ export default async function OrderPage({
       </p>
       <h1 className="mt-3 text-2xl font-semibold tracking-tight">{order.number}</h1>
       <p className="mt-2 text-sm text-muted">
-        {STATUS_LABEL[order.status] ?? order.status} · placed{" "}
+        {ORDER_STATUS_LABEL[order.status] ?? order.status} · placed{" "}
         {order.placedAt.toLocaleDateString("en-AE", {
           day: "numeric",
           month: "long",
@@ -43,61 +41,54 @@ export default async function OrderPage({
         })}
       </p>
 
-      <div className="mt-8 rounded-xl border border-line bg-surface">
-        <ul className="divide-y divide-line">
-          {order.items.map((item) => (
-            <li key={`${item.sku}-${item.title}`} className="flex justify-between gap-4 px-5 py-4">
-              <div>
-                <p className="text-sm font-medium">{item.title}</p>
-                <p className="mt-0.5 text-xs text-muted">
-                  {item.sku} · × {item.quantity}
-                </p>
+      <OrderDetail order={order}>
+        <div className="mt-6 space-y-4">
+          {claimable && session ? (
+            <section className="rounded-xl border border-line bg-surface p-5">
+              <h2 className="text-sm font-semibold">Save this order to your account</h2>
+              <p className="mt-2 text-sm text-muted">
+                Keep it in your order history on this and other devices. The token proves you own
+                this lookup link.
+              </p>
+              <div className="mt-4">
+                <ClaimOrderForm number={order.number} token={t} compact />
               </div>
-              <p className="shrink-0 text-sm tabular-nums">{formatMoney(item.lineTotalMinor)}</p>
-            </li>
-          ))}
-        </ul>
-
-        <dl className="space-y-2 border-t border-line px-5 py-4 text-sm">
-          <div className="flex justify-between">
-            <dt className="text-muted">Subtotal</dt>
-            <dd className="tabular-nums">{formatMoney(order.subtotalMinor)}</dd>
-          </div>
-          <div className="flex justify-between">
-            <dt className="text-muted">Delivery</dt>
-            <dd className="tabular-nums">
-              {order.shippingMinor === 0 ? "Free" : formatMoney(order.shippingMinor)}
-            </dd>
-          </div>
-          <div className="flex justify-between border-t border-line pt-3 text-base font-semibold">
-            <dt>Total</dt>
-            <dd className="tabular-nums">{formatMoney(order.totalMinor)}</dd>
-          </div>
-          <p className="text-xs text-muted">Includes {formatMoney(order.taxMinor)} VAT</p>
-        </dl>
-      </div>
-
-      <div className="mt-6 grid gap-6 sm:grid-cols-2">
-        <section className="rounded-xl border border-line bg-surface p-5">
-          <h2 className="text-sm font-semibold">Delivering to</h2>
-          <div className="mt-2 space-y-0.5 text-sm text-muted">
-            {address.map((line) => (
-              <p key={line}>{line}</p>
-            ))}
-          </div>
-          {order.notes ? (
-            <p className="mt-3 text-xs text-muted">Notes: {order.notes}</p>
+            </section>
+          ) : claimable ? (
+            <section className="rounded-xl border border-line bg-surface p-5">
+              <h2 className="text-sm font-semibold">Keep this order</h2>
+              <p className="mt-2 text-sm text-muted">
+                Sign in or create an account to save this order to your history.
+              </p>
+              <Link
+                href={`/account/sign-in?next=${encodeURIComponent(returnTo)}`}
+                className={buttonClass("secondary", "sm", "mt-4")}
+              >
+                Sign in to save
+              </Link>
+            </section>
+          ) : ownedByViewer ? (
+            <p className="text-sm text-muted">
+              This order is in your account.{" "}
+              <Link
+                href={`/account/orders/${encodeURIComponent(order.number)}`}
+                className="underline underline-offset-4 hover:text-ink"
+              >
+                View it in your order history
+              </Link>
+              .
+            </p>
           ) : null}
-        </section>
 
-        <section className="rounded-xl border border-line bg-surface p-5">
-          <h2 className="text-sm font-semibold">Keep this link</h2>
-          <p className="mt-2 text-sm text-muted">
-            Without an account, this page is your way back into the order. It was also sent to{" "}
-            {order.email}.
-          </p>
-        </section>
-      </div>
+          <section className="rounded-xl border border-line bg-surface p-5">
+            <h2 className="text-sm font-semibold">Keep this link</h2>
+            <p className="mt-2 text-sm text-muted">
+              This page is your way back into the order without an account. It was also sent to{" "}
+              {order.email}.
+            </p>
+          </section>
+        </div>
+      </OrderDetail>
 
       <Link href="/" className={buttonClass("secondary", "md", "mt-8")}>
         Continue shopping

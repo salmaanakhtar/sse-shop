@@ -21,8 +21,25 @@ env:
 
 jobs:
   verify:
-    name: Lint, types, and unit tests
+    name: Lint, types, and tests
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: sse_shop
+          POSTGRES_PASSWORD: sse_shop
+          POSTGRES_DB: sse_shop_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U sse_shop -d sse_shop_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      # Integration tests migrate and truncate this disposable database.
+      DATABASE_URL_TEST: postgres://sse_shop:sse_shop@localhost:5432/sse_shop_test
     steps:
       - uses: actions/checkout@v7
       - uses: pnpm/action-setup@v6

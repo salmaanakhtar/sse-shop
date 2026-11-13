@@ -1,13 +1,37 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { CheckoutForm } from "@/components/storefront/checkout-form";
+import type { Address } from "@/lib/address";
 import { formatMoney } from "@/lib/money";
+import { getAuthSession } from "@/server/auth/guard";
+import { getDefaultAddress } from "@/server/services/addresses";
 import { getCartView } from "@/server/services/cart";
+
+function toAddress(address: NonNullable<Awaited<ReturnType<typeof getDefaultAddress>>>): Address {
+  return {
+    fullName: address.fullName,
+    phone: address.phone,
+    emirate: address.emirate as Address["emirate"],
+    street: address.street,
+    building: address.building,
+    area: address.area,
+    poBox: address.poBox,
+    notes: address.notes,
+  };
+}
 
 export default async function CheckoutPage() {
   const cart = await getCartView();
 
   if (!cart || cart.lines.length === 0) redirect("/cart");
+
+  const session = await getAuthSession();
+  const [shipping, billing] = session
+    ? await Promise.all([
+        getDefaultAddress(session.user.id, "shipping"),
+        getDefaultAddress(session.user.id, "billing"),
+      ])
+    : [null, null];
 
   const blocked = cart.lines.filter((line) => !line.available);
 
@@ -31,7 +55,17 @@ export default async function CheckoutPage() {
       ) : null}
 
       <div className="mt-8 grid gap-10 lg:grid-cols-[1fr_340px]">
-        <CheckoutForm expectedTotalMinor={cart.totals.totalMinor} />
+        <CheckoutForm
+          expectedTotalMinor={cart.totals.totalMinor}
+          defaults={{
+            email: session?.user.email ?? "",
+            fullName: shipping?.fullName ?? session?.user.name ?? "",
+            phone: shipping?.phone ?? session?.user.phone ?? "",
+            shipping: shipping ? toAddress(shipping) : null,
+            billing: billing ? toAddress(billing) : null,
+            signedIn: Boolean(session),
+          }}
+        />
 
         <aside className="h-fit rounded-xl border border-line bg-surface p-5">
           <h2 className="text-sm font-semibold">Your order</h2>

@@ -1,12 +1,24 @@
 import { ProductCard } from "@/components/storefront/product-card";
+import { PromotionCarousel } from "@/components/storefront/promotion-carousel";
 import { listCatalog } from "@/server/services/catalog";
+import { listActivePromotions } from "@/server/services/promotions";
 import { getStoreSettings } from "@/server/services/settings";
 
 export default async function HomePage() {
-  const [products, settings] = await Promise.all([listCatalog(), getStoreSettings()]);
+  const [products, settings, promotions] = await Promise.all([
+    listCatalog(),
+    getStoreSettings(),
+    listActivePromotions(),
+  ]);
 
   return (
     <div className="mx-auto max-w-5xl px-6 py-12">
+      {promotions.length > 0 ? (
+        <div className="mb-10">
+          <PromotionCarousel promotions={promotions} />
+        </div>
+      ) : null}
+
       <section className="mb-12">
         <p className="text-xs font-semibold tracking-[0.18em] text-brand uppercase">
           {settings.name}

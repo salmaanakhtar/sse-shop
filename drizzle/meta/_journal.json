@@ -43,6 +43,13 @@
       "when": 1794555391770,
       "tag": "0005_variant_sales",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1794556772229,
+      "tag": "0006_promotions",
+      "breakpoints": true
     }
   ]
 }

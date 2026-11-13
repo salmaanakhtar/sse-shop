@@ -3,9 +3,9 @@
 Sequenced so every phase leaves a working store. A phase is done when its completion criteria
 hold, not when the code is written.
 
-**Current:** Phase 3 complete. Phase 4 in progress — sales. The final phase is a full UI redesign of
-layout, theme, and design language. No-code control is a continuous background stream, not a
-numbered phase.
+**Current:** Phase 3 complete. Phase 4 in progress — sales and promotions are live. The final phase is
+a full UI redesign of layout, theme, and design language. No-code control is a continuous background
+stream, not a numbered phase.
 
 ## Phase 0 — Foundation
 
@@ -73,14 +73,15 @@ create, and the tree survives the migration.
 
 ## Phase 4 — Merchandising
 
-**Status: in progress — sales shipped.**
+**Status: in progress — sales and promotions shipped.**
 
 - **Sales (done):** per-variant sale price with an optional start/end in Asia/Dubai; the sale must
   be below the regular price; cart, checkout, and order snapshots use the effective price. The
   storefront shows the percentage off, original price, sale price, and a countdown. The admin sale
   change writes an audit entry.
-- **Promotions:** manually managed top-of-home carousel slides with image, headline/CTA, link,
-  schedule, and optional sale link; timer and arrows.
+- **Promotions (done):** manually managed top-of-home carousel slides with image, headline, CTA,
+  internal link, optional schedule, active flag, ordering, and audit entries. The storefront carousel
+  auto-advances, pauses on hover/focus, respects reduced motion, and has arrows and dots.
 - **Categories:** a hierarchical category tree with subcategories, ordered in the navbar.
 - **Collections:** manually curated rows such as Best Selling, Featured, and Daily Offers; automatic
   best-seller rules can follow.
@@ -214,7 +215,8 @@ These shape upcoming work. Answers land in `CONTEXT.md`, an ADR, or this file.
   active price, used by the storefront, cart, checkout, and order snapshot, with a countdown and an
   audit entry.
 - **Wishlist:** private named lists; first qualifying drop sends one email, including sale prices.
-- **Carousel:** manually managed slides that can link to a sale.
+- **Carousel:** manually managed slides with image, headline, CTA, internal link, schedule, active
+  flag, and ordering. It auto-advances, pauses on hover/focus, and has arrows and dots.
 - **Arabic:** interface-only first, per-customer numerals, storefront only.
 - **Dark mode:** customer toggle with system default; admin stays light.
 - **Roadmap order:** accounts → variations/images → sales/promotions → categories/collections →

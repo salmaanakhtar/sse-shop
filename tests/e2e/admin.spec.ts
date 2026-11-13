@@ -87,6 +87,30 @@ test("a sale price reaches the storefront, timer, and cart", async ({ page }) =>
   await expect(page.getByTestId("cart-total")).toHaveText(/AED\s119\.00/);
 });
 
+test("admin creates a promotion carousel and it appears on the home page", async ({ page }) => {
+  const createSlide = async (headline: string, subheadline: string, cta: string) => {
+    await page.goto("/admin/promotions/new");
+    await page.getByLabel("Headline", { exact: true }).fill(headline);
+    await page.getByLabel("Subheadline").fill(subheadline);
+    await page.getByLabel("Button label").fill(cta);
+    await page.getByLabel("Link").fill(`/products/${SLUG}`);
+    await page.setInputFiles("#promotion-image", "tests/e2e/fixtures/product.png");
+    await page.getByLabel("Image alt text").fill(headline);
+    await page.getByRole("button", { name: "Create slide" }).click();
+    await expect(page).toHaveURL(/\/admin\/promotions$/);
+  };
+
+  await createSlide("Weekend Sale", "Up to 34% off selected pieces", "Shop the sale");
+  await createSlide("New Arrivals", "Fresh pieces just landed", "Browse new");
+
+  await page.goto("/");
+  await page.getByRole("region", { name: "Promotions" }).hover();
+  await expect(page.getByRole("heading", { name: "Weekend Sale" })).toBeVisible();
+  await page.getByRole("button", { name: "Next slide" }).click();
+  await expect(page.getByRole("heading", { name: "New Arrivals" })).toBeVisible();
+  await expect(page.getByRole("link", { name: /New Arrivals/ })).toBeVisible();
+});
+
 test("admin can open the customer list", async ({ page }) => {
   await page.goto("/admin/customers");
   await expect(page.getByRole("heading", { name: "Customers" })).toBeVisible();

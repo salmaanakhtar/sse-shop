@@ -47,7 +47,7 @@ rules.
 
 ## Data model
 
-Nineteen tables, deliberately narrow. Every table carries `created_at`; most carry `updated_at`.
+Twenty tables, deliberately narrow. Every table carries `created_at`; most carry `updated_at`.
 | Table | Holds | Notes |
 | --- | --- | --- |
 | `users` | Admin and customer identity | `role` is `admin` or `customer`; `phone`; `deleted_at` tombstones a deleted customer |
@@ -66,6 +66,7 @@ Nineteen tables, deliberately narrow. Every table carries `created_at`; most car
 | `cart_items` | Variants in a cart | Unique on `(cart_id, variant_id)` |
 | `orders` | Placed order and its totals | `number` unique and sequential; `user_id` links the owner; `billing_address` snapshot |
 | `order_items` | Snapshot of what was bought | Prices frozen at placement |
+| `promotions` | Home-page carousel slides | image, headline, CTA, internal link, schedule, order |
 | `audit_log` | Admin and account changes | Actor, action, before/after JSON, IP |
 | `settings` | Store configuration | Key → JSONB, changed in admin |
 | `counters` | Monotonic sequences | Order numbers come from here, inside the placement transaction |
@@ -182,6 +183,22 @@ The pre-launch migration created a tree from every existing variant, then droppe
 `variant_option_values`. New products start with a default single variant when they have no levels,
 and with whichever branches the merchant adds when they do.
 
+## Home page promotions
+
+`promotions` holds the slides above the catalog on the home page:
+
+- image (same upload pipeline as products), headline, subheadline, call-to-action label, and an
+  internal path such as `/products/essential-tee` or `/collections/weekend`.
+- active flag, position, and an optional Asia/Dubai start/end window. Only active slides inside
+  their window are selected; expired and scheduled slides stay in the admin list with a status.
+- the admin list supports create, edit, reorder, image replacement, and delete. Every mutation
+  writes an `audit_log` entry.
+- the storefront carousel renders the live slides in position order. It auto-advances every six
+  seconds when there is more than one slide, pauses on hover/focus, respects reduced motion, and
+  exposes previous/next and dot controls. A single slide renders without controls.
+- links are internal paths only. This prevents a slide from becoming an open redirect or a
+  `javascript:` link.
+
 ## Cart and checkout
 
 ```text
@@ -297,6 +314,9 @@ detail page for saved addresses and order history. Customers never reach this ho
 The product editor defines levels and values, then builds the variant tree. The tree is a compact
 table: groups expand inline, the selected branch opens in a side inspector, and a single “Add
 branches” form creates only the ticked values. Nothing is generated from a Cartesian product.
+
+The admin also manages the home-page promotion carousel: image, headline, CTA, internal link,
+schedule, order, and active state, with an audit entry for every change.
 
 A no-code boundary is intentional: admin edits `settings` and content rows, never code. Anything
 that would require a deploy belongs in this repo, not in the admin UI.

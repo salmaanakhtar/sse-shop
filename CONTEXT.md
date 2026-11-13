@@ -148,13 +148,22 @@ expired sale automatically falls back to the list price.
 _Avoid_: Campaign dates
 
 **Promotion**:
-A merchandising message at the top of the home page, usually an image with a link. A group of
-promotions becomes a carousel.
+A merchandising message at the top of the home page: an image, optional headline and subheadline,
+a call to action, and an internal link. A group of promotions becomes a carousel.
 _Avoid_: Banner, ad
 
+**Promotion window**:
+The optional start and end of a promotion, edited in Asia/Dubai. Empty bounds mean open-ended; an
+inactive or expired promotion is not shown.
+_Avoid_: Campaign dates
+
+**Call to action**:
+The button label on a promotion, such as “Shop the sale”. It links to the promotion's internal path.
+_Avoid_: CTA as a database term, button text everywhere
+
 **Carousel slide**:
-One promotion in the rotating top-of-home carousel, with an image, optional headline/CTA, link,
-and schedule.
+One promotion in the rotating top-of-home carousel, with an image, optional headline and
+subheadline, a call to action, an internal link, and a schedule.
 
 ## Wishlist
 

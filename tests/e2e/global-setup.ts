@@ -18,6 +18,7 @@ export default async function globalSetup() {
   const { and, eq, like } = await import("drizzle-orm");
 
   await db.delete(schema.products).where(like(schema.products.slug, "playwright-%"));
+  await db.delete(schema.promotions);
   await db.delete(schema.sessions);
   await db.delete(schema.twoFactors);
   await db.update(schema.users).set({ twoFactorEnabled: false });

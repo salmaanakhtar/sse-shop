@@ -45,6 +45,8 @@ without replacing it.
     is the chosen path, not a phantom combination.
 13. **Sale price** — admin sets a sale with an end time; the storefront shows the discount, original
     price, and timer; the cart total uses the sale price.
+14. **Promotion carousel** — admin creates two scheduled slides; the home page shows the first, the
+    next arrow moves to the second, and the slide links to its internal path.
 
 ## Vitest setup
 
@@ -140,6 +142,9 @@ backfills existing variants into leaves. The gallery fallback is a unit-tested p
 Sale tests cover the active window, an expired window, a sale that is not below the list price, a
 free sale, the discount percentage, and the Asia/Dubai input round trip. The catalog integration
 test asserts the effective from-price and the sale fields on the product detail.
+
+Promotion tests cover live/scheduled/expired/inactive status, filtering live slides, position order,
+moving a slide, and deletion. The admin e2e creates two slides and drives the carousel arrows.
 
 Rules that keep unit tests honest:
 

@@ -398,6 +398,27 @@ export const orderItems = pgTable(
 
 /* ─────────────────────── operations ─────────────────────── */
 
+export const promotions = pgTable(
+  "promotions",
+  {
+    id: id(),
+    headline: text("headline").notNull().default(""),
+    subheadline: text("subheadline").notNull().default(""),
+    ctaLabel: text("cta_label").notNull().default("Shop now"),
+    /** Internal path only, e.g. /products/essential-tee or /collections/sale. */
+    href: text("href").notNull(),
+    imageKey: text("image_key").notNull(),
+    imageAlt: text("image_alt").notNull().default(""),
+    active: boolean("active").notNull().default(true),
+    position: integer("position").notNull().default(0),
+    startsAt: timestamp("starts_at", { withTimezone: true, mode: "date" }),
+    endsAt: timestamp("ends_at", { withTimezone: true, mode: "date" }),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (table) => [index("promotions_active_position_idx").on(table.active, table.position)],
+);
+
 export const auditLog = pgTable(
   "audit_log",
   {

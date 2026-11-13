@@ -23,13 +23,27 @@ export function ProductCard({ product }: { product: CatalogCardData }) {
             No image yet
           </div>
         )}
+        {product.onSale ? (
+          <span className="absolute left-3 top-3 rounded-full bg-brand px-2 py-0.5 text-[10px] font-semibold tracking-wide text-white uppercase">
+            Sale
+          </span>
+        ) : null}
       </div>
 
       <div className="space-y-1 p-4">
         <h2 className="text-sm font-medium">{product.title}</h2>
-        <p className="text-sm text-muted">
-          {product.inStock ? formatMoney(product.priceFromMinor) : "Sold out"}
-        </p>
+        {product.inStock ? (
+          <p className="flex items-baseline gap-2 text-sm text-muted">
+            <span>{formatMoney(product.priceFromMinor)}</span>
+            {product.compareAtFromMinor !== null ? (
+              <span className="text-xs line-through">
+                {formatMoney(product.compareAtFromMinor)}
+              </span>
+            ) : null}
+          </p>
+        ) : (
+          <p className="text-sm text-muted">Sold out</p>
+        )}
       </div>
     </Link>
   );

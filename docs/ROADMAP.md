@@ -3,7 +3,9 @@
 Sequenced so every phase leaves a working store. A phase is done when its completion criteria
 hold, not when the code is written.
 
-**Current:** Phase 3 complete. Phase 4 next — sales, promotions, categories, collections, and badges. No-code control is a continuous background stream, not a numbered phase.
+**Current:** Phase 3 complete. Phase 4 in progress — sales. The final phase is a full UI redesign of
+layout, theme, and design language. No-code control is a continuous background stream, not a
+numbered phase.
 
 ## Phase 0 — Foundation
 
@@ -71,9 +73,12 @@ create, and the tree survives the migration.
 
 ## Phase 4 — Merchandising
 
-- **Sales:** per-variant sale price with optional start/end; the lowest active price wins; show
-  percentage off, original price, sale price, and a timer. Cart and checkout use the same
-  server-side price.
+**Status: in progress — sales shipped.**
+
+- **Sales (done):** per-variant sale price with an optional start/end in Asia/Dubai; the sale must
+  be below the regular price; cart, checkout, and order snapshots use the effective price. The
+  storefront shows the percentage off, original price, sale price, and a countdown. The admin sale
+  change writes an audit entry.
 - **Promotions:** manually managed top-of-home carousel slides with image, headline/CTA, link,
   schedule, and optional sale link; timer and arrows.
 - **Categories:** a hierarchical category tree with subcategories, ordered in the navbar.
@@ -149,6 +154,25 @@ This is a background stream expanded as each feature lands, not a phase with a f
 - Draft/publish for content, with a preview link.
 - Each new configurable feature adds its admin screen and its audit entry here.
 
+## Phase 9 — Full UI redesign
+
+**Status: last.** Deliberately after every feature exists.
+
+- A single design language for storefront and admin: typography, spacing, colour, radius, elevation,
+  motion, iconography, and component states.
+- Layout and information architecture review: navigation, page composition, tables, forms, filters,
+  empty/loading/error states, and mobile behaviour.
+- Apply the theme tokens from the continuous no-code stream and the dark-mode/RTL work from Phase 6
+  consistently across every screen.
+- Replace one-off styling and inconsistent primitives; no screen keeps a legacy layout.
+- Accessibility pass: focus order, contrast, keyboard use, labels, and reduced motion.
+
+**Done when** every storefront and admin screen shares one documented design language, the same
+primitives, and an accessibility pass, with no legacy screen left behind.
+
+Until this phase, new features use the existing `src/components/ui` primitives and Tailwind tokens;
+they do not pre-build a parallel design system.
+
 ## Open questions
 
 These shape upcoming work. Answers land in `CONTEXT.md`, an ADR, or this file.
@@ -186,10 +210,13 @@ These shape upcoming work. Answers land in `CONTEXT.md`, an ADR, or this file.
   picker shows the selected image; swapping the large gallery is the remaining polish.
 - **Categories, collections, badges:** three separate systems. Categories are a tree; collections
   are curated rows; badges are card labels. Manual first.
-- **Sales:** per-variant sale price with a schedule; the lowest active price wins.
+- **Sales:** per-variant sale price with an Asia/Dubai schedule; the effective price is the lower
+  active price, used by the storefront, cart, checkout, and order snapshot, with a countdown and an
+  audit entry.
 - **Wishlist:** private named lists; first qualifying drop sends one email, including sale prices.
 - **Carousel:** manually managed slides that can link to a sale.
 - **Arabic:** interface-only first, per-customer numerals, storefront only.
 - **Dark mode:** customer toggle with system default; admin stays light.
 - **Roadmap order:** accounts → variations/images → sales/promotions → categories/collections →
-  wishlist → dark mode → Arabic → real payments/email → hardening. No-code control is continuous.
+  wishlist → dark mode → Arabic → real payments/email → hardening → full UI redesign. No-code control
+  is continuous.

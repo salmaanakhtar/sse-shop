@@ -3,8 +3,10 @@
 import { useRouter } from "next/navigation";
 import { useMemo, useState, useTransition } from "react";
 import { addToCartAction } from "@/app/(storefront)/cart-actions";
+import { SaleCountdown } from "@/components/storefront/sale-countdown";
 import { Button } from "@/components/ui/button";
 import { formatMoney } from "@/lib/money";
+import { activeSalePrice, discountPercent } from "@/lib/sale";
 import { cn } from "@/lib/utils";
 import {
   buildVariantTree,
@@ -40,6 +42,12 @@ export function ProductOptions({ options, nodes, selectedIds, onSelectedIdsChang
   const selectedNode = path[path.length - 1];
   const variant = selectedNode?.variant ?? null;
   const soldOut = !variant || !variant.active || !selectedNode?.active || variant.stockQty === 0;
+  const salePriceMinor = variant ? activeSalePrice(variant.priceMinor, variant) : null;
+  const effectivePriceMinor = salePriceMinor ?? variant?.priceMinor ?? null;
+  const percent =
+    variant && salePriceMinor !== null
+      ? discountPercent(variant.priceMinor, salePriceMinor)
+      : null;
 
   const groups: { level: OptionGroup; siblings: VariantTreeNode[]; selectedId?: string }[] = [];
   let parent: VariantTreeNode | undefined;
@@ -127,10 +135,27 @@ export function ProductOptions({ options, nodes, selectedIds, onSelectedIdsChang
 
       <div className="flex items-baseline justify-between gap-4 border-t border-line pt-5">
         <div>
-          <p className="text-xl font-semibold tabular-nums">
-            {variant ? formatMoney(variant.priceMinor) : "—"}
-          </p>
+          <div className="flex flex-wrap items-baseline gap-2">
+            <p className="text-xl font-semibold tabular-nums">
+              {effectivePriceMinor !== null ? formatMoney(effectivePriceMinor) : "—"}
+            </p>
+            {salePriceMinor !== null && variant ? (
+              <>
+                <p className="text-sm text-muted line-through tabular-nums">
+                  {formatMoney(variant.priceMinor)}
+                </p>
+                {percent !== null ? (
+                  <span className="rounded-full bg-brand-soft px-2 py-0.5 text-[10px] font-semibold text-brand">
+                    −{percent}%
+                  </span>
+                ) : null}
+              </>
+            ) : null}
+          </div>
           <p className="mt-1 text-xs text-muted">{statusText}</p>
+          {salePriceMinor !== null && variant?.saleEndsAt ? (
+            <SaleCountdown endsAt={variant.saleEndsAt} />
+          ) : null}
         </div>
         <p className="text-xs text-muted">VAT included</p>
       </div>

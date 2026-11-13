@@ -36,6 +36,9 @@ type NodeRow = {
   variantTitle: string | null;
   variantSku: string | null;
   variantPriceMinor: number | null;
+  variantSalePriceMinor: number | null;
+  variantSaleStartsAt: Date | null;
+  variantSaleEndsAt: Date | null;
   variantStockQty: number | null;
   variantActive: boolean | null;
 };
@@ -60,6 +63,9 @@ async function listNodeRows(productIds: readonly string[]): Promise<NodeRow[]> {
       variantTitle: variants.title,
       variantSku: variants.sku,
       variantPriceMinor: variants.priceMinor,
+      variantSalePriceMinor: variants.salePriceMinor,
+      variantSaleStartsAt: variants.saleStartsAt,
+      variantSaleEndsAt: variants.saleEndsAt,
       variantStockQty: variants.stockQty,
       variantActive: variants.active,
     })
@@ -77,6 +83,9 @@ function toView(row: NodeRow): VariantNodeView {
           title: row.variantTitle ?? "",
           sku: row.variantSku ?? "",
           priceMinor: row.variantPriceMinor ?? 0,
+          salePriceMinor: row.variantSalePriceMinor,
+          saleStartsAt: row.variantSaleStartsAt,
+          saleEndsAt: row.variantSaleEndsAt,
           stockQty: row.variantStockQty ?? 0,
           active: row.variantActive ?? false,
         }

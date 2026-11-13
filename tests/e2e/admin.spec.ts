@@ -56,6 +56,29 @@ test("a price change in admin reaches the storefront", async ({ page }) => {
   await expect(page.getByText(/AED\s149\.00/)).toBeVisible();
 });
 
+test("a sale price reaches the storefront, timer, and cart", async ({ page }) => {
+  await page.goto("/admin/products");
+  await page.getByRole("link", { name: "Playwright Hoodie" }).click();
+
+  await page.getByRole("button", { name: "Edit" }).first().click();
+  await page.getByTestId("sale-price").fill("99.00");
+  await page.getByLabel("Ends").fill("2030-01-01T00:00");
+  await page.getByRole("button", { name: "Save sale" }).click();
+
+  await expect(page.getByText(/AED\s99\.00/).first()).toBeVisible();
+
+  await page.goto(`/products/${SLUG}`);
+  await expect(page.getByText(/AED\s99\.00/)).toBeVisible();
+  await expect(page.getByText(/AED\s149\.00/)).toBeVisible();
+  await expect(page.getByTestId("sale-timer")).toBeVisible();
+
+  await page.getByTestId("add-to-cart").click();
+  await expect(page.getByRole("status")).toHaveText("Added to cart.");
+
+  await page.getByRole("link", { name: /^Cart/ }).click();
+  await expect(page.getByTestId("cart-total")).toHaveText(/AED\s119\.00/);
+});
+
 test("admin can open the customer list", async ({ page }) => {
   await page.goto("/admin/customers");
   await expect(page.getByRole("heading", { name: "Customers" })).toBeVisible();

@@ -8,6 +8,7 @@ import {
   products,
   variants,
 } from "@/server/db/schema";
+import { getProductDetail, listCatalog } from "@/server/services/catalog";
 import {
   bulkUpdateVariantLeaves,
   copyVariantChildren,
@@ -262,5 +263,57 @@ describe("variant tree", () => {
       .from(variants)
       .where(eq(variants.id, variantIds[0]!));
     expect(first).toEqual({ priceMinor: 15_000, stockQty: 3 });
+  });
+
+  it("uses the active sale price in the catalog and product detail", async () => {
+    const setup = await setupProduct();
+
+    await db
+      .update(products)
+      .set({ status: "active", publishedAt: new Date() })
+      .where(eq(products.id, setup.product.id));
+
+    await createVariantBranches({
+      productId: setup.product.id,
+      parentId: null,
+      optionValueIds: [setup.blue.id],
+      priceMinor: 12_000,
+      stockQty: 10,
+    });
+    const root = (await getVariantTree(setup.product.id))[0]!;
+    await createVariantBranches({
+      productId: setup.product.id,
+      parentId: root.id,
+      optionValueIds: [setup.s.id],
+    });
+
+    const leaf = flattenVariantTree(await getVariantTree(setup.product.id)).find(
+      (node) => node.variant,
+    );
+    const variantId = leaf?.variant?.id;
+    if (!variantId) throw new Error("missing test variant");
+
+    await db
+      .update(variants)
+      .set({ salePriceMinor: 9_000, saleEndsAt: new Date(Date.now() + 60 * 60 * 1000) })
+      .where(eq(variants.id, variantId));
+
+    const detail = await getProductDetail(setup.product.slug);
+    expect(detail?.priceFromMinor).toBe(9_000);
+    expect(detail?.nodes.find((node) => node.variant)?.variant?.salePriceMinor).toBe(9_000);
+
+    const card = (await listCatalog()).find((item) => item.id === setup.product.id);
+    expect(card?.onSale).toBe(true);
+    expect(card?.priceFromMinor).toBe(9_000);
+    expect(card?.compareAtFromMinor).toBe(12_000);
+
+    await db
+      .update(variants)
+      .set({ saleEndsAt: new Date(Date.now() - 1_000) })
+      .where(eq(variants.id, variantId));
+
+    const expired = (await listCatalog()).find((item) => item.id === setup.product.id);
+    expect(expired?.onSale).toBe(false);
+    expect(expired?.priceFromMinor).toBe(12_000);
   });
 });

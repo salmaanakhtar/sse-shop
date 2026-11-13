@@ -151,6 +151,10 @@ export const variants = pgTable(
     priceMinor: integer("price_minor").notNull(),
     compareAtMinor: integer("compare_at_minor"),
     costMinor: integer("cost_minor"),
+    /** Sale price for the active window; the list price stays untouched. */
+    salePriceMinor: integer("sale_price_minor"),
+    saleStartsAt: timestamp("sale_starts_at", { withTimezone: true, mode: "date" }),
+    saleEndsAt: timestamp("sale_ends_at", { withTimezone: true, mode: "date" }),
     stockQty: integer("stock_qty").notNull().default(0),
     weightGrams: integer("weight_grams"),
     position: integer("position").notNull().default(0),

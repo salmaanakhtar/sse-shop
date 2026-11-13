@@ -137,6 +137,16 @@ A time-boxed price for a variant. The sale price is the price charged while the 
 the list price remains visible as the original.
 _Avoid_: Discount code, promotion
 
+**Sale price**:
+The lower price a variant is sold at while its sale window is active. It must be below the list
+price and is stored on the variant, not by overwriting the list price.
+_Avoid_: Discounted price, current price
+
+**Sale window**:
+The optional start and end of a sale, edited in Asia/Dubai. An empty bound means open-ended; an
+expired sale automatically falls back to the list price.
+_Avoid_: Campaign dates
+
 **Promotion**:
 A merchandising message at the top of the home page, usually an image with a link. A group of
 promotions becomes a carousel.
@@ -172,6 +182,11 @@ only; product content stays English initially.
 **Numeral style**:
 The customer's choice between Arabic-Indic digits (٠١٢٣) and Latin digits (0123) for prices.
 _Avoid_: Number format
+
+**Design language**:
+The shared rules for typography, spacing, colour, radius, elevation, motion, iconography, and
+component states across storefront and admin. The final roadmap phase applies it everywhere.
+_Avoid_: Theme, skin, style guide as a loose collection
 
 ## Orders
 

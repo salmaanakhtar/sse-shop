@@ -3,6 +3,7 @@ import { cookies } from "next/headers";
 import { and, asc, desc, eq, gt, inArray, sql } from "drizzle-orm";
 import { priceCart, type CartTotals } from "@/lib/pricing";
 import { fail, ok, type Result } from "@/lib/result";
+import { effectivePriceMinor } from "@/lib/sale";
 import { getAuthSession } from "../auth/guard";
 import { db } from "../db/client";
 import {
@@ -27,6 +28,7 @@ export type CartLine = {
   variantTitle: string;
   optionLabel: string;
   unitPriceMinor: number;
+  regularPriceMinor: number;
   quantity: number;
   stockQty: number;
   lineTotalMinor: number;
@@ -250,6 +252,9 @@ export async function loadCart(cartId: string): Promise<CartView> {
       variantId: variants.id,
       variantTitle: variants.title,
       priceMinor: variants.priceMinor,
+      salePriceMinor: variants.salePriceMinor,
+      saleStartsAt: variants.saleStartsAt,
+      saleEndsAt: variants.saleEndsAt,
       stockQty: variants.stockQty,
       variantActive: variants.active,
       productId: products.id,
@@ -283,21 +288,27 @@ export async function loadCart(cartId: string): Promise<CartView> {
     }
   }
 
-  const lines: CartLine[] = rows.map((row) => ({
-    itemId: row.itemId,
-    variantId: row.variantId,
-    productTitle: row.productTitle,
-    productSlug: row.productSlug,
-    variantTitle: row.variantTitle,
-    optionLabel: (labelsByVariant.get(row.variantId) ?? []).join(" / "),
-    unitPriceMinor: row.priceMinor,
-    quantity: row.quantity,
-    stockQty: row.stockQty,
-    lineTotalMinor: row.priceMinor * row.quantity,
-    imageKey: imageByProduct.get(row.productId) ?? null,
-    available:
-      row.variantActive && row.productStatus === "active" && row.stockQty >= row.quantity,
-  }));
+  const now = new Date();
+  const lines: CartLine[] = rows.map((row) => {
+    const unitPriceMinor = effectivePriceMinor(row.priceMinor, row, now);
+
+    return {
+      itemId: row.itemId,
+      variantId: row.variantId,
+      productTitle: row.productTitle,
+      productSlug: row.productSlug,
+      variantTitle: row.variantTitle,
+      optionLabel: (labelsByVariant.get(row.variantId) ?? []).join(" / "),
+      unitPriceMinor,
+      regularPriceMinor: row.priceMinor,
+      quantity: row.quantity,
+      stockQty: row.stockQty,
+      lineTotalMinor: unitPriceMinor * row.quantity,
+      imageKey: imageByProduct.get(row.productId) ?? null,
+      available:
+        row.variantActive && row.productStatus === "active" && row.stockQty >= row.quantity,
+    };
+  });
 
   const totals = priceCart({
     lines: lines.map((line) => ({ unitPriceMinor: line.unitPriceMinor, quantity: line.quantity })),

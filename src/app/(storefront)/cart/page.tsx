@@ -102,9 +102,16 @@ export default async function CartPage({
                     </button>
                   </form>
 
-                  <p className="w-24 text-right text-sm font-medium tabular-nums">
-                    {formatMoney(line.lineTotalMinor)}
-                  </p>
+                  <div className="w-24 text-right">
+                    <p className="text-sm font-medium tabular-nums">
+                      {formatMoney(line.lineTotalMinor)}
+                    </p>
+                    {line.regularPriceMinor > line.unitPriceMinor ? (
+                      <p className="text-[11px] text-muted line-through tabular-nums">
+                        {formatMoney(line.regularPriceMinor * line.quantity)}
+                      </p>
+                    ) : null}
+                  </div>
 
                   <form action={removeItemAction}>
                     <input type="hidden" name="itemId" value={line.itemId} />

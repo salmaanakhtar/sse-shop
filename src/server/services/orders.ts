@@ -4,6 +4,7 @@ import { z } from "zod";
 import { addressSchema, type Address } from "@/lib/address";
 import { priceCart } from "@/lib/pricing";
 import { fail, ok, type Result } from "@/lib/result";
+import { effectivePriceMinor } from "@/lib/sale";
 import { db } from "../db/client";
 import {
   auditLog,
@@ -171,6 +172,9 @@ export async function placeOrder(input: {
           sku: variants.sku,
           variantTitle: variants.title,
           priceMinor: variants.priceMinor,
+          salePriceMinor: variants.salePriceMinor,
+          saleStartsAt: variants.saleStartsAt,
+          saleEndsAt: variants.saleEndsAt,
           stockQty: variants.stockQty,
           active: variants.active,
           productTitle: products.title,
@@ -184,6 +188,7 @@ export async function placeOrder(input: {
 
       const byId = new Map(locked.map((row) => [row.variantId, row]));
       const lines: Committed["lines"] = [];
+      const now = new Date();
 
       for (const item of items) {
         const variant = byId.get(item.variantId);
@@ -201,7 +206,7 @@ export async function placeOrder(input: {
           variantId: variant.variantId,
           sku: variant.sku,
           title: `${variant.productTitle} — ${variant.variantTitle}`,
-          unitPriceMinor: variant.priceMinor,
+          unitPriceMinor: effectivePriceMinor(variant.priceMinor, variant, now),
           quantity: item.quantity,
         });
       }

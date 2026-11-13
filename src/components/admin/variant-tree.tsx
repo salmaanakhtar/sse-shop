@@ -12,12 +12,15 @@ import {
   deleteVariantNodeAction,
   updateVariantAction,
   updateVariantNodeAction,
+  updateVariantSaleAction,
   uploadNodeImageAction,
 } from "@/server/actions/admin-products";
 import { Button } from "@/components/ui/button";
 import { ConfirmSubmitButton } from "@/components/ui/confirm-submit-button";
 import { Input, Label } from "@/components/ui/field";
+import { formatDubaiDateTimeInput } from "@/lib/dates";
 import { formatMoney } from "@/lib/money";
+import { activeSalePrice, discountPercent } from "@/lib/sale";
 import {
   buildVariantTree,
   effectiveImageKey,
@@ -114,6 +117,9 @@ function TreeRows({
         const isGroup = node.children.length > 0;
         const variant = node.variant;
         const imageKey = effectiveImageKey(path);
+        const salePrice = variant ? activeSalePrice(variant.priceMinor, variant) : null;
+        const percent =
+          variant && salePrice !== null ? discountPercent(variant.priceMinor, salePrice) : null;
         const status: "Active" | "Inactive" | "Sold out" | "Empty" = isGroup
           ? node.active
             ? "Active"
@@ -169,7 +175,12 @@ function TreeRows({
               </td>
               <td className="px-4 py-3 text-xs text-muted">{variant?.sku ?? "—"}</td>
               <td className="px-4 py-3 text-sm tabular-nums">
-                {variant ? formatMoney(variant.priceMinor) : "—"}
+                {variant ? formatMoney(salePrice ?? variant.priceMinor) : "—"}
+                {salePrice !== null && percent !== null ? (
+                  <p className="text-[10px] text-muted">
+                    was {formatMoney(variant!.priceMinor)} · −{percent}%
+                  </p>
+                ) : null}
               </td>
               <td className="px-4 py-3 text-sm tabular-nums">{variant?.stockQty ?? "—"}</td>
               <td className="px-4 py-3">
@@ -489,6 +500,56 @@ function BranchInspector({
           </Button>
         </form>
       )}
+
+      {node.variant ? (
+        <form
+          action={updateVariantSaleAction}
+          className="mt-5 space-y-3 border-t border-line pt-4"
+        >
+          <input type="hidden" name="productId" value={productId} />
+          <input type="hidden" name="variantId" value={node.variant.id} />
+          <div>
+            <p className="text-sm font-semibold">Sale</p>
+            <p className="mt-1 text-[11px] text-muted">
+              Times are Asia/Dubai. Leave the sale price blank to clear it.
+            </p>
+          </div>
+          <div>
+            <Label htmlFor={`sale-price-${node.variant.id}`}>Sale price (AED)</Label>
+            <Input
+              id={`sale-price-${node.variant.id}`}
+              name="salePrice"
+              inputMode="decimal"
+              placeholder="No sale"
+              defaultValue={moneyInput(node.variant.salePriceMinor)}
+              data-testid="sale-price"
+            />
+          </div>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <div>
+              <Label htmlFor={`sale-start-${node.variant.id}`}>Starts</Label>
+              <Input
+                id={`sale-start-${node.variant.id}`}
+                name="saleStartsAt"
+                type="datetime-local"
+                defaultValue={formatDubaiDateTimeInput(node.variant.saleStartsAt)}
+              />
+            </div>
+            <div>
+              <Label htmlFor={`sale-end-${node.variant.id}`}>Ends</Label>
+              <Input
+                id={`sale-end-${node.variant.id}`}
+                name="saleEndsAt"
+                type="datetime-local"
+                defaultValue={formatDubaiDateTimeInput(node.variant.saleEndsAt)}
+              />
+            </div>
+          </div>
+          <Button type="submit" size="sm" variant="secondary">
+            Save sale
+          </Button>
+        </form>
+      ) : null}
 
       <div className="mt-5 border-t border-line pt-4">
         <BranchImageForm productId={productId} node={node} />

@@ -43,6 +43,8 @@ without replacing it.
 11. **Admin customer list** — the panel lists customers and opens their detail.
 12. **Variant tree selection** — selecting a parent updates the children and price; the cart label
     is the chosen path, not a phantom combination.
+13. **Sale price** — admin sets a sale with an end time; the storefront shows the discount, original
+    price, and timer; the cart total uses the sale price.
 
 ## Vitest setup
 
@@ -134,6 +136,10 @@ Variant-tree tests own the catalog rules: per-parent children never create a pha
 children inherit parent defaults, copying a sibling creates new SKUs on the target path, deleting a
 branch removes its variants, bulk updates apply only to the selected leaves, and the migration
 backfills existing variants into leaves. The gallery fallback is a unit-tested pure helper.
+
+Sale tests cover the active window, an expired window, a sale that is not below the list price, a
+free sale, the discount percentage, and the Asia/Dubai input round trip. The catalog integration
+test asserts the effective from-price and the sale fields on the product detail.
 
 Rules that keep unit tests honest:
 

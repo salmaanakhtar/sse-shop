@@ -36,6 +36,13 @@
       "when": 1794553197798,
       "tag": "0004_drop_variant_option_values",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1794555391770,
+      "tag": "0005_variant_sales",
+      "breakpoints": true
     }
   ]
 }

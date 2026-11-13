@@ -3,6 +3,9 @@ export type VariantLeaf = {
   title: string;
   sku: string;
   priceMinor: number;
+  salePriceMinor: number | null;
+  saleStartsAt: Date | string | null;
+  saleEndsAt: Date | string | null;
   stockQty: number;
   active: boolean;
 };

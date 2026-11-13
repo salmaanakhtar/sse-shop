@@ -1,4 +1,5 @@
 import { and, asc, desc, eq, inArray } from "drizzle-orm";
+import { effectivePriceMinor } from "@/lib/sale";
 import { db } from "../db/client";
 import {
   productMedia,
@@ -15,6 +16,8 @@ export type CatalogCard = {
   title: string;
   description: string;
   priceFromMinor: number;
+  compareAtFromMinor: number | null;
+  onSale: boolean;
   inStock: boolean;
   imageKey: string | null;
   imageAlt: string;
@@ -82,13 +85,25 @@ export async function listCatalog(): Promise<CatalogCard[]> {
   return productRows.map((product) => {
     const own = variantRows.filter((variant) => variant.productId === product.id);
     const media = firstImage.get(product.id);
+    const now = new Date();
+    const priced = own.map((variant) => ({
+      regular: variant.priceMinor,
+      effective: effectivePriceMinor(variant.priceMinor, variant, now),
+    }));
+    const cheapest = priced.reduce<(typeof priced)[number] | null>(
+      (best, current) => (!best || current.effective < best.effective ? current : best),
+      null,
+    );
 
     return {
       id: product.id,
       slug: product.slug,
       title: product.title,
       description: product.description,
-      priceFromMinor: own.length > 0 ? Math.min(...own.map((v) => v.priceMinor)) : 0,
+      priceFromMinor: cheapest?.effective ?? 0,
+      compareAtFromMinor:
+        cheapest && cheapest.effective < cheapest.regular ? cheapest.regular : null,
+      onSale: priced.some((item) => item.effective < item.regular),
       inStock: own.some((variant) => variant.stockQty > 0),
       imageKey: media?.storageKey ?? null,
       imageAlt: media?.alt ?? product.title,
@@ -149,7 +164,14 @@ export async function getProductDetail(slug: string): Promise<ProductDetail | nu
       width: row.width,
       height: row.height,
     })),
-    priceFromMinor: variantRows.length > 0 ? Math.min(...variantRows.map((v) => v.priceMinor)) : 0,
+    priceFromMinor:
+      variantRows.length > 0
+        ? Math.min(
+            ...variantRows.map((variant) =>
+              effectivePriceMinor(variant.priceMinor, variant, new Date()),
+            ),
+          )
+        : 0,
     inStock: variantRows.some((variant) => variant.stockQty > 0),
   };
 }

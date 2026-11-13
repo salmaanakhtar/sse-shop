@@ -5,11 +5,13 @@ import path from "node:path";
 import { and, asc, eq, inArray } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
+import { parseDubaiDateTimeInput } from "@/lib/dates";
 import { parseMoney } from "@/lib/money";
 import { collectSubtreeVariantIds, flattenVariantTree } from "@/lib/variants";
 import { requireAdminAction } from "../auth/guard";
 import { db } from "../db/client";
 import {
+  auditLog,
   productMedia,
   productOptionValues,
   productOptions,
@@ -461,6 +463,21 @@ export async function updateVariantAction(formData: FormData): Promise<void> {
   const title = String(formData.get("title") ?? "").trim();
   const active = formData.get("active") === "on";
 
+  const [current] = await db
+    .select({ salePriceMinor: variants.salePriceMinor })
+    .from(variants)
+    .where(and(eq(variants.id, variantId), eq(variants.productId, productId)))
+    .limit(1);
+
+  if (!current) backToProduct(productId, "That variant could not be found.", "variants");
+  if (current.salePriceMinor !== null && price <= current.salePriceMinor) {
+    backToProduct(
+      productId,
+      "The regular price must stay above the existing sale price.",
+      "variants",
+    );
+  }
+
   try {
     await db.transaction(async (tx) => {
       await tx
@@ -486,6 +503,85 @@ export async function updateVariantAction(formData: FormData): Promise<void> {
     console.error("updateVariantAction failed", error);
     backToProduct(productId, "Could not save the variant. Is the SKU unique?", "variants");
   }
+
+  revalidatePath(`/admin/products/${productId}`);
+  revalidatePath("/");
+  backToProduct(productId, undefined, "variants");
+}
+
+export async function updateVariantSaleAction(formData: FormData): Promise<void> {
+  const session = await requireAdminAction();
+
+  const productId = requireText(formData.get("productId"), "Product id");
+  const variantId = requireText(formData.get("variantId"), "Variant id");
+
+  const salePriceRaw = String(formData.get("salePrice") ?? "").trim();
+  const salePriceMinor = salePriceRaw === "" ? null : parseMoney(salePriceRaw);
+  if (salePriceRaw !== "" && salePriceMinor === null) {
+    backToProduct(productId, "Enter a valid sale price", "variants");
+  }
+
+  let saleStartsAt = parseDubaiDateTimeInput(String(formData.get("saleStartsAt") ?? ""));
+  if (saleStartsAt === "invalid") {
+    backToProduct(productId, "Enter a valid sale start time", "variants");
+  }
+
+  let saleEndsAt = parseDubaiDateTimeInput(String(formData.get("saleEndsAt") ?? ""));
+  if (saleEndsAt === "invalid") {
+    backToProduct(productId, "Enter a valid sale end time", "variants");
+  }
+
+  if (salePriceMinor === null) {
+    saleStartsAt = null;
+    saleEndsAt = null;
+  }
+
+  if (saleStartsAt && saleEndsAt && saleStartsAt >= saleEndsAt) {
+    backToProduct(productId, "The sale must end after it starts", "variants");
+  }
+
+  const [variant] = await db
+    .select()
+    .from(variants)
+    .where(and(eq(variants.id, variantId), eq(variants.productId, productId)))
+    .limit(1);
+
+  if (!variant) backToProduct(productId, "That variant could not be found.", "variants");
+
+  if (
+    salePriceMinor !== null &&
+    (salePriceMinor < 0 || salePriceMinor >= variant.priceMinor)
+  ) {
+    backToProduct(productId, "The sale price must be below the regular price", "variants");
+  }
+
+  const before = {
+    salePriceMinor: variant.salePriceMinor,
+    saleStartsAt: variant.saleStartsAt,
+    saleEndsAt: variant.saleEndsAt,
+  };
+  const after = { salePriceMinor, saleStartsAt, saleEndsAt };
+
+  await db.transaction(async (tx) => {
+    await tx
+      .update(variants)
+      .set({
+        salePriceMinor,
+        saleStartsAt: saleStartsAt as Date | null,
+        saleEndsAt: saleEndsAt as Date | null,
+        updatedAt: new Date(),
+      })
+      .where(and(eq(variants.id, variantId), eq(variants.productId, productId)));
+
+    await tx.insert(auditLog).values({
+      actorUserId: session.user.id,
+      action: "variant.sale",
+      entity: "variants",
+      entityId: variantId,
+      before,
+      after,
+    });
+  });
 
   revalidatePath(`/admin/products/${productId}`);
   revalidatePath("/");

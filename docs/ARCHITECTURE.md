@@ -125,6 +125,18 @@ therefore always reconciles to the total.
 Only the storefront formats currency. No formatting, parsing, or rounding happens anywhere near
 persistence, because round-trip formatting is where fils-level bugs live.
 
+### Sale pricing
+
+A sale is a `sale_price_minor` on the variant plus an optional `sale_starts_at` / `sale_ends_at`
+window. The list price is never overwritten. The effective unit price is the sale price when the
+window is active and the sale is below the list price; otherwise it is the list price. The same
+pure helper (`src/lib/sale.ts`) is used by the catalog, product picker, cart, and checkout, so the
+displayed price and the charged price cannot drift.
+
+Admin times are entered in Asia/Dubai (UTC+4) and stored as instants. An expired sale falls back to
+the list price automatically. `order_items.unit_price_minor` snapshots the effective price paid, so
+a later sale or price change cannot rewrite an order. Sale edits write an `audit_log` entry.
+
 The single currency is AED. Multi-currency is out of scope until there is a reason for it; the
 `currency` column exists so a future migration is additive rather than a rewrite.
 

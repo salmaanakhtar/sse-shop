@@ -57,7 +57,7 @@ src/
     db/               schema.ts, client.ts, migrations/
     services/         catalog, cart, orders, settings, variant-tree, addresses, customers, payments/, mail/
     auth/             better-auth config, session helpers, guards
-  lib/                money, slugs, result, dates — pure, importable anywhere
+  lib/                money, sale, slugs, result, dates — pure, importable anywhere
 tests/
   unit/               fast, no I/O
   integration/        services against a real Postgres

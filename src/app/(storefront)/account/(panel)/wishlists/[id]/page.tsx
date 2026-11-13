@@ -119,9 +119,7 @@ export default async function WishlistDetailPage({
           </Link>
         </div>
       ) : (
-        <form action={addWishlistToCartAction} className="space-y-3">
-          <input type="hidden" name="wishlistId" value={wishlist.id} />
-
+        <div className="space-y-3">
           {items.map((item) => (
             <div
               key={item.variantId}
@@ -129,6 +127,7 @@ export default async function WishlistDetailPage({
             >
               <input
                 type="checkbox"
+                form="wishlist-checkout"
                 name="variantIds"
                 value={item.variantId}
                 defaultChecked={item.available}
@@ -182,20 +181,26 @@ export default async function WishlistDetailPage({
                     {formatMoney(item.priceMinor)}
                   </p>
                 ) : null}
-                <button
-                  type="submit"
-                  formAction={removeWishlistItemAction}
-                  name="variantId"
-                  value={item.variantId}
-                  className="mt-2 text-xs text-muted underline-offset-4 hover:text-red-600 hover:underline"
-                >
-                  Remove
-                </button>
+                <form action={removeWishlistItemAction}>
+                  <input type="hidden" name="wishlistId" value={wishlist.id} />
+                  <input type="hidden" name="variantId" value={item.variantId} />
+                  <button
+                    type="submit"
+                    className="mt-2 text-xs text-muted underline-offset-4 hover:text-red-600 hover:underline"
+                  >
+                    Remove
+                  </button>
+                </form>
               </div>
             </div>
           ))}
 
-          <div className="flex flex-wrap items-center justify-between gap-3 border-t border-line pt-4">
+          <form
+            id="wishlist-checkout"
+            action={addWishlistToCartAction}
+            className="flex flex-wrap items-center justify-between gap-3 border-t border-line pt-4"
+          >
+            <input type="hidden" name="wishlistId" value={wishlist.id} />
             <p className="text-xs text-muted">
               {availableCount === 0
                 ? "No items in this list are available right now."
@@ -204,8 +209,8 @@ export default async function WishlistDetailPage({
             <Button type="submit" disabled={availableCount === 0}>
               Add selected to cart &amp; checkout
             </Button>
-          </div>
-        </form>
+          </form>
+        </div>
       )}
     </div>
   );

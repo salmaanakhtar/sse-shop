@@ -10,6 +10,11 @@ test.beforeAll(() => {
 });
 
 test("a customer saves a variant to two lists and checks out from one", async ({ page }) => {
+  const consoleErrors: string[] = [];
+  page.on("console", (message) => {
+    if (message.type() === "error") consoleErrors.push(message.text());
+  });
+
   await page.goto("/account/sign-up");
   await page.getByLabel("Name").fill("Wishlist Customer");
   await page.getByLabel("Email").fill(accountEmail);
@@ -36,6 +41,12 @@ test("a customer saves a variant to two lists and checks out from one", async ({
   await expect(page.getByRole("status")).toHaveText("Saved to 2 lists.");
 
   await page.goto("/account/wishlists");
+  await page.getByRole("link", { name: "Gifts" }).click();
+  await expect(page.getByText("Essential Tee")).toBeVisible();
+  await page.getByRole("button", { name: "Remove" }).click();
+  await expect(page.getByText("Nothing saved in this list yet.")).toBeVisible();
+
+  await page.goto("/account/wishlists");
   await page.getByRole("link", { name: "Saved" }).click();
   await expect(page.getByRole("heading", { name: "Saved" })).toBeVisible();
   await expect(page.getByText("Essential Tee")).toBeVisible();
@@ -45,6 +56,10 @@ test("a customer saves a variant to two lists and checks out from one", async ({
   await expect(page).toHaveURL(/\/checkout$/);
   await expect(page.getByRole("heading", { name: "Checkout" })).toBeVisible();
   await expect(page.getByText("Essential Tee")).toBeVisible();
+
+  expect(
+    consoleErrors.filter((message) => message.includes("Cannot specify a \"name\" prop")),
+  ).toEqual([]);
 });
 
 test("dark mode persists in the browser and follows the signed-in account", async ({

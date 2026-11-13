@@ -4,6 +4,7 @@ import { notFound } from "next/navigation";
 import { Button, buttonClass } from "@/components/ui/button";
 import { Input, Label, Textarea } from "@/components/ui/field";
 import { formatMoney } from "@/lib/money";
+import { buildCombinations, combinationKey, describeVariant } from "@/lib/variants";
 import {
   addOptionAction,
   addOptionValueAction,
@@ -11,6 +12,7 @@ import {
   deleteOptionAction,
   deleteOptionValueAction,
   generateVariantsAction,
+  moveOptionAction,
   updateProductAction,
   updateVariantAction,
   uploadImageAction,
@@ -32,6 +34,16 @@ export default async function EditProductPage({
   const product = await getProductForAdmin(id);
 
   if (!product) notFound();
+
+  const hasOptions = product.options.length > 0;
+  const optionsComplete =
+    hasOptions && product.options.every((option) => option.values.length > 0);
+  const combinations = optionsComplete ? buildCombinations(product.options) : [];
+  const existingKeys = new Set(
+    product.variants.map((variant) => combinationKey(variant.optionValueIds)),
+  );
+  const missing = combinations.filter((combination) => !existingKeys.has(combination.key));
+  const activeVariants = product.variants.filter((variant) => variant.active).length;
 
   return (
     <div className="space-y-8">
@@ -109,7 +121,7 @@ export default async function EditProductPage({
       </section>
 
       {/* ── media ───────────────────────────────────────────────── */}
-      <section className="rounded-xl border border-line bg-surface p-6">
+      <section id="images" className="rounded-xl border border-line bg-surface p-6">
         <h2 className="mb-1 text-sm font-semibold">Images</h2>
         <p className="mb-4 text-xs text-muted">
           Re-encoded to WebP, 1600px wide, metadata stripped. The first image is the main one.
@@ -144,7 +156,6 @@ export default async function EditProductPage({
 
         <form
           action={uploadImageAction}
-          encType="multipart/form-data"
           className="mt-5 flex flex-wrap items-end gap-3 border-t border-line pt-5"
         >
           <input type="hidden" name="productId" value={product.id} />
@@ -170,24 +181,67 @@ export default async function EditProductPage({
       </section>
 
       {/* ── options ─────────────────────────────────────────────── */}
-      <section className="rounded-xl border border-line bg-surface p-6">
-        <h2 className="mb-1 text-sm font-semibold">Options</h2>
-        <p className="mb-4 text-xs text-muted">
-          Name the choices this product offers. Every combination becomes a variant.
-        </p>
+      <section id="options" className="scroll-mt-6 rounded-xl border border-line bg-surface p-6">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <h2 className="text-sm font-semibold">Options</h2>
+            <p className="mt-1 max-w-2xl text-xs text-muted">
+              Options are the choices a shopper picks, in order. Each value combines with every
+              value in the other options to make a variant. Removing an option or value removes the
+              variants built from it; past orders keep their snapshots.
+            </p>
+          </div>
+          <span className="rounded-full bg-page px-2.5 py-1 text-xs text-muted">
+            {product.options.length} of 3 options
+          </span>
+        </div>
 
-        <div className="space-y-4">
-          {product.options.map((option) => (
-            <div key={option.id} className="rounded-lg border border-line p-4">
-              <div className="flex items-center justify-between">
-                <p className="text-sm font-medium">{option.name}</p>
-                <form action={deleteOptionAction}>
-                  <input type="hidden" name="productId" value={product.id} />
-                  <input type="hidden" name="optionId" value={option.id} />
-                  <button type="submit" className="text-xs text-muted hover:text-red-600">
-                    Remove option
-                  </button>
-                </form>
+        <div className="mt-5 space-y-4">
+          {product.options.map((option, index) => (
+            <div key={option.id} className="rounded-xl border border-line p-4">
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <div>
+                  <p className="text-[11px] font-semibold tracking-wide text-muted uppercase">
+                    Option {index + 1}
+                  </p>
+                  <p className="text-sm font-semibold">{option.name}</p>
+                </div>
+
+                <div className="flex items-center gap-1">
+                  <form action={moveOptionAction}>
+                    <input type="hidden" name="productId" value={product.id} />
+                    <input type="hidden" name="optionId" value={option.id} />
+                    <input type="hidden" name="direction" value="up" />
+                    <button
+                      type="submit"
+                      disabled={index === 0}
+                      aria-label={`Move ${option.name} up`}
+                      className="flex size-8 items-center justify-center rounded-md border border-line text-sm text-muted hover:text-ink disabled:cursor-not-allowed disabled:opacity-30"
+                    >
+                      ↑
+                    </button>
+                  </form>
+                  <form action={moveOptionAction}>
+                    <input type="hidden" name="productId" value={product.id} />
+                    <input type="hidden" name="optionId" value={option.id} />
+                    <input type="hidden" name="direction" value="down" />
+                    <button
+                      type="submit"
+                      disabled={index === product.options.length - 1}
+                      aria-label={`Move ${option.name} down`}
+                      className="flex size-8 items-center justify-center rounded-md border border-line text-sm text-muted hover:text-ink disabled:cursor-not-allowed disabled:opacity-30"
+                    >
+                      ↓
+                    </button>
+                  </form>
+                  <form action={deleteOptionAction}>
+                    <input type="hidden" name="productId" value={product.id} />
+                    <input type="hidden" name="optionId" value={option.id} />
+                    <button type="submit" className="ml-2 text-xs text-muted hover:text-red-600">
+                      Remove
+                    </button>
+                  </form>
+                </div>
               </div>
 
               <div className="mt-3 flex flex-wrap gap-2">
@@ -198,12 +252,17 @@ export default async function EditProductPage({
                     <button
                       type="submit"
                       className="rounded-md border border-line bg-page px-2 py-1 text-xs hover:border-red-300 hover:text-red-600"
-                      title="Remove value"
+                      title={`Remove ${value.value}`}
                     >
                       {value.value} ×
                     </button>
                   </form>
                 ))}
+                {option.values.length === 0 ? (
+                  <p className="text-xs text-amber-700">
+                    Add at least one value to use this option.
+                  </p>
+                ) : null}
               </div>
 
               <form action={addOptionValueAction} className="mt-3 flex gap-2">
@@ -211,138 +270,310 @@ export default async function EditProductPage({
                 <input type="hidden" name="optionId" value={option.id} />
                 <Input
                   name="value"
-                  placeholder="Add value, e.g. Medium"
+                  placeholder={`Add a ${option.name.toLowerCase()} value`}
+                  aria-label={`Add a value to ${option.name}`}
                   className="max-w-56"
                   data-testid="add-option-value"
                 />
-                <Button type="submit" size="sm" variant="secondary" data-testid="add-option-value-submit">
-                  Add
+                <Button
+                  type="submit"
+                  size="sm"
+                  variant="secondary"
+                  data-testid="add-option-value-submit"
+                >
+                  Add value
                 </Button>
               </form>
             </div>
           ))}
+
+          {product.options.length === 0 ? (
+            <div className="rounded-xl border border-dashed border-line px-4 py-6 text-sm text-muted">
+              No options yet. Add the first choice, such as Spec or Colour.
+            </div>
+          ) : null}
         </div>
 
-        <form action={addOptionAction} className="mt-4 flex gap-2">
-          <input type="hidden" name="productId" value={product.id} />
-          <Input
-            name="name"
-            placeholder="Add option, e.g. Size"
-            className="max-w-56"
-            data-testid="add-option-name"
-          />
-          <Button type="submit" size="sm" variant="secondary" data-testid="add-option">
-            Add option
-          </Button>
-        </form>
+        {product.options.length < 3 ? (
+          <div className="mt-5 rounded-xl border border-dashed border-line p-4">
+            <p className="text-sm font-medium">Add another option</p>
+            <p className="mt-1 text-xs text-muted">
+              The order above is the order the storefront shows. Put the choice you want first at
+              the top.
+            </p>
+            <form action={addOptionAction} className="mt-3 flex gap-2">
+              <input type="hidden" name="productId" value={product.id} />
+              <Input
+                name="name"
+                placeholder="e.g. Colour"
+                aria-label="New option name"
+                className="max-w-56"
+                data-testid="add-option-name"
+              />
+              <Button type="submit" size="sm" variant="secondary" data-testid="add-option">
+                Add option
+              </Button>
+            </form>
+          </div>
+        ) : (
+          <p className="mt-5 text-xs text-muted">Three options is the practical limit.</p>
+        )}
       </section>
 
       {/* ── variants ────────────────────────────────────────────── */}
-      <section className="rounded-xl border border-line bg-surface p-6">
-        <h2 className="mb-1 text-sm font-semibold">Variants</h2>
-        <p className="mb-4 text-xs text-muted">
-          One variant per option combination. Price and stock are per variant.
-        </p>
-
-        <form action={generateVariantsAction} className="mb-6 flex flex-wrap items-end gap-3">
-          <input type="hidden" name="productId" value={product.id} />
-          <div className="w-32">
-            <Label htmlFor="price">Price (AED)</Label>
-            <Input
-              id="price"
-              name="price"
-              inputMode="decimal"
-              placeholder="120.00"
-              required
-              data-testid="generate-price"
-            />
+      <section id="variants" className="scroll-mt-6 rounded-xl border border-line bg-surface p-6">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <h2 className="text-sm font-semibold">Variants</h2>
+            <p className="mt-1 max-w-2xl text-xs text-muted">
+              One variant per combination of option values. SKU, price, stock, and active state
+              belong to the variant, not to the product. Uncheck Active to hide a combination
+              without deleting it.
+            </p>
           </div>
-          <div className="w-28">
-            <Label htmlFor="stock">Stock</Label>
-            <Input
-              id="stock"
-              name="stock"
-              type="number"
-              min={0}
-              defaultValue={10}
-              required
-              data-testid="generate-stock"
-            />
-          </div>
-          <Button type="submit" size="sm" variant="secondary" data-testid="generate-variants">
-            Generate missing variants
-          </Button>
-        </form>
+          <span className="rounded-full bg-page px-2.5 py-1 text-xs text-muted">
+            {product.variants.length} variants · {activeVariants} active
+          </span>
+        </div>
 
-        {product.variants.length === 0 ? (
-          <p className="text-sm text-muted">
-            No variants yet. Add options, then generate.
+        {!hasOptions ? (
+          <div className="mt-5 rounded-xl border border-dashed border-line px-4 py-6 text-sm text-muted">
+            Add an option above first. Variants are built from the option values.
+          </div>
+        ) : !optionsComplete ? (
+          <p className="mt-5 rounded-lg bg-amber-50 px-4 py-3 text-sm text-amber-800">
+            Add a value to every option to see the combinations.
           </p>
         ) : (
-          <div className="space-y-3">
-            {product.variants.map((variant) => {
-              const labels = product.options
-                .map(
-                  (option) =>
-                    option.values.find((value) => variant.optionValueIds.includes(value.id))
-                      ?.value,
-                )
-                .filter(Boolean)
-                .join(" / ");
+          <>
+            <div className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+              <div className="rounded-lg border border-line p-3">
+                <p className="text-[11px] font-semibold tracking-wide text-muted uppercase">
+                  Options
+                </p>
+                <p className="mt-1 text-lg font-semibold tabular-nums">
+                  {product.options.length}
+                </p>
+              </div>
+              <div className="rounded-lg border border-line p-3">
+                <p className="text-[11px] font-semibold tracking-wide text-muted uppercase">
+                  Combinations
+                </p>
+                <p className="mt-1 text-lg font-semibold tabular-nums">
+                  {combinations.length}
+                </p>
+              </div>
+              <div className="rounded-lg border border-line p-3">
+                <p className="text-[11px] font-semibold tracking-wide text-muted uppercase">
+                  Generated
+                </p>
+                <p className="mt-1 text-lg font-semibold tabular-nums">
+                  {product.variants.length}
+                </p>
+              </div>
+              <div
+                className={`rounded-lg border p-3 ${
+                  missing.length > 0
+                    ? "border-amber-200 bg-amber-50"
+                    : "border-emerald-200 bg-emerald-50"
+                }`}
+              >
+                <p className="text-[11px] font-semibold tracking-wide text-muted uppercase">
+                  Missing
+                </p>
+                <p
+                  className={`mt-1 text-lg font-semibold tabular-nums ${
+                    missing.length > 0 ? "text-amber-800" : "text-emerald-700"
+                  }`}
+                >
+                  {missing.length}
+                </p>
+              </div>
+            </div>
 
-              return (
+            {missing.length > 0 ? (
+              <div className="mt-5 rounded-xl border border-amber-200 bg-amber-50/60 p-4">
+                <p className="text-sm font-semibold">
+                  Create {missing.length} missing variant{missing.length === 1 ? "" : "s"}
+                </p>
+                <p className="mt-1 text-xs text-muted">
+                  Base price and stock for the new rows. Existing variants are left untouched.
+                </p>
+
                 <form
-                  key={variant.id}
-                  action={updateVariantAction}
-                  className="flex flex-wrap items-end gap-3 rounded-lg border border-line p-3"
+                  action={generateVariantsAction}
+                  className="mt-3 flex flex-wrap items-end gap-3"
                 >
                   <input type="hidden" name="productId" value={product.id} />
-                  <input type="hidden" name="variantId" value={variant.id} />
-
-                  <div className="min-w-40 flex-1">
-                    <Label>Title</Label>
-                    <Input name="title" defaultValue={variant.title} />
-                    <p className="mt-1 text-xs text-muted">{labels || "No options"}</p>
-                  </div>
-
-                  <div className="w-36">
-                    <Label>SKU</Label>
-                    <Input name="sku" defaultValue={variant.sku} />
-                  </div>
-
-                  <div className="w-28">
-                    <Label>Price (AED)</Label>
+                  <div className="w-32">
+                    <Label htmlFor="price">Price (AED)</Label>
                     <Input
+                      id="price"
                       name="price"
                       inputMode="decimal"
-                      defaultValue={moneyInput(variant.priceMinor)}
-                      data-testid="variant-price"
+                      placeholder="120.00"
+                      required
+                      data-testid="generate-price"
                     />
-                    <p className="mt-1 text-[11px] text-muted">{formatMoney(variant.priceMinor)}</p>
                   </div>
-
-                  <div className="w-24">
-                    <Label>Stock</Label>
-                    <Input name="stock" type="number" min={0} defaultValue={variant.stockQty} />
-                  </div>
-
-                  <label className="flex h-10 items-center gap-2 text-sm">
-                    <input
-                      type="checkbox"
-                      name="active"
-                      defaultChecked={variant.active}
-                      className="size-4"
+                  <div className="w-28">
+                    <Label htmlFor="stock">Stock</Label>
+                    <Input
+                      id="stock"
+                      name="stock"
+                      type="number"
+                      min={0}
+                      defaultValue={10}
+                      required
+                      data-testid="generate-stock"
                     />
-                    Active
-                  </label>
-
-                  <Button type="submit" size="sm" variant="secondary" data-testid="variant-save">
-                    Save
+                  </div>
+                  <Button
+                    type="submit"
+                    size="sm"
+                    variant="secondary"
+                    data-testid="generate-variants"
+                  >
+                    Generate missing variants
                   </Button>
                 </form>
-              );
-            })}
-          </div>
+
+                {missing.length <= 12 ? (
+                  <div className="mt-3 flex flex-wrap gap-1.5">
+                    {missing.map((combination) => (
+                      <span
+                        key={combination.key}
+                        className="rounded-full border border-amber-200 bg-surface px-2 py-0.5 text-xs text-amber-800"
+                      >
+                        {combination.labels.join(" / ")}
+                      </span>
+                    ))}
+                  </div>
+                ) : null}
+              </div>
+            ) : (
+              <p className="mt-5 rounded-lg bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
+                Every combination has a variant.
+              </p>
+            )}
+
+            {product.variants.length === 0 ? (
+              <p className="mt-4 text-sm text-muted">
+                No variants yet. Generate the missing combinations above.
+              </p>
+            ) : (
+              <div className="mt-5">
+                <div className="hidden gap-3 px-3 pb-2 text-[11px] font-semibold tracking-wide text-muted uppercase lg:grid lg:grid-cols-[minmax(0,1.8fr)_9rem_9rem_7rem_6rem_auto]">
+                  <span>Combination</span>
+                  <span>SKU</span>
+                  <span>Price</span>
+                  <span>Stock</span>
+                  <span>Active</span>
+                  <span />
+                </div>
+
+                <div className="space-y-3">
+                  {product.variants.map((variant) => {
+                    const labels = describeVariant(product.options, variant.optionValueIds);
+
+                    return (
+                      <form
+                        key={variant.id}
+                        action={updateVariantAction}
+                        className="grid gap-3 rounded-xl border border-line p-3 lg:grid-cols-[minmax(0,1.8fr)_9rem_9rem_7rem_6rem_auto] lg:items-start"
+                      >
+                        <input type="hidden" name="productId" value={product.id} />
+                        <input type="hidden" name="variantId" value={variant.id} />
+
+                        <div>
+                          <Label className="lg:hidden">Combination</Label>
+                          <div className="flex flex-wrap gap-1.5">
+                            {labels.length > 0 ? (
+                              labels.map((label) => (
+                                <span
+                                  key={label}
+                                  className="rounded-full bg-page px-2 py-0.5 text-xs"
+                                >
+                                  {label}
+                                </span>
+                              ))
+                            ) : (
+                              <span className="text-xs text-muted">No options</span>
+                            )}
+                          </div>
+
+                          <div className="mt-2">
+                            <Label htmlFor={`variant-title-${variant.id}`}>Order title</Label>
+                            <Input
+                              id={`variant-title-${variant.id}`}
+                              name="title"
+                              defaultValue={variant.title}
+                            />
+                            <p className="mt-1 text-[11px] text-muted">Shown on order lines.</p>
+                          </div>
+                        </div>
+
+                        <div>
+                          <Label htmlFor={`variant-sku-${variant.id}`}>SKU</Label>
+                          <Input
+                            id={`variant-sku-${variant.id}`}
+                            name="sku"
+                            defaultValue={variant.sku}
+                          />
+                        </div>
+
+                        <div>
+                          <Label htmlFor={`variant-price-${variant.id}`}>Price (AED)</Label>
+                          <Input
+                            id={`variant-price-${variant.id}`}
+                            name="price"
+                            inputMode="decimal"
+                            defaultValue={moneyInput(variant.priceMinor)}
+                            data-testid="variant-price"
+                          />
+                          <p className="mt-1 text-[11px] text-muted">
+                            {formatMoney(variant.priceMinor)}
+                          </p>
+                        </div>
+
+                        <div>
+                          <Label htmlFor={`variant-stock-${variant.id}`}>Stock</Label>
+                          <Input
+                            id={`variant-stock-${variant.id}`}
+                            name="stock"
+                            type="number"
+                            min={0}
+                            defaultValue={variant.stockQty}
+                          />
+                        </div>
+
+                        <label className="flex h-10 items-center gap-2 text-sm lg:mt-5">
+                          <input
+                            type="checkbox"
+                            name="active"
+                            defaultChecked={variant.active}
+                            className="size-4"
+                          />
+                          Active
+                        </label>
+
+                        <div className="lg:mt-5">
+                          <Button
+                            type="submit"
+                            size="sm"
+                            variant="secondary"
+                            data-testid="variant-save"
+                          >
+                            Save
+                          </Button>
+                        </div>
+                      </form>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+          </>
         )}
       </section>
     </div>

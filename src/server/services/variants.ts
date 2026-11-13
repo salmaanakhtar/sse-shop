@@ -1,4 +1,5 @@
 import { asc, eq, inArray } from "drizzle-orm";
+import { buildCombinations, combinationKey } from "@/lib/variants";
 import { db } from "../db/client";
 import {
   productOptionValues,
@@ -44,18 +45,23 @@ export async function generateMissingVariants(input: {
     .where(inArray(productOptionValues.optionId, optionRows.map((option) => option.id)))
     .orderBy(asc(productOptionValues.position));
 
-  let combinations: { optionId: string; valueId: string }[][] = [[]];
+  const options = optionRows.map((option) => ({
+    id: option.id,
+    name: option.name,
+    values: valueRows
+      .filter((value) => value.optionId === option.id)
+      .map((value) => ({ id: value.id, value: value.value })),
+  }));
 
-  for (const option of optionRows) {
-    const owned = valueRows.filter((value) => value.optionId === option.id);
-    if (owned.length === 0) {
-      return { ok: false, error: `"${option.name}" has no values yet.` };
-    }
+  const incomplete = options.find((option) => option.values.length === 0);
+  if (incomplete) return { ok: false, error: `"${incomplete.name}" has no values yet.` };
 
-    combinations = combinations.flatMap((combination) =>
-      owned.map((value) => [...combination, { optionId: option.id, valueId: value.id }]),
-    );
-  }
+  const combinations = buildCombinations(options);
+  const optionIdByValue = new Map(
+    options.flatMap((option) =>
+      option.values.map((value) => [value.id, option.id] as const),
+    ),
+  );
 
   const existingVariants = await db
     .select()
@@ -75,18 +81,12 @@ export async function generateMissingVariants(input: {
           )
       : [];
 
-  const combinationKey = (pairs: { valueId: string }[]) =>
-    pairs
-      .map((pair) => pair.valueId)
-      .sort()
-      .join("|");
-
   const existingKeys = new Set(
     existingVariants.map((variant) =>
       combinationKey(
         existingLinks
           .filter((link) => link.variantId === variant.id)
-          .map((link) => ({ valueId: link.optionValueId })),
+          .map((link) => link.optionValueId),
       ),
     ),
   );
@@ -97,7 +97,7 @@ export async function generateMissingVariants(input: {
   let created = 0;
 
   for (const [index, combination] of combinations.entries()) {
-    if (existingKeys.has(combinationKey(combination))) continue;
+    if (existingKeys.has(combination.key)) continue;
 
     let sku = `${skuBase}-${String(index + 1).padStart(3, "0")}`;
     let attempt = 1;
@@ -107,17 +107,12 @@ export async function generateMissingVariants(input: {
     }
     takenSkus.add(sku);
 
-    const title = combination
-      .map((pair) => valueRows.find((value) => value.id === pair.valueId)?.value ?? "")
-      .filter(Boolean)
-      .join(" / ");
-
     const [variant] = await db
       .insert(variants)
       .values({
         productId: product.id,
         sku,
-        title: title || "Default",
+        title: combination.labels.join(" / ") || "Default",
         priceMinor: input.priceMinor,
         stockQty: input.stockQty,
         position: index,
@@ -126,13 +121,13 @@ export async function generateMissingVariants(input: {
 
     if (!variant) return { ok: false, error: "Could not create a variant." };
 
-    await db.insert(variantOptionValues).values(
-      combination.map((pair) => ({
-        variantId: variant.id,
-        optionId: pair.optionId,
-        optionValueId: pair.valueId,
-      })),
-    );
+    const links = combination.optionValueIds.map((valueId) => {
+      const optionId = optionIdByValue.get(valueId);
+      if (!optionId) throw new Error("A generated combination lost its option.");
+      return { variantId: variant.id, optionId, optionValueId: valueId };
+    });
+
+    await db.insert(variantOptionValues).values(links);
 
     created += 1;
   }

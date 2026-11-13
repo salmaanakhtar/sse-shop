@@ -2,20 +2,28 @@
 
 import { unlink } from "node:fs/promises";
 import path from "node:path";
-import { and, eq } from "drizzle-orm";
+import { and, asc, eq, inArray } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { parseMoney } from "@/lib/money";
 import { requireAdminAction } from "../auth/guard";
 import { db } from "../db/client";
-import { productMedia, productOptionValues, productOptions, products, variants } from "../db/schema";
+import {
+  productMedia,
+  productOptionValues,
+  productOptions,
+  products,
+  variantOptionValues,
+  variants,
+} from "../db/schema";
 import { storeProductImage, uploadsRoot } from "../media/storage";
 import { slugify } from "../services/catalog";
 import { generateMissingVariants } from "../services/variants";
 
-function backToProduct(productId: string, error?: string): never {
-  const suffix = error ? `?error=${encodeURIComponent(error)}` : "";
-  redirect(`/admin/products/${productId}${suffix}`);
+function backToProduct(productId: string, error?: string, anchor?: string): never {
+  const query = error ? `?error=${encodeURIComponent(error)}` : "";
+  const hash = anchor ? `#${anchor}` : "";
+  redirect(`/admin/products/${productId}${query}${hash}`);
 }
 
 function requireText(value: FormDataEntryValue | null, label: string): string {
@@ -113,21 +121,66 @@ export async function addOptionAction(formData: FormData): Promise<void> {
 
   const productId = requireText(formData.get("productId"), "Product id");
   const name = String(formData.get("name") ?? "").trim();
-  if (name.length === 0) backToProduct(productId, "Name the option");
+  if (name.length === 0) backToProduct(productId, "Name the option", "options");
 
   const existing = await db
-    .select({ id: productOptions.id })
+    .select({ id: productOptions.id, position: productOptions.position })
     .from(productOptions)
     .where(eq(productOptions.productId, productId));
 
-  if (existing.length >= 3) backToProduct(productId, "Three options is the practical limit");
+  if (existing.length >= 3) {
+    backToProduct(productId, "Three options is the practical limit", "options");
+  }
+
+  const nextPosition = existing.reduce((max, option) => Math.max(max, option.position), -1) + 1;
 
   await db
     .insert(productOptions)
-    .values({ productId, name, position: existing.length })
+    .values({ productId, name, position: nextPosition })
     .onConflictDoNothing();
 
-  backToProduct(productId);
+  revalidatePath("/");
+  backToProduct(productId, undefined, "options");
+}
+
+export async function moveOptionAction(formData: FormData): Promise<void> {
+  await requireAdminAction();
+
+  const productId = requireText(formData.get("productId"), "Product id");
+  const optionId = requireText(formData.get("optionId"), "Option id");
+  const direction = formData.get("direction") === "up" ? "up" : "down";
+
+  await db.transaction(async (tx) => {
+    const options = await tx
+      .select()
+      .from(productOptions)
+      .where(eq(productOptions.productId, productId))
+      .orderBy(asc(productOptions.position), asc(productOptions.createdAt));
+
+    const index = options.findIndex((option) => option.id === optionId);
+    if (index === -1) return;
+
+    const swapIndex = direction === "up" ? index - 1 : index + 1;
+    const current = options[index];
+    const swap = options[swapIndex];
+    if (!current || !swap) return;
+
+    const reordered = [...options];
+    reordered[index] = swap;
+    reordered[swapIndex] = current;
+
+    for (const [position, option] of reordered.entries()) {
+      if (option.position !== position) {
+        await tx
+          .update(productOptions)
+          .set({ position })
+          .where(eq(productOptions.id, option.id));
+      }
+    }
+  });
+
+  revalidatePath("/");
+  backToProduct(productId, undefined, "options");
 }
 
 export async function addOptionValueAction(formData: FormData): Promise<void> {
@@ -136,7 +189,7 @@ export async function addOptionValueAction(formData: FormData): Promise<void> {
   const productId = requireText(formData.get("productId"), "Product id");
   const optionId = requireText(formData.get("optionId"), "Option id");
   const value = String(formData.get("value") ?? "").trim();
-  if (value.length === 0) backToProduct(productId, "Enter a value");
+  if (value.length === 0) backToProduct(productId, "Enter a value", "options");
 
   const [option] = await db
     .select({ id: productOptions.id })
@@ -144,19 +197,22 @@ export async function addOptionValueAction(formData: FormData): Promise<void> {
     .where(and(eq(productOptions.id, optionId), eq(productOptions.productId, productId)))
     .limit(1);
 
-  if (!option) backToProduct(productId, "That option is not on this product");
+  if (!option) backToProduct(productId, "That option is not on this product", "options");
 
   const existing = await db
-    .select({ id: productOptionValues.id })
+    .select({ id: productOptionValues.id, position: productOptionValues.position })
     .from(productOptionValues)
     .where(eq(productOptionValues.optionId, optionId));
 
+  const nextPosition = existing.reduce((max, value) => Math.max(max, value.position), -1) + 1;
+
   await db
     .insert(productOptionValues)
-    .values({ optionId, value, position: existing.length })
+    .values({ optionId, value, position: nextPosition })
     .onConflictDoNothing();
 
-  backToProduct(productId);
+  revalidatePath("/");
+  backToProduct(productId, undefined, "options");
 }
 
 export async function deleteOptionAction(formData: FormData): Promise<void> {
@@ -165,11 +221,25 @@ export async function deleteOptionAction(formData: FormData): Promise<void> {
   const productId = requireText(formData.get("productId"), "Product id");
   const optionId = requireText(formData.get("optionId"), "Option id");
 
-  await db
-    .delete(productOptions)
-    .where(and(eq(productOptions.id, optionId), eq(productOptions.productId, productId)));
+  const linked = await db
+    .select({ variantId: variantOptionValues.variantId })
+    .from(variantOptionValues)
+    .innerJoin(variants, eq(variantOptionValues.variantId, variants.id))
+    .where(and(eq(variantOptionValues.optionId, optionId), eq(variants.productId, productId)));
 
-  backToProduct(productId);
+  const variantIds = [...new Set(linked.map((row) => row.variantId))];
+
+  await db.transaction(async (tx) => {
+    if (variantIds.length > 0) {
+      await tx.delete(variants).where(inArray(variants.id, variantIds));
+    }
+    await tx
+      .delete(productOptions)
+      .where(and(eq(productOptions.id, optionId), eq(productOptions.productId, productId)));
+  });
+
+  revalidatePath("/");
+  backToProduct(productId, undefined, "options");
 }
 
 export async function deleteOptionValueAction(formData: FormData): Promise<void> {
@@ -178,9 +248,22 @@ export async function deleteOptionValueAction(formData: FormData): Promise<void>
   const productId = requireText(formData.get("productId"), "Product id");
   const valueId = requireText(formData.get("valueId"), "Value id");
 
-  await db.delete(productOptionValues).where(eq(productOptionValues.id, valueId));
+  const linked = await db
+    .select({ variantId: variantOptionValues.variantId })
+    .from(variantOptionValues)
+    .where(eq(variantOptionValues.optionValueId, valueId));
 
-  backToProduct(productId);
+  const variantIds = [...new Set(linked.map((row) => row.variantId))];
+
+  await db.transaction(async (tx) => {
+    if (variantIds.length > 0) {
+      await tx.delete(variants).where(inArray(variants.id, variantIds));
+    }
+    await tx.delete(productOptionValues).where(eq(productOptionValues.id, valueId));
+  });
+
+  revalidatePath("/");
+  backToProduct(productId, undefined, "options");
 }
 
 export async function generateVariantsAction(formData: FormData): Promise<void> {
@@ -190,8 +273,10 @@ export async function generateVariantsAction(formData: FormData): Promise<void> 
   const price = parseMoney(String(formData.get("price") ?? ""));
   const stockRaw = Number(formData.get("stock") ?? 0);
 
-  if (price === null) backToProduct(productId, "Enter a valid price");
-  if (!Number.isInteger(stockRaw) || stockRaw < 0) backToProduct(productId, "Enter a valid stock count");
+  if (price === null) backToProduct(productId, "Enter a valid price", "variants");
+  if (!Number.isInteger(stockRaw) || stockRaw < 0) {
+    backToProduct(productId, "Enter a valid stock count", "variants");
+  }
 
   let result;
   try {
@@ -201,14 +286,19 @@ export async function generateVariantsAction(formData: FormData): Promise<void> 
     backToProduct(
       productId,
       error instanceof Error ? error.message : "Could not generate variants",
+      "variants",
     );
   }
 
   revalidatePath(`/admin/products/${productId}`);
   revalidatePath("/");
 
-  if (!result.ok) backToProduct(productId, result.error);
-  backToProduct(productId, result.created === 0 ? "No new variants to add" : undefined);
+  if (!result.ok) backToProduct(productId, result.error, "variants");
+  backToProduct(
+    productId,
+    result.created === 0 ? "No new variants to add" : undefined,
+    "variants",
+  );
 }
 
 export async function updateVariantAction(formData: FormData): Promise<void> {
@@ -218,13 +308,15 @@ export async function updateVariantAction(formData: FormData): Promise<void> {
   const variantId = requireText(formData.get("variantId"), "Variant id");
 
   const price = parseMoney(String(formData.get("price") ?? ""));
-  if (price === null) backToProduct(productId, "Enter a valid price");
+  if (price === null) backToProduct(productId, "Enter a valid price", "variants");
 
   const stock = Number(formData.get("stock") ?? 0);
-  if (!Number.isInteger(stock) || stock < 0) backToProduct(productId, "Enter a valid stock count");
+  if (!Number.isInteger(stock) || stock < 0) {
+    backToProduct(productId, "Enter a valid stock count", "variants");
+  }
 
   const sku = String(formData.get("sku") ?? "").trim();
-  if (sku.length === 0) backToProduct(productId, "SKU is required");
+  if (sku.length === 0) backToProduct(productId, "SKU is required", "variants");
 
   const title = String(formData.get("title") ?? "").trim();
 
@@ -242,7 +334,7 @@ export async function updateVariantAction(formData: FormData): Promise<void> {
 
   revalidatePath(`/admin/products/${productId}`);
   revalidatePath("/");
-  backToProduct(productId);
+  backToProduct(productId, undefined, "variants");
 }
 
 export async function uploadImageAction(formData: FormData): Promise<void> {
@@ -252,14 +344,14 @@ export async function uploadImageAction(formData: FormData): Promise<void> {
   const file = formData.get("image");
 
   if (!(file instanceof File) || file.size === 0) {
-    backToProduct(productId, "Choose an image file");
+    backToProduct(productId, "Choose an image file", "images");
   }
 
   let stored;
   try {
     stored = await storeProductImage(file);
   } catch (error) {
-    backToProduct(productId, error instanceof Error ? error.message : "Upload failed");
+    backToProduct(productId, error instanceof Error ? error.message : "Upload failed", "images");
   }
 
   const existing = await db
@@ -278,7 +370,7 @@ export async function uploadImageAction(formData: FormData): Promise<void> {
 
   revalidatePath(`/admin/products/${productId}`);
   revalidatePath("/");
-  backToProduct(productId);
+  backToProduct(productId, undefined, "images");
 }
 
 export async function deleteImageAction(formData: FormData): Promise<void> {
@@ -302,5 +394,5 @@ export async function deleteImageAction(formData: FormData): Promise<void> {
 
   revalidatePath(`/admin/products/${productId}`);
   revalidatePath("/");
-  backToProduct(productId);
+  backToProduct(productId, undefined, "images");
 }

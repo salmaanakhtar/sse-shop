@@ -64,6 +64,9 @@ docker compose -f docker-compose.dev.yml exec db createdb -U sse_shop sse_shop_t
 The admin sits on a second hostname. Locally, `admin.localhost` resolves to your machine on most
 systems, and `src/proxy.ts` rewrites that host to the `/admin` route tree.
 
+Local development may set `ADMIN_REQUIRE_TWO_FACTOR=false` for a password-only admin. Production
+must keep it `true`; the guard still checks the role on every page and action either way.
+
 ---
 
 Created in [T3 Code](https://t3.codes).

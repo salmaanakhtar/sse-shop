@@ -8,11 +8,12 @@ const password = process.env.E2E_ADMIN_PASSWORD ?? "change-this-admin-password";
 setup.setTimeout(60_000);
 
 /**
- * Signs in through the real UI and enrols TOTP, then parks the session cookie
- * for the admin specs. This is deliberately not an API shortcut: the login and
- * enrolment forms are part of what Phase 1 promises.
+ * Signs in through the real UI, enrols TOTP when the admin config requires it,
+ * then parks the session cookie for the admin specs. This is deliberately not
+ * an API shortcut: the login and enrolment forms are part of what Phase 1
+ * promises.
  */
-setup("admin signs in and enrols two-factor", async ({ page }) => {
+setup("admin signs in and prepares two-factor when required", async ({ page }) => {
   await page.goto("/admin/sign-in");
 
   await page.getByLabel("Email").fill(email);

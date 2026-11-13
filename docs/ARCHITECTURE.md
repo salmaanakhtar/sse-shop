@@ -214,6 +214,8 @@ addresses, order history, and faster checkout.
 - CSRF defence in depth: `SameSite=Lax` plus an Origin/Host check helper called by every mutating
   action.
 - Admin requires TOTP. A control is checked once per session to avoid prompting on every action.
+  Production keeps `ADMIN_REQUIRE_TWO_FACTOR=true`; local development may set it to `false` for a
+  password-only admin, and the docs treat that as a dev-only override.
 - Customer accounts use email + password. Email verification and self-service password reset are
   deliberately deferred to Phase 7; until then, an unverified email never grants ownership of an
   order or account data.
@@ -233,7 +235,8 @@ addresses, order history, and faster checkout.
 
 1. Network: Caddy basic auth now; Tailscale or an IP allowlist later.
 2. Session: a valid session bound to a `role = admin` user.
-3. Factor: TOTP verified for this session.
+3. Factor: TOTP verified for this session in production. `ADMIN_REQUIRE_TWO_FACTOR=false` is a
+   local-development override only; it must never be false on the deployed store.
 4. Action: the individual action re-checks the role, not just the page.
 
 The panel also lists customers: name, email, phone, order count, spend, and last order, with a

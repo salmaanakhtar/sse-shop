@@ -17,6 +17,8 @@ const envSchema = z.object({
 
   NEXT_PUBLIC_STORE_URL: z.string().default("http://localhost:3000"),
   ADMIN_HOST: z.string().default("admin.localhost"),
+  /** Production must keep this true; local development may opt out of TOTP. */
+  ADMIN_REQUIRE_TWO_FACTOR: z.enum(["true", "false"]).default("true"),
 
   UPLOADS_DIR: z.string().default("./data/uploads"),
   MEDIA_BASE_URL: z.string().default("http://localhost:3000/media"),

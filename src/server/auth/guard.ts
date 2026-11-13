@@ -1,6 +1,9 @@
 import { headers } from "next/headers";
 import { notFound, redirect } from "next/navigation";
+import { env } from "@/lib/env";
 import { auth } from "./index";
+
+const requiresTwoFactor = env.ADMIN_REQUIRE_TWO_FACTOR === "true";
 
 export async function getAuthSession() {
   return auth.api.getSession({ headers: await headers() });
@@ -16,7 +19,7 @@ export async function requireAdminPage() {
 
   if (!session) redirect("/admin/sign-in");
   if (session.user.role !== "admin") notFound();
-  if (!session.user.twoFactorEnabled) redirect("/admin/setup-2fa");
+  if (requiresTwoFactor && !session.user.twoFactorEnabled) redirect("/admin/setup-2fa");
 
   return session;
 }
@@ -48,7 +51,7 @@ export async function requireAdminAction() {
   if (!session || session.user.role !== "admin") {
     throw new Error("Not authorized.");
   }
-  if (!session.user.twoFactorEnabled) {
+  if (requiresTwoFactor && !session.user.twoFactorEnabled) {
     throw new Error("Two-factor authentication is required.");
   }
 

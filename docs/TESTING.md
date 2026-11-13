@@ -172,9 +172,9 @@ known catalog with predictable prices, one admin user whose password and TOTP se
 env vars, and a low-stock variant used by the stock-limit spec.
 
 Admin authentication is captured once into `tests/e2e/.auth/admin.json` via `storageState`, using a
-setup project that runs first. The setup signs in through the real form and enrols TOTP, generating
-codes with `otplib`; the file is gitignored. Do not sign in through the UI in every spec; that tests
-the form six times and makes flakes stack up.
+setup project that runs first. The setup signs in through the real form, enrols TOTP when the
+admin config requires it, and generates codes with `otplib`; the file is gitignored. Do not sign in
+through the UI in every spec; that tests the form six times and makes flakes stack up.
 
 The account specs create customers with a unique `customer-…@example.com` address. Global setup
 deletes those customers, their carts, sessions, and addresses between runs, so a rerun starts clean

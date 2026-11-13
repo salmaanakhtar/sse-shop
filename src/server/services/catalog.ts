@@ -1,5 +1,5 @@
 import { and, asc, desc, eq, inArray } from "drizzle-orm";
-import { effectivePriceMinor } from "@/lib/sale";
+import { activeSalePrice, discountPercent, effectivePriceMinor } from "@/lib/sale";
 import { db } from "../db/client";
 import {
   productMedia,
@@ -197,6 +197,9 @@ export type AdminProductRow = {
   variantCount: number;
   priceFromMinor: number;
   inStock: number;
+  saleStatus: "active" | "scheduled" | null;
+  saleDiscountPercent: number | null;
+  activeSaleVariantCount: number;
 };
 
 export type AdminProductDetail = {
@@ -216,9 +219,36 @@ export async function listAdminProducts(): Promise<AdminProductRow[]> {
 
   const ids = rows.map((row) => row.id);
   const variantRows = await db.select().from(variants).where(inArray(variants.productId, ids));
+  const now = new Date();
 
   return rows.map((product) => {
     const own = variantRows.filter((variant) => variant.productId === product.id);
+    let activeSaleVariantCount = 0;
+    let saleDiscountPercent: number | null = null;
+    let hasScheduledSale = false;
+
+    for (const variant of own) {
+      const sale = activeSalePrice(variant.priceMinor, variant, now);
+      if (sale !== null) {
+        activeSaleVariantCount += 1;
+        const percent = discountPercent(variant.priceMinor, sale);
+        if (saleDiscountPercent === null || percent > saleDiscountPercent) {
+          saleDiscountPercent = percent;
+        }
+        continue;
+      }
+
+      if (variant.salePriceMinor === null || variant.salePriceMinor >= variant.priceMinor) {
+        continue;
+      }
+
+      const startsAt = variant.saleStartsAt ? new Date(variant.saleStartsAt).getTime() : null;
+      const endsAt = variant.saleEndsAt ? new Date(variant.saleEndsAt).getTime() : null;
+      if (startsAt !== null && startsAt > now.getTime() && (endsAt === null || endsAt > now.getTime())) {
+        hasScheduledSale = true;
+      }
+    }
+
     return {
       id: product.id,
       slug: product.slug,
@@ -227,6 +257,10 @@ export async function listAdminProducts(): Promise<AdminProductRow[]> {
       variantCount: own.length,
       priceFromMinor: own.length > 0 ? Math.min(...own.map((v) => v.priceMinor)) : 0,
       inStock: own.reduce((sum, variant) => sum + Math.max(0, variant.stockQty), 0),
+      saleStatus:
+        activeSaleVariantCount > 0 ? "active" : hasScheduledSale ? "scheduled" : null,
+      saleDiscountPercent,
+      activeSaleVariantCount,
     };
   });
 }

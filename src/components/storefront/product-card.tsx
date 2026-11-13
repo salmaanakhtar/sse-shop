@@ -1,9 +1,15 @@
 import Image from "next/image";
 import Link from "next/link";
 import { formatMoney } from "@/lib/money";
+import { discountPercent } from "@/lib/sale";
 import type { CatalogCard as CatalogCardData } from "@/server/services/catalog";
 
 export function ProductCard({ product }: { product: CatalogCardData }) {
+  const discount =
+    product.compareAtFromMinor !== null
+      ? discountPercent(product.compareAtFromMinor, product.priceFromMinor)
+      : null;
+
   return (
     <Link
       href={`/products/${product.slug}`}
@@ -25,7 +31,7 @@ export function ProductCard({ product }: { product: CatalogCardData }) {
         )}
         {product.onSale ? (
           <span className="absolute left-3 top-3 rounded-full bg-brand px-2 py-0.5 text-[10px] font-semibold tracking-wide text-white uppercase">
-            Sale
+            Sale{discount !== null ? ` −${discount}%` : ""}
           </span>
         ) : null}
       </div>

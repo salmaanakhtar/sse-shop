@@ -35,6 +35,7 @@ export default async function AdminProductsPage() {
               <tr>
                 <th className="px-5 py-3 font-semibold">Product</th>
                 <th className="hidden px-5 py-3 font-semibold sm:table-cell">Status</th>
+                <th className="hidden px-5 py-3 font-semibold sm:table-cell">Sale</th>
                 <th className="px-5 py-3 font-semibold">Variants</th>
                 <th className="hidden px-5 py-3 font-semibold md:table-cell">Stock</th>
                 <th className="px-5 py-3 text-right font-semibold">From</th>
@@ -50,7 +51,22 @@ export default async function AdminProductsPage() {
                     >
                       {product.title}
                     </Link>
-                    <p className="text-xs text-muted">/{product.slug}</p>
+                    <div className="mt-0.5 flex flex-wrap items-center gap-2">
+                      <p className="text-xs text-muted">/{product.slug}</p>
+                      {product.saleStatus ? (
+                        <span
+                          className={`inline-block rounded-full px-2 py-0.5 text-[10px] font-semibold tracking-wide uppercase sm:hidden ${
+                            product.saleStatus === "active"
+                              ? "bg-brand-soft text-brand"
+                              : "bg-amber-50 text-amber-700"
+                          }`}
+                        >
+                          {product.saleStatus === "active"
+                            ? `Sale${product.saleDiscountPercent !== null ? ` ${product.saleDiscountPercent}%` : ""}`
+                            : "Sale soon"}
+                        </span>
+                      ) : null}
+                    </div>
                   </td>
                   <td className="hidden px-5 py-3 sm:table-cell">
                     <span
@@ -60,6 +76,24 @@ export default async function AdminProductsPage() {
                     >
                       {product.status}
                     </span>
+                  </td>
+                  <td className="hidden px-5 py-3 sm:table-cell">
+                    {product.saleStatus === "active" ? (
+                      <span
+                        className="rounded-full bg-brand-soft px-2 py-0.5 text-xs font-semibold text-brand"
+                        title={`${product.activeSaleVariantCount} variant${
+                          product.activeSaleVariantCount === 1 ? "" : "s"
+                        } on sale`}
+                      >
+                        Sale{product.saleDiscountPercent !== null ? ` ${product.saleDiscountPercent}%` : ""}
+                      </span>
+                    ) : product.saleStatus === "scheduled" ? (
+                      <span className="rounded-full bg-amber-50 px-2 py-0.5 text-xs font-medium text-amber-700">
+                        Scheduled
+                      </span>
+                    ) : (
+                      <span className="text-xs text-muted">—</span>
+                    )}
                   </td>
                   <td className="px-5 py-3 tabular-nums">{product.variantCount}</td>
                   <td className="hidden px-5 py-3 tabular-nums md:table-cell">{product.inStock}</td>

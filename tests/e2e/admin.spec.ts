@@ -67,6 +67,14 @@ test("a sale price reaches the storefront, timer, and cart", async ({ page }) =>
 
   await expect(page.getByText(/AED\s99\.00/).first()).toBeVisible();
 
+  await page.goto("/admin/products");
+  const adminRow = page.getByRole("row", { name: /Playwright Hoodie/ });
+  await expect(adminRow.getByTitle(/variant on sale/)).toBeVisible();
+
+  await page.goto("/");
+  const card = page.getByRole("link", { name: /Playwright Hoodie/ });
+  await expect(card.getByText(/Sale\s*−34%/)).toBeVisible();
+
   await page.goto(`/products/${SLUG}`);
   await expect(page.getByText(/AED\s99\.00/)).toBeVisible();
   await expect(page.getByText(/AED\s149\.00/)).toBeVisible();

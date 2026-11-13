@@ -544,6 +544,49 @@ export async function createLeafVariant(input: {
   });
 }
 
+/**
+ * Updates price and/or stock across a set of leaf variants. Blank fields mean
+ * "leave unchanged"; the caller must send at least one.
+ */
+export async function bulkUpdateVariantLeaves(input: {
+  productId: string;
+  variantIds: string[];
+  priceMinor?: number | null;
+  stockQty?: number | null;
+}): Promise<Result<{ updated: number }>> {
+  const ids = [...new Set(input.variantIds)];
+  if (ids.length === 0) return fail("Select at least one variant.");
+
+  const hasPrice = input.priceMinor !== null && input.priceMinor !== undefined;
+  const hasStock = input.stockQty !== null && input.stockQty !== undefined;
+  if (!hasPrice && !hasStock) return fail("Enter a price or stock value to update.");
+
+  if (hasPrice && (!Number.isInteger(input.priceMinor) || (input.priceMinor as number) < 0)) {
+    return fail("Enter a valid price.");
+  }
+  if (hasStock && (!Number.isInteger(input.stockQty) || (input.stockQty as number) < 0)) {
+    return fail("Enter a valid stock count.");
+  }
+
+  const rows = await db
+    .select({ id: variants.id })
+    .from(variants)
+    .where(and(eq(variants.productId, input.productId), inArray(variants.id, ids)));
+
+  if (rows.length !== ids.length) return fail("Some variants do not belong to this product.");
+
+  await db
+    .update(variants)
+    .set({
+      ...(hasPrice ? { priceMinor: input.priceMinor as number } : {}),
+      ...(hasStock ? { stockQty: input.stockQty as number } : {}),
+      updatedAt: new Date(),
+    })
+    .where(and(eq(variants.productId, input.productId), inArray(variants.id, ids)));
+
+  return ok({ updated: rows.length });
+}
+
 /** First node in a tree with stock, used by the storefront picker. */
 export function firstSellableNode(tree: readonly VariantTreeNode[]): VariantTreeNode | null {
   for (const node of tree) {

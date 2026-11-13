@@ -20,6 +20,7 @@ import {
 import { storeProductImage, uploadsRoot } from "../media/storage";
 import { slugify } from "../services/catalog";
 import {
+  bulkUpdateVariantLeaves,
   copyVariantChildren,
   createDefaultVariant,
   createLeafVariant,
@@ -485,6 +486,37 @@ export async function updateVariantAction(formData: FormData): Promise<void> {
     console.error("updateVariantAction failed", error);
     backToProduct(productId, "Could not save the variant. Is the SKU unique?", "variants");
   }
+
+  revalidatePath(`/admin/products/${productId}`);
+  revalidatePath("/");
+  backToProduct(productId, undefined, "variants");
+}
+
+export async function bulkUpdateVariantsAction(formData: FormData): Promise<void> {
+  await requireAdminAction();
+
+  const productId = requireText(formData.get("productId"), "Product id");
+  const variantIds = formData
+    .getAll("variantIds")
+    .map((value) => String(value))
+    .filter(Boolean);
+
+  const priceMinor = readOptionalMoney(formData, "price");
+  if (priceMinor === "invalid") backToProduct(productId, "Enter a valid price", "variants");
+
+  const stockQty = readOptionalStock(formData, "stock");
+  if (stockQty === "invalid") {
+    backToProduct(productId, "Enter a valid stock count", "variants");
+  }
+
+  const result = await bulkUpdateVariantLeaves({
+    productId,
+    variantIds,
+    priceMinor,
+    stockQty,
+  });
+
+  if (!result.ok) backToProduct(productId, result.error, "variants");
 
   revalidatePath(`/admin/products/${productId}`);
   revalidatePath("/");

@@ -3,7 +3,7 @@
 Sequenced so every phase leaves a working store. A phase is done when its completion criteria
 hold, not when the code is written.
 
-**Current:** Phase 2 complete. Phase 3 in progress — the explicit variant tree has shipped. No-code control is a continuous background stream, not a numbered phase.
+**Current:** Phase 3 complete. Phase 4 next — sales, promotions, categories, collections, and badges. No-code control is a continuous background stream, not a numbered phase.
 
 ## Phase 0 — Foundation
 
@@ -49,27 +49,21 @@ methods, marketing consent, and the map address picker. Address entry is manual 
 
 ## Phase 3 — Catalog depth
 
-**Status: in progress.** The explicit variant tree is complete; bulk editing and the full gallery
-swap remain.
+**Status: complete.**
 
 - Replace the Cartesian product with an explicit tree of levels, branches, groups, and leaves.
   Depth is whatever the admin configures: Colour → Size → Fit, and deeper.
 - Each parent defines its own child values. Blue can have S/M/L while Red has S/M only; there is no
   phantom Red/L row.
-- Tree builder: add roots and children, copy a sibling's subtree, parent defaults and images, leaf
-  SKU/price/stock, and branch deletion with its descendants.
+- Tree builder: a compact expandable table, a single add-branches form, and a side inspector for
+  parent defaults, images, copy, leaf SKU/price/stock, and branch deletion.
 - Leaves own the real SKU, price, and stock. Parent defaults pre-fill child creation but do not
   rewrite existing leaves. SKUs are generated from the path and remain editable.
-- Storefront selects parent first, filters to existing children, disables sold-out branches, and
-  shows the selected leaf image with nearest-ancestor fallback.
-- Migration backfills every existing variant into a leaf and drops the old join table.
-
-**Remaining in this phase**
-
 - Bulk price/stock edits across selected leaves.
-- A filter for branches missing images.
-- Swap the main product gallery to the selected leaf/ancestor image; the picker already shows the
-  selected image, but the large gallery still uses the product gallery.
+- A missing-image filter over the branch table.
+- Storefront selects parent first, filters to existing children, disables sold-out branches, and
+  swaps the main gallery to the selected leaf or nearest-ancestor image.
+- Migration backfills every existing variant into a leaf and drops the old join table.
 
 **Done when** an asymmetric catalog (for example Blue S/M/L, Red S/M) can be built and published
 without creating impossible rows, the storefront never offers a combination the admin did not

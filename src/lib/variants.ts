@@ -110,6 +110,23 @@ export function firstAvailableLeafInTree(nodes: readonly VariantTreeNode[]): Var
   return null;
 }
 
+export function firstLeafInTree(nodes: readonly VariantTreeNode[]): VariantTreeNode | null {
+  for (const node of nodes) {
+    const found = firstLeaf(node);
+    if (found) return found;
+  }
+  return null;
+}
+
+/** Nearest branch image on a root-to-leaf path, or null. */
+export function effectiveImageKey(path: readonly VariantTreeNode[]): string | null {
+  for (let index = path.length - 1; index >= 0; index -= 1) {
+    const key = path[index]?.imageKey;
+    if (key) return key;
+  }
+  return null;
+}
+
 export function collectSubtreeVariantIds(node: VariantTreeNode): string[] {
   const ids = node.variant ? [node.variant.id] : [];
   for (const child of node.children) ids.push(...collectSubtreeVariantIds(child));

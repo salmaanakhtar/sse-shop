@@ -9,6 +9,7 @@ import {
   variants,
 } from "@/server/db/schema";
 import {
+  bulkUpdateVariantLeaves,
   copyVariantChildren,
   createVariantBranches,
   deleteVariantNode,
@@ -206,5 +207,60 @@ describe("variant tree", () => {
       .from(variants)
       .where(eq(variants.productId, setup.product.id));
     expect(remainingVariants).toHaveLength(1);
+  });
+
+  it("bulk-updates price and stock across selected leaves", async () => {
+    const setup = await setupProduct();
+
+    await createVariantBranches({
+      productId: setup.product.id,
+      parentId: null,
+      optionValueIds: [setup.blue.id],
+      priceMinor: 12_000,
+      stockQty: 10,
+    });
+    const tree = await getVariantTree(setup.product.id);
+    const blueId = tree[0]!.id;
+
+    await createVariantBranches({
+      productId: setup.product.id,
+      parentId: blueId,
+      optionValueIds: [setup.s.id, setup.m.id],
+    });
+
+    const leaves = flattenVariantTree(await getVariantTree(setup.product.id)).filter(
+      (node) => node.variant,
+    );
+    const variantIds = leaves.map((node) => node.variant!.id);
+    expect(variantIds).toHaveLength(2);
+
+    const updated = await bulkUpdateVariantLeaves({
+      productId: setup.product.id,
+      variantIds,
+      priceMinor: 15_000,
+      stockQty: 7,
+    });
+    expect(updated.ok).toBe(true);
+
+    const rows = await db
+      .select({ priceMinor: variants.priceMinor, stockQty: variants.stockQty })
+      .from(variants)
+      .where(eq(variants.productId, setup.product.id));
+
+    expect(rows).toHaveLength(2);
+    expect(rows.every((row) => row.priceMinor === 15_000 && row.stockQty === 7)).toBe(true);
+
+    const stockOnly = await bulkUpdateVariantLeaves({
+      productId: setup.product.id,
+      variantIds: [variantIds[0]!],
+      stockQty: 3,
+    });
+    expect(stockOnly.ok).toBe(true);
+
+    const [first] = await db
+      .select({ priceMinor: variants.priceMinor, stockQty: variants.stockQty })
+      .from(variants)
+      .where(eq(variants.id, variantIds[0]!));
+    expect(first).toEqual({ priceMinor: 15_000, stockQty: 3 });
   });
 });

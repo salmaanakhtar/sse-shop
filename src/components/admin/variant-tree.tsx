@@ -4,6 +4,7 @@ import Image from "next/image";
 import { Fragment, useMemo, useState } from "react";
 import {
   addVariantBranchesAction,
+  bulkUpdateVariantsAction,
   copyVariantChildrenAction,
   createDefaultVariantAction,
   createLeafVariantAction,
@@ -19,6 +20,7 @@ import { Input, Label } from "@/components/ui/field";
 import { formatMoney } from "@/lib/money";
 import {
   buildVariantTree,
+  effectiveImageKey,
   flattenVariantTree,
   pathToNode,
   type VariantNodeView,
@@ -87,6 +89,9 @@ function TreeRows({
   selectedId,
   onSelect,
   tree,
+  allowedIds,
+  selectedLeafIds,
+  onToggleLeaf,
 }: {
   nodes: VariantTreeNode[];
   depth: number;
@@ -95,15 +100,20 @@ function TreeRows({
   selectedId: string | null;
   onSelect: (id: string) => void;
   tree: VariantTreeNode[];
+  allowedIds: Set<string> | null;
+  selectedLeafIds: Set<string>;
+  onToggleLeaf: (variantId: string) => void;
 }) {
   return (
     <>
       {nodes.map((node) => {
+        if (allowedIds && !allowedIds.has(node.id)) return null;
+
         const path = pathToNode(tree, node.id);
         const labels = path.map((item) => item.label);
         const isGroup = node.children.length > 0;
         const variant = node.variant;
-        const imageNode = [...path].reverse().find((item) => item.imageKey);
+        const imageKey = effectiveImageKey(path);
         const status: "Active" | "Inactive" | "Sold out" | "Empty" = isGroup
           ? node.active
             ? "Active"
@@ -123,6 +133,17 @@ function TreeRows({
                 selectedId === node.id ? "bg-brand-soft/40" : "hover:bg-page/60"
               }`}
             >
+              <td className="w-10 px-4 py-3">
+                {variant ? (
+                  <input
+                    type="checkbox"
+                    aria-label={`Select ${labels.join(" / ")}`}
+                    checked={selectedLeafIds.has(variant.id)}
+                    onChange={() => onToggleLeaf(variant.id)}
+                    className="size-4"
+                  />
+                ) : null}
+              </td>
               <td className="px-4 py-3">
                 <div className="flex items-start" style={{ paddingLeft: depth * 18 }}>
                   {isGroup ? (
@@ -155,10 +176,10 @@ function TreeRows({
                 <StatusBadge status={status} />
               </td>
               <td className="px-4 py-3">
-                {imageNode?.imageKey ? (
+                {imageKey ? (
                   <Image
-                    src={`/media/${imageNode.imageKey}`}
-                    alt={imageNode.imageAlt || node.label}
+                    src={`/media/${imageKey}`}
+                    alt={node.label}
                     width={36}
                     height={36}
                     className="h-9 w-9 rounded-md border border-line object-cover"
@@ -187,6 +208,9 @@ function TreeRows({
                 selectedId={selectedId}
                 onSelect={onSelect}
                 tree={tree}
+                allowedIds={allowedIds}
+                selectedLeafIds={selectedLeafIds}
+                onToggleLeaf={onToggleLeaf}
               />
             ) : null}
           </Fragment>
@@ -524,6 +548,28 @@ export function VariantTreeEditor({
     });
     return candidate?.id ?? "";
   });
+  const [selectedLeafIds, setSelectedLeafIds] = useState<Set<string>>(() => new Set());
+  const [onlyMissingImages, setOnlyMissingImages] = useState(false);
+
+  const missingImageLeaves = leaves.filter(
+    (leaf) => !effectiveImageKey(pathToNode(tree, leaf.id)),
+  );
+  const allowedIds = useMemo(() => {
+    if (!onlyMissingImages) return null;
+    const allowed = new Set<string>();
+    for (const leaf of leaves) {
+      const path = pathToNode(tree, leaf.id);
+      if (effectiveImageKey(path)) continue;
+      for (const node of path) allowed.add(node.id);
+    }
+    return allowed;
+  }, [onlyMissingImages, leaves, tree]);
+  const visibleLeaves = allowedIds
+    ? leaves.filter((leaf) => allowedIds.has(leaf.id))
+    : leaves;
+  const allVisibleSelected =
+    visibleLeaves.length > 0 &&
+    visibleLeaves.every((leaf) => leaf.variant && selectedLeafIds.has(leaf.variant.id));
 
   const selected = selectedId ? (all.find((node) => node.id === selectedId) ?? null) : null;
   const addParent = addParentId ? (all.find((node) => node.id === addParentId) ?? null) : null;
@@ -569,6 +615,27 @@ export function VariantTreeEditor({
     });
   }
 
+  function toggleLeaf(variantId: string) {
+    setSelectedLeafIds((current) => {
+      const next = new Set(current);
+      if (next.has(variantId)) next.delete(variantId);
+      else next.add(variantId);
+      return next;
+    });
+  }
+
+  function toggleAllVisible() {
+    setSelectedLeafIds((current) => {
+      const next = new Set(current);
+      for (const leaf of visibleLeaves) {
+        if (!leaf.variant) continue;
+        if (allVisibleSelected) next.delete(leaf.variant.id);
+        else next.add(leaf.variant.id);
+      }
+      return next;
+    });
+  }
+
   function addChildrenTo(id: string) {
     setAddParentId(id);
     setSelectedId(id);
@@ -608,14 +675,62 @@ export function VariantTreeEditor({
 
   return (
     <div className="mt-5 space-y-5">
-      <div className="flex flex-wrap gap-2 text-xs">
+      <div className="flex flex-wrap items-center gap-2 text-xs">
         <span className="rounded-full bg-page px-2.5 py-1 text-muted">{levels.length} levels</span>
         <span className="rounded-full bg-page px-2.5 py-1 text-muted">{groups.length} groups</span>
         <span className="rounded-full bg-page px-2.5 py-1 text-muted">{sellable.length} variants</span>
         <span className="rounded-full bg-emerald-50 px-2.5 py-1 text-emerald-700">
           {activeInStock.length} active and in stock
         </span>
+        <label className="ml-auto flex items-center gap-2 rounded-full bg-page px-2.5 py-1 text-muted">
+          <input
+            type="checkbox"
+            checked={onlyMissingImages}
+            onChange={() => {
+              setOnlyMissingImages((value) => !value);
+              setSelectedLeafIds(new Set());
+            }}
+            className="size-3.5"
+          />
+          Missing image ({missingImageLeaves.length})
+        </label>
       </div>
+
+      {selectedLeafIds.size > 0 ? (
+        <div className="rounded-xl border border-brand/30 bg-brand-soft/30 p-4">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <p className="text-sm font-medium">{selectedLeafIds.size} variants selected</p>
+            <button
+              type="button"
+              onClick={() => setSelectedLeafIds(new Set())}
+              className="text-xs text-muted underline-offset-4 hover:text-ink hover:underline"
+            >
+              Clear selection
+            </button>
+          </div>
+          <form action={bulkUpdateVariantsAction} className="mt-3 flex flex-wrap items-end gap-3">
+            <input type="hidden" name="productId" value={productId} />
+            {[...selectedLeafIds].map((variantId) => (
+              <input key={variantId} type="hidden" name="variantIds" value={variantId} />
+            ))}
+            <div className="w-36">
+              <Label htmlFor="bulk-price">Price (AED)</Label>
+              <Input id="bulk-price" name="price" inputMode="decimal" placeholder="Leave blank" />
+            </div>
+            <div className="w-32">
+              <Label htmlFor="bulk-stock">Stock</Label>
+              <Input id="bulk-stock" name="stock" type="number" min={0} placeholder="Leave blank" />
+            </div>
+            <Button type="submit" size="sm" variant="secondary">
+              Update selected
+            </Button>
+          </form>
+          <p className="mt-2 text-[11px] text-muted">
+            Blank fields stay unchanged. This writes the same price or stock to every selected
+            variant.
+          </p>
+        </div>
+      ) : null}
 
       {levels.length > 0 && addParentOptions.length > 0 ? (
         <div className="rounded-xl border border-line bg-surface p-4">
@@ -707,11 +822,24 @@ export function VariantTreeEditor({
             <p className="px-4 py-8 text-sm text-muted">
               No branches yet. Add a root above, then add its children.
             </p>
+          ) : allowedIds && visibleLeaves.length === 0 ? (
+            <p className="px-4 py-8 text-sm text-muted">
+              No branches are missing an image. Turn the filter off to see the full tree.
+            </p>
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead className="border-b border-line text-left text-[11px] tracking-wide text-muted uppercase">
                   <tr>
+                    <th className="w-10 px-4 py-3">
+                      <input
+                        type="checkbox"
+                        checked={allVisibleSelected}
+                        onChange={toggleAllVisible}
+                        aria-label="Select all visible variants"
+                        className="size-4"
+                      />
+                    </th>
                     <th className="px-4 py-3 font-semibold">Branch</th>
                     <th className="px-4 py-3 font-semibold">Type</th>
                     <th className="px-4 py-3 font-semibold">SKU</th>
@@ -731,6 +859,9 @@ export function VariantTreeEditor({
                     selectedId={selectedId}
                     onSelect={setSelectedId}
                     tree={tree}
+                    allowedIds={allowedIds}
+                    selectedLeafIds={selectedLeafIds}
+                    onToggleLeaf={toggleLeaf}
                   />
                 </tbody>
               </table>

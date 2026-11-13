@@ -1,6 +1,5 @@
 "use client";
 
-import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { useMemo, useState, useTransition } from "react";
 import { addToCartAction } from "@/app/(storefront)/cart-actions";
@@ -25,24 +24,16 @@ type OptionGroup = {
 type Props = {
   options: OptionGroup[];
   nodes: VariantNodeView[];
+  selectedIds: string[];
+  onSelectedIdsChange: (ids: string[]) => void;
 };
 
-function initialPath(tree: VariantTreeNode[]): string[] {
-  for (const root of tree) {
-    const leaf = firstAvailableLeaf(root) ?? firstLeaf(root);
-    if (leaf) return pathToNode(tree, leaf.id).map((node) => node.id);
-  }
-  return [];
-}
-
-export function ProductOptions({ options, nodes }: Props) {
+export function ProductOptions({ options, nodes, selectedIds, onSelectedIdsChange }: Props) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [message, setMessage] = useState<{ kind: "ok" | "error"; text: string } | null>(null);
 
   const tree = useMemo(() => buildVariantTree(nodes), [nodes]);
-  const [selectedIds, setSelectedIds] = useState<string[]>(() => initialPath(tree));
-
   const path = selectedIds.length
     ? pathToNode(tree, selectedIds[selectedIds.length - 1] ?? "")
     : [];
@@ -66,7 +57,6 @@ export function ProductOptions({ options, nodes }: Props) {
 
   const selectedLabel =
     options.length > 0 ? path.map((node) => node.label).join(" / ") : "";
-  const imageNode = [...path].reverse().find((node) => node.imageKey);
   const statusText = !variant
     ? "Not available in this combination"
     : !variant.active || variant.stockQty === 0
@@ -76,7 +66,7 @@ export function ProductOptions({ options, nodes }: Props) {
   function choose(node: VariantTreeNode) {
     const leaf = firstAvailableLeaf(node) ?? firstLeaf(node) ?? node;
     const next = pathToNode(tree, leaf.id).map((item) => item.id);
-    setSelectedIds(next.length > 0 ? next : [node.id]);
+    onSelectedIdsChange(next.length > 0 ? next : [node.id]);
     setMessage(null);
   }
 
@@ -135,23 +125,12 @@ export function ProductOptions({ options, nodes }: Props) {
 
       {selectedLabel ? <p className="text-xs text-muted">Selected: {selectedLabel}</p> : null}
 
-      <div className="flex items-center justify-between gap-4 border-t border-line pt-5">
-        <div className="flex items-center gap-3">
-          {imageNode?.imageKey ? (
-            <Image
-              src={`/media/${imageNode.imageKey}`}
-              alt={imageNode.imageAlt || selectedLabel}
-              width={64}
-              height={64}
-              className="h-16 w-16 rounded-lg border border-line object-cover"
-            />
-          ) : null}
-          <div>
-            <p className="text-xl font-semibold tabular-nums">
-              {variant ? formatMoney(variant.priceMinor) : "—"}
-            </p>
-            <p className="mt-1 text-xs text-muted">{statusText}</p>
-          </div>
+      <div className="flex items-baseline justify-between gap-4 border-t border-line pt-5">
+        <div>
+          <p className="text-xl font-semibold tabular-nums">
+            {variant ? formatMoney(variant.priceMinor) : "—"}
+          </p>
+          <p className="mt-1 text-xs text-muted">{statusText}</p>
         </div>
         <p className="text-xs text-muted">VAT included</p>
       </div>

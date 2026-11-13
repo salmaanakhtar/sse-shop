@@ -132,7 +132,8 @@ order already claimed cannot move, and deletion anonymises the profile while kee
 
 Variant-tree tests own the catalog rules: per-parent children never create a phantom combination,
 children inherit parent defaults, copying a sibling creates new SKUs on the target path, deleting a
-branch removes its variants, and the migration backfills existing variants into leaves.
+branch removes its variants, bulk updates apply only to the selected leaves, and the migration
+backfills existing variants into leaves. The gallery fallback is a unit-tested pure helper.
 
 Rules that keep unit tests honest:
 

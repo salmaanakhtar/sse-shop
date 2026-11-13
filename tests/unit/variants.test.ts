@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   buildVariantTree,
+  effectiveImageKey,
   firstAvailableLeaf,
   firstAvailableLeafInTree,
   generateVariantSku,
@@ -75,6 +76,17 @@ describe("buildVariantTree", () => {
     const tree = buildVariantTree([blue, red, leaf("blue-m", "M", 0), redSmall]);
     expect(firstAvailableLeaf(tree[1]!)?.id).toBe("red-s");
     expect(firstAvailableLeafInTree(tree)?.id).toBe("red-s");
+  });
+});
+
+describe("effectiveImageKey", () => {
+  it("uses the nearest branch image on the path", () => {
+    const blueWithImage = { ...blue, imageKey: "blue.webp" };
+    const childWithImage = { ...leaf("blue-s", "S", 5), imageKey: "blue-s.webp" };
+    const tree = buildVariantTree([blueWithImage, childWithImage]);
+
+    expect(effectiveImageKey(pathToNode(tree, "blue-s"))).toBe("blue-s.webp");
+    expect(effectiveImageKey([tree[0]!])).toBe("blue.webp");
   });
 });
 

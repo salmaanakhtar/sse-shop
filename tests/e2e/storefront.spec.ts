@@ -28,6 +28,10 @@ test("a shopper can browse, add to cart, and place an order", async ({ page }) =
   await expect(page.getByRole("heading", { name: /SS-\d{4}-\d{6}/ })).toBeVisible();
   await expect(page.getByText("Ayesha Khan")).toBeVisible();
   await expect(page.getByText(/Includes\sAED\s6\.67 VAT/)).toBeVisible();
+
+  // The cart is consumed, and the header lives in the layout: the badge must
+  // clear on the confirmation page, not just on the next full reload.
+  await expect(page.getByRole("link", { name: /^Cart/ })).toHaveText("Cart");
 });
 
 test("the cart survives a reload", async ({ page }) => {

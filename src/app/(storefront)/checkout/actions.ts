@@ -1,5 +1,6 @@
 "use server";
 
+import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import type { Address } from "@/lib/address";
 import { placeOrder } from "@/server/services/orders";
@@ -28,7 +29,13 @@ export async function checkoutAction(
 
   if (!result.ok) return { error: result.error };
 
+  // The order consumed the cart. The header lives in the layout, so the layout
+  // cache has to be dropped or the badge keeps the pre-checkout count.
+  revalidatePath("/", "layout");
+
   redirect(
     `/orders/${encodeURIComponent(result.data.number)}?t=${encodeURIComponent(result.data.lookupToken)}`,
   );
 }
+
+

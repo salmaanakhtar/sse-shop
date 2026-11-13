@@ -3,9 +3,9 @@
 Sequenced so every phase leaves a working store. A phase is done when its completion criteria
 hold, not when the code is written.
 
-**Current:** Phase 3 complete. Phase 4 in progress — sales and promotions are live. The final phase is
-a full UI redesign of layout, theme, and design language. No-code control is a continuous background
-stream, not a numbered phase.
+**Current:** Phase 3 complete. Phase 4 in progress — sales, promotions, categories, collections, and
+badges are live. The final phase is a full UI redesign of layout, theme, and design language. No-code
+control is a continuous background stream, not a numbered phase.
 
 ## Phase 0 — Foundation
 
@@ -73,7 +73,8 @@ create, and the tree survives the migration.
 
 ## Phase 4 — Merchandising
 
-**Status: in progress — sales and promotions shipped.**
+**Status: in progress — sales, promotions, categories, collections, and badges shipped; promotion
+targets are being reworked.**
 
 - **Sales (done):** per-variant sale price with an optional start/end in Asia/Dubai; the sale must
   be below the regular price; cart, checkout, and order snapshots use the effective price. The
@@ -82,10 +83,15 @@ create, and the tree survives the migration.
 - **Promotions (done):** manually managed top-of-home carousel slides with image, headline, CTA,
   internal link, optional schedule, active flag, ordering, and audit entries. The storefront carousel
   auto-advances, pauses on hover/focus, respects reduced motion, and has arrows and dots.
-- **Categories:** a hierarchical category tree with subcategories, ordered in the navbar.
-- **Collections:** manually curated rows such as Best Selling, Featured, and Daily Offers; automatic
+- **Categories (done):** a hierarchical tree with subcategories, sibling ordering, active flags, and
+  a navbar with child dropdowns. Category pages include descendant products; deletion is blocked
+  while children or products remain. Every change writes an audit entry.
+- **Collections (done):** manually curated rows such as Best Selling, Featured, and Daily Offers,
+  with home-page order and per-product order. Inactive or empty collections are hidden. Automatic
   best-seller rules can follow.
-- **Badges:** reusable card labels such as Best Seller and Powered by AMD.
+- **Badges (done):** reusable labels such as Best Seller and Powered by AMD, with four tones,
+  ordering, and per-product assignment. Active badges appear top-left on cards and on the detail
+  page; the sale flag is top-right.
 
 **Done when** a sale, a carousel slide, a category, a collection, and a badge can each be changed
 in admin and appear on the storefront without a deploy, with an audit entry.

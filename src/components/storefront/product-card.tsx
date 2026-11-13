@@ -1,5 +1,6 @@
 import Image from "next/image";
 import Link from "next/link";
+import { badgeToneClass } from "@/lib/badges";
 import { formatMoney } from "@/lib/money";
 import { discountPercent } from "@/lib/sale";
 import type { CatalogCard as CatalogCardData } from "@/server/services/catalog";
@@ -29,8 +30,22 @@ export function ProductCard({ product }: { product: CatalogCardData }) {
             No image yet
           </div>
         )}
+        {product.badges.length > 0 ? (
+          <div className="absolute left-3 top-3 flex max-w-[72%] flex-col items-start gap-1">
+            {product.badges.map((badge) => (
+              <span
+                key={badge.id}
+                className={`rounded-full px-2 py-0.5 text-[10px] font-semibold tracking-wide uppercase ${badgeToneClass(
+                  badge.tone,
+                )}`}
+              >
+                {badge.label}
+              </span>
+            ))}
+          </div>
+        ) : null}
         {product.onSale ? (
-          <span className="absolute left-3 top-3 rounded-full bg-brand px-2 py-0.5 text-[10px] font-semibold tracking-wide text-white uppercase">
+          <span className="absolute right-3 top-3 rounded-full bg-brand px-2 py-0.5 text-[10px] font-semibold tracking-wide text-white uppercase">
             Sale{discount !== null ? ` −${discount}%` : ""}
           </span>
         ) : null}

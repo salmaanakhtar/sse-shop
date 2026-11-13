@@ -8,7 +8,14 @@ import {
   products,
   variants,
 } from "../db/schema";
+import { badgesForProducts } from "./badges";
 import { listVariantNodes, type VariantNodeView } from "./variant-tree";
+
+export type CatalogBadge = {
+  id: string;
+  label: string;
+  tone: string;
+};
 
 export type CatalogCard = {
   id: string;
@@ -21,6 +28,7 @@ export type CatalogCard = {
   inStock: boolean;
   imageKey: string | null;
   imageAlt: string;
+  badges: CatalogBadge[];
 };
 
 export type ProductOptionView = {
@@ -46,6 +54,7 @@ export type ProductDetail = {
   media: ProductMediaView[];
   priceFromMinor: number;
   inStock: boolean;
+  badges: CatalogBadge[];
 };
 
 function firstBy<T>(rows: T[], key: (row: T) => string): Map<string, T> {
@@ -57,18 +66,15 @@ function firstBy<T>(rows: T[], key: (row: T) => string): Map<string, T> {
   return map;
 }
 
-export async function listCatalog(): Promise<CatalogCard[]> {
-  const productRows = await db
-    .select()
-    .from(products)
-    .where(eq(products.status, "active"))
-    .orderBy(desc(products.publishedAt), asc(products.title));
-
+async function catalogCardsForProducts(
+  productRows: (typeof products.$inferSelect)[],
+  now = new Date(),
+): Promise<CatalogCard[]> {
   if (productRows.length === 0) return [];
 
   const ids = productRows.map((row) => row.id);
 
-  const [variantRows, mediaRows] = await Promise.all([
+  const [variantRows, mediaRows, badgeMap] = await Promise.all([
     db
       .select()
       .from(variants)
@@ -78,6 +84,7 @@ export async function listCatalog(): Promise<CatalogCard[]> {
       .from(productMedia)
       .where(inArray(productMedia.productId, ids))
       .orderBy(asc(productMedia.position)),
+    badgesForProducts(ids),
   ]);
 
   const firstImage = firstBy(mediaRows, (row) => row.productId);
@@ -85,7 +92,6 @@ export async function listCatalog(): Promise<CatalogCard[]> {
   return productRows.map((product) => {
     const own = variantRows.filter((variant) => variant.productId === product.id);
     const media = firstImage.get(product.id);
-    const now = new Date();
     const priced = own.map((variant) => ({
       regular: variant.priceMinor,
       effective: effectivePriceMinor(variant.priceMinor, variant, now),
@@ -107,15 +113,48 @@ export async function listCatalog(): Promise<CatalogCard[]> {
       inStock: own.some((variant) => variant.stockQty > 0),
       imageKey: media?.storageKey ?? null,
       imageAlt: media?.alt ?? product.title,
+      badges: (badgeMap.get(product.id) ?? []).map((badge) => ({
+        id: badge.id,
+        label: badge.label,
+        tone: badge.tone,
+      })),
     };
   });
+}
+
+export async function listCatalog(): Promise<CatalogCard[]> {
+  const productRows = await db
+    .select()
+    .from(products)
+    .where(eq(products.status, "active"))
+    .orderBy(desc(products.publishedAt), asc(products.title));
+
+  return catalogCardsForProducts(productRows);
+}
+
+/** Catalog cards for a known set of ids, keeping the caller's order. */
+export async function listCatalogByIds(ids: string[]): Promise<CatalogCard[]> {
+  const unique = [...new Set(ids.filter(Boolean))];
+  if (unique.length === 0) return [];
+
+  const productRows = await db
+    .select()
+    .from(products)
+    .where(and(inArray(products.id, unique), eq(products.status, "active")));
+
+  const cards = await catalogCardsForProducts(productRows);
+  const byId = new Map(cards.map((card) => [card.id, card]));
+
+  return unique
+    .map((id) => byId.get(id))
+    .filter((card): card is CatalogCard => Boolean(card));
 }
 
 export async function getProductDetail(slug: string): Promise<ProductDetail | null> {
   const [product] = await db.select().from(products).where(eq(products.slug, slug)).limit(1);
   if (!product || product.status !== "active") return null;
 
-  const [optionRows, variantRows, mediaRows] = await Promise.all([
+  const [optionRows, variantRows, mediaRows, badgeMap] = await Promise.all([
     db
       .select()
       .from(productOptions)
@@ -131,6 +170,7 @@ export async function getProductDetail(slug: string): Promise<ProductDetail | nu
       .from(productMedia)
       .where(eq(productMedia.productId, product.id))
       .orderBy(asc(productMedia.position)),
+    badgesForProducts([product.id]),
   ]);
 
   const optionIds = optionRows.map((option) => option.id);
@@ -173,6 +213,11 @@ export async function getProductDetail(slug: string): Promise<ProductDetail | nu
           )
         : 0,
     inStock: variantRows.some((variant) => variant.stockQty > 0),
+    badges: (badgeMap.get(product.id) ?? []).map((badge) => ({
+      id: badge.id,
+      label: badge.label,
+      tone: badge.tone,
+    })),
   };
 }
 

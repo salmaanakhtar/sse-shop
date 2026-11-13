@@ -11,7 +11,11 @@ test("home page renders the catalog without page errors", async ({ page }) => {
   await expect(page.getByRole("heading", { level: 1 })).toHaveText(
     "Considered goods, delivered across the UAE.",
   );
-  await expect(page.getByRole("link", { name: /Essential Tee/ })).toBeVisible();
+  await expect(
+    page.getByRole("region", { name: "All products" }).getByRole("link", {
+      name: /Essential Tee/,
+    }),
+  ).toBeVisible();
   expect(pageErrors).toEqual([]);
 });
 

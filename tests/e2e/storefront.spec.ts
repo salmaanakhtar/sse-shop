@@ -3,7 +3,8 @@ import { expect, test } from "@playwright/test";
 test("a shopper can browse, add to cart, and place an order", async ({ page }) => {
   await page.goto("/");
 
-  await page.getByRole("link", { name: /Essential Tee/ }).click();
+  const allProducts = page.getByRole("region", { name: "All products" });
+  await allProducts.getByRole("link", { name: /Essential Tee/ }).click();
   await expect(page).toHaveURL(/\/products\/essential-tee$/);
 
   await page.getByTestId("add-to-cart").click();

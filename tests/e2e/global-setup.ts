@@ -19,6 +19,9 @@ export default async function globalSetup() {
 
   await db.delete(schema.products).where(like(schema.products.slug, "playwright-%"));
   await db.delete(schema.promotions);
+  await db.delete(schema.categories).where(like(schema.categories.slug, "playwright-%"));
+  await db.delete(schema.collections).where(like(schema.collections.slug, "playwright-%"));
+  await db.delete(schema.badges).where(like(schema.badges.label, "Playwright %"));
   await db.delete(schema.sessions);
   await db.delete(schema.twoFactors);
   await db.update(schema.users).set({ twoFactorEnabled: false });

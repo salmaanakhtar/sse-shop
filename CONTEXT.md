@@ -115,21 +115,25 @@ _Avoid_: Variant image only
 ## Merchandising
 
 **Category**:
-A hierarchical navigation grouping, such as Computer Components.
+A hierarchical navigation grouping, such as Computer Components. A category has a parent or is a
+top-level item, a slug, an active flag, and a position among its siblings. Its page includes the
+products in its child categories.
 _Avoid_: Tag, collection
 
 **Subcategory**:
 A child category, such as Graphics Card under Computer Components. It can be browsed on its own
-and still belongs to its parent.
+and still belongs to its parent. A category cannot move under itself or one of its descendants.
 
 **Collection**:
 A group of products shown as a row or page, such as Best Selling, Featured, or Daily Offers. It
-is curated by the merchant, and may later gain automatic rules.
+is curated by the merchant, ordered on the home page, and ordered internally per product. It does
+not imply a category or a badge, and may later gain automatic rules.
 _Avoid_: Tag, tab, category
 
 **Badge**:
 A small reusable label on a product card, such as Best Seller or Powered by AMD. It is not a
-category or a collection.
+category or a collection. A badge has one of four tones — brand, neutral, success, warning — and
+can be assigned to many products.
 _Avoid_: Tag
 
 **Sale**:

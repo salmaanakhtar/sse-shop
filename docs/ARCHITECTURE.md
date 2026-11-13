@@ -47,7 +47,8 @@ rules.
 
 ## Data model
 
-Twenty tables, deliberately narrow. Every table carries `created_at`; most carry `updated_at`.
+Twenty-six tables, deliberately narrow. Core tables carry `created_at`; most carry `updated_at`; join
+tables stay minimal.
 | Table | Holds | Notes |
 | --- | --- | --- |
 | `users` | Admin and customer identity | `role` is `admin` or `customer`; `phone`; `deleted_at` tombstones a deleted customer |
@@ -61,6 +62,12 @@ Twenty tables, deliberately narrow. Every table carries `created_at`; most carry
 | `product_option_values` | The values within a level | e.g. `Black`, `S`, `M` |
 | `variant_nodes` | Explicit variant tree | group or leaf; parent defaults and images; leaf links one `variants` row |
 | `product_media` | Ordered images per product | `storage_key`, `alt`, `position` |
+| `categories` | Hierarchical navigation | self-referencing `parent_id`; `slug` unique; sibling `position` |
+| `product_categories` | Product ↔ category | Many-to-many; composite primary key |
+| `collections` | Curated product group | `slug` unique; home-page `position` |
+| `collection_products` | Product ↔ collection | Many-to-many; per-collection `position` |
+| `badges` | Reusable card label | `label` unique; tone and `position` |
+| `product_badges` | Product ↔ badge | Many-to-many; composite primary key |
 | `customer_addresses` | Saved delivery and billing addresses | one default of each per customer, partial unique indexes |
 | `carts` | One basket per shopper token | Token hashed; `expires_at`; `user_id` links a signed-in cart |
 | `cart_items` | Variants in a cart | Unique on `(cart_id, variant_id)` |
@@ -88,6 +95,12 @@ Twenty tables, deliberately narrow. Every table carries `created_at`; most carry
 - Deleting a branch deletes its descendants and their variants. Orders keep their line and address
   snapshots.
 - Existing Cartesian variants were migrated into leaves; the old join table is gone.
+- A category slug is unique. A category cannot move under itself or a descendant, and cannot be
+  deleted while it has children or assigned products.
+- A collection is curated: `collection_products.position` is the row order, separate from catalog
+  order. An inactive or empty collection is omitted from the home page.
+- A badge label is unique and only active badges render. A product can carry several badges, shown
+  top-left on its card; the sale flag stays top-right.
 - Stored order totals must be reproducible from their lines. If they disagree, the bug is in
   placement, not in the display.
 - A cart is consumed when its order is placed; it never becomes the same cart again.
@@ -182,6 +195,28 @@ A product's variant structure is an explicit tree, not a Cartesian product.
 The pre-launch migration created a tree from every existing variant, then dropped
 `variant_option_values`. New products start with a default single variant when they have no levels,
 and with whichever branches the merchant adds when they do.
+
+## Categories, collections, and badges
+
+Three separate systems share the product catalog but mean different things:
+
+- **Categories** are navigation. `categories.parent_id` makes the tree; siblings are ordered by
+  `position`. The admin creates, edits, reorders, and deletes categories; a category with children
+  or assigned products cannot be deleted, and a move under itself or a descendant is rejected. The
+  storefront navbar shows active roots, with active children in a hover/focus dropdown. A category
+  page includes the products assigned to it and to every descendant.
+- **Collections** are curated merchandising. The admin creates a collection, then adds products and
+  orders them with `collection_products.position`. Active, non-empty collections render as rows on
+  the home page, four products each, with a “View all” link to `/collections/[slug]`. Automatic
+  best-seller rules can be layered on later without changing the manual model.
+- **Badges** are labels. A badge has a unique label, a tone (`brand`, `neutral`, `success`,
+  `warning`), an active flag, and an order. The admin assigns any number of badges on the product
+  edit page. Active badges render top-left on cards and under the product title; the sale flag moved
+  top-right so the two never collide.
+
+Both assignments are many-to-many (`product_categories`, `product_badges`), so a product can sit in
+several categories and carry several badges. Every create, update, delete, reorder, and assignment
+writes an `audit_log` entry.
 
 ## Home page promotions
 

@@ -4,6 +4,8 @@ import { notFound } from "next/navigation";
 import { VariantTreeEditor } from "@/components/admin/variant-tree";
 import { Button, buttonClass } from "@/components/ui/button";
 import { Input, Label, Textarea } from "@/components/ui/field";
+import { badgeToneClass } from "@/lib/badges";
+import { buildCategoryTree, flattenCategoryTree } from "@/lib/categories";
 import {
   addOptionAction,
   addOptionValueAction,
@@ -14,7 +16,16 @@ import {
   updateProductAction,
   uploadImageAction,
 } from "@/server/actions/admin-products";
+import {
+  setProductCategoriesAction,
+} from "@/server/actions/admin-categories";
+import { setProductBadgesAction } from "@/server/actions/admin-badges";
 import { getProductForAdmin } from "@/server/services/catalog";
+import { listBadges, listProductBadgeIds } from "@/server/services/badges";
+import {
+  listAllCategories,
+  listProductCategoryIds,
+} from "@/server/services/categories";
 
 export default async function EditProductPage({
   params,
@@ -24,10 +35,22 @@ export default async function EditProductPage({
   searchParams: Promise<{ error?: string }>;
 }) {
   const [{ id }, { error }] = await Promise.all([params, searchParams]);
-  const product = await getProductForAdmin(id);
+  const [product, categoryRows, badgeRows] = await Promise.all([
+    getProductForAdmin(id),
+    listAllCategories(),
+    listBadges(),
+  ]);
 
   if (!product) notFound();
 
+  const [selectedCategoryIds, selectedBadgeIds] = await Promise.all([
+    listProductCategoryIds(product.id),
+    listProductBadgeIds(product.id),
+  ]);
+
+  const categoryTree = flattenCategoryTree(buildCategoryTree(categoryRows));
+  const selectedCategories = new Set(selectedCategoryIds);
+  const selectedBadges = new Set(selectedBadgeIds);
   const hasTree = product.nodes.length > 0;
 
   return (
@@ -108,6 +131,121 @@ export default async function EditProductPage({
             Save details
           </Button>
         </form>
+      </section>
+
+      {/* ── categories ──────────────────────────────────────────── */}
+      <section
+        id="categories"
+        className="scroll-mt-6 rounded-xl border border-line bg-surface p-6"
+      >
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <h2 className="text-sm font-semibold">Categories</h2>
+            <p className="mt-1 max-w-2xl text-xs text-muted">
+              A product can sit in several categories. Category pages include the products in
+              their child categories.
+            </p>
+          </div>
+          <Link href="/admin/categories" className="text-xs text-muted hover:text-ink">
+            Manage categories
+          </Link>
+        </div>
+
+        {categoryTree.length === 0 ? (
+          <p className="mt-4 rounded-lg border border-dashed border-line px-4 py-3 text-sm text-muted">
+            No categories yet.{" "}
+            <Link href="/admin/categories/new" className="text-brand hover:underline">
+              Create one
+            </Link>
+            .
+          </p>
+        ) : (
+          <form action={setProductCategoriesAction} className="mt-4 space-y-3">
+            <input type="hidden" name="productId" value={product.id} />
+            <div className="grid gap-2 sm:grid-cols-2">
+              {categoryTree.map((category) => (
+                <label
+                  key={category.id}
+                  className="flex items-center gap-2 rounded-lg border border-line px-3 py-2 text-sm"
+                >
+                  <input
+                    type="checkbox"
+                    name="categoryIds"
+                    value={category.id}
+                    defaultChecked={selectedCategories.has(category.id)}
+                    className="size-4"
+                  />
+                  <span style={{ paddingLeft: `${category.depth * 14}px` }}>
+                    {category.depth > 0 ? "↳ " : ""}
+                    {category.name}
+                    {category.active ? "" : " (inactive)"}
+                  </span>
+                </label>
+              ))}
+            </div>
+            <Button type="submit" size="sm" variant="secondary">
+              Save categories
+            </Button>
+          </form>
+        )}
+      </section>
+
+      {/* ── badges ──────────────────────────────────────────────── */}
+      <section id="badges" className="scroll-mt-6 rounded-xl border border-line bg-surface p-6">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <h2 className="text-sm font-semibold">Badges</h2>
+            <p className="mt-1 max-w-2xl text-xs text-muted">
+              Labels shown on the product card and detail page, in badge order.
+            </p>
+          </div>
+          <Link href="/admin/badges" className="text-xs text-muted hover:text-ink">
+            Manage badges
+          </Link>
+        </div>
+
+        {badgeRows.length === 0 ? (
+          <p className="mt-4 rounded-lg border border-dashed border-line px-4 py-3 text-sm text-muted">
+            No badges yet.{" "}
+            <Link href="/admin/badges" className="text-brand hover:underline">
+              Create one
+            </Link>
+            .
+          </p>
+        ) : (
+          <form action={setProductBadgesAction} className="mt-4 space-y-3">
+            <input type="hidden" name="productId" value={product.id} />
+            <div className="flex flex-wrap gap-2">
+              {badgeRows.map((badge) => (
+                <label
+                  key={badge.id}
+                  className="flex items-center gap-2 rounded-lg border border-line px-3 py-2 text-sm"
+                >
+                  <input
+                    type="checkbox"
+                    name="badgeIds"
+                    value={badge.id}
+                    defaultChecked={selectedBadges.has(badge.id)}
+                    className="size-4"
+                  />
+                  <span
+                    className={`rounded-full px-2 py-0.5 text-[10px] font-semibold tracking-wide uppercase ${badgeToneClass(
+                      badge.tone,
+                    )}`}
+                  >
+                    {badge.label}
+                  </span>
+                  {badge.active ? null : (
+                    <span className="text-[10px] text-muted">inactive</span>
+                  )}
+                </label>
+              ))}
+            </div>
+            <Button type="submit" size="sm" variant="secondary">
+              Save badges
+            </Button>
+          </form>
+        )}
       </section>
 
       {/* ── media ───────────────────────────────────────────────── */}

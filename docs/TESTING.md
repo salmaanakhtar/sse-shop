@@ -43,10 +43,13 @@ without replacing it.
 11. **Admin customer list** — the panel lists customers and opens their detail.
 12. **Variant tree selection** — selecting a parent updates the children and price; the cart label
     is the chosen path, not a phantom combination.
-13. **Sale price** — admin sets a sale with an end time; the storefront shows the discount, original
+13. **Sale price** - admin sets a sale with an end time; the storefront shows the discount, original
     price, and timer; the cart total uses the sale price.
-14. **Promotion carousel** — admin creates two scheduled slides; the home page shows the first, the
+14. **Promotion carousel** - admin creates two scheduled slides; the home page shows the first, the
     next arrow moves to the second, and the slide links to its internal path.
+15. **Merchandising** - admin creates a parent category and a child, assigns a product, and sees the
+    navbar and both category pages; creates a collection, adds the product, and sees the home row and
+    collection page; creates a badge, assigns it, and sees it on the card and detail page.
 
 ## Vitest setup
 
@@ -145,6 +148,14 @@ test asserts the effective from-price and the sale fields on the product detail.
 
 Promotion tests cover live/scheduled/expired/inactive status, filtering live slides, position order,
 moving a slide, and deletion. The admin e2e creates two slides and drives the carousel arrows.
+
+Category tests cover tree building, sibling order, depth-first flattening, paths, cycle rejection,
+deletion guards, descendant product lookup, and product assignment. Collection tests cover curated
+per-product order, duplicate-add rejection, empty-collection filtering, collection reorder, and
+cascade delete. Badge tests cover unique labels, tone validation, active filtering, per-product
+assignment, and the badges on a catalog card. The admin e2e creates the parent/child tree, the
+collection, and the badge, then checks the navbar, category pages, home row, collection page, card,
+and detail page.
 
 Rules that keep unit tests honest:
 

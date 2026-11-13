@@ -72,7 +72,9 @@ test("a sale price reaches the storefront, timer, and cart", async ({ page }) =>
   await expect(adminRow.getByTitle(/variant on sale/)).toBeVisible();
 
   await page.goto("/");
-  const card = page.getByRole("link", { name: /Playwright Hoodie/ });
+  const card = page
+    .getByRole("region", { name: "All products" })
+    .getByRole("link", { name: /Playwright Hoodie/ });
   await expect(card.getByText(/Sale\s*−34%/)).toBeVisible();
 
   await page.goto(`/products/${SLUG}`);
@@ -85,6 +87,79 @@ test("a sale price reaches the storefront, timer, and cart", async ({ page }) =>
 
   await page.getByRole("link", { name: /^Cart/ }).click();
   await expect(page.getByTestId("cart-total")).toHaveText(/AED\s119\.00/);
+});
+
+test("admin builds a category tree, a collection, and a badge", async ({ page }) => {
+  await page.goto("/admin/categories/new");
+  await page.getByLabel("Name").fill("Playwright Apparel");
+  await page.getByRole("button", { name: "Create category" }).click();
+  await expect(page).toHaveURL(/\/admin\/categories$/);
+  await expect(page.getByRole("link", { name: /Playwright Apparel/ })).toBeVisible();
+
+  await page.goto("/admin/categories/new");
+  await page.getByLabel("Name").fill("Playwright Tops");
+  await page.getByLabel("Parent category").selectOption({ label: "Playwright Apparel" });
+  await page.getByRole("button", { name: "Create category" }).click();
+  await expect(page).toHaveURL(/\/admin\/categories$/);
+  await expect(page.getByRole("link", { name: /Playwright Tops/ })).toBeVisible();
+
+  await page.goto("/");
+  const categoryNav = page.getByRole("navigation", { name: "Categories" });
+  await expect(categoryNav.getByRole("link", { name: "Playwright Apparel" })).toBeVisible();
+
+  await page.goto("/admin/products");
+  await page.getByRole("link", { name: "Playwright Hoodie" }).click();
+  await page.getByRole("checkbox", { name: /Playwright Tops/ }).check();
+  await page.getByRole("button", { name: "Save categories" }).click();
+  await expect(page).toHaveURL(/#categories$/);
+  await expect(page.getByRole("checkbox", { name: /Playwright Tops/ })).toBeChecked();
+
+  await page.goto("/category/playwright-apparel");
+  await expect(page.getByRole("heading", { level: 1 })).toHaveText("Playwright Apparel");
+  await expect(page.getByRole("link", { name: /Playwright Hoodie/ })).toBeVisible();
+
+  await page.goto("/category/playwright-tops");
+  await expect(page.getByRole("heading", { level: 1 })).toHaveText("Playwright Tops");
+  await expect(page.getByRole("link", { name: /Playwright Hoodie/ })).toBeVisible();
+
+  await page.goto("/admin/collections/new");
+  await page.getByLabel("Name").fill("Playwright Picks");
+  await page.getByRole("button", { name: "Create collection" }).click();
+  await expect(page).toHaveURL(/\/admin\/collections\/[0-9a-f-]{36}$/);
+
+  await page.selectOption("#collection-product", { label: "Playwright Hoodie (active)" });
+  await page.getByRole("button", { name: "Add to collection" }).click();
+  await expect(page).toHaveURL(/#products$/);
+  await expect(page.getByRole("link", { name: "Playwright Hoodie" })).toBeVisible();
+
+  await page.goto("/");
+  const picks = page.getByRole("region", { name: "Playwright Picks collection" });
+  await expect(picks.getByRole("link", { name: /Playwright Hoodie/ })).toBeVisible();
+
+  await page.goto("/collections/playwright-picks");
+  await expect(page.getByRole("heading", { level: 1 })).toHaveText("Playwright Picks");
+  await expect(page.getByRole("link", { name: /Playwright Hoodie/ })).toBeVisible();
+
+  await page.goto("/admin/badges");
+  await page.getByLabel("Label").fill("Playwright Badge");
+  await page.getByLabel("Tone").selectOption("success");
+  await page.getByRole("button", { name: "Create badge" }).click();
+  await expect(page).toHaveURL(/\/admin\/badges$/);
+  await expect(page.getByText("Playwright Badge", { exact: true })).toBeVisible();
+
+  await page.goto("/admin/products");
+  await page.getByRole("link", { name: "Playwright Hoodie" }).click();
+  await page.getByRole("checkbox", { name: /Playwright Badge/ }).check();
+  await page.getByRole("button", { name: "Save badges" }).click();
+  await expect(page).toHaveURL(/#badges$/);
+
+  await page.goto("/");
+  const allProducts = page.getByRole("region", { name: "All products" });
+  const card = allProducts.getByRole("link", { name: /Playwright Hoodie/ });
+  await expect(card.getByText("Playwright Badge")).toBeVisible();
+
+  await page.goto(`/products/${SLUG}`);
+  await expect(page.getByText("Playwright Badge")).toBeVisible();
 });
 
 test("admin creates a promotion carousel and it appears on the home page", async ({ page }) => {

@@ -10,6 +10,7 @@ import {
   firstLeafInTree,
   pathToNode,
 } from "@/lib/variants";
+import { badgeToneClass } from "@/lib/badges";
 import type { ProductDetail } from "@/server/services/catalog";
 
 export function ProductDetailView({ product }: { product: ProductDetail }) {
@@ -99,6 +100,20 @@ export function ProductDetailView({ product }: { product: ProductDetail }) {
 
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">{product.title}</h1>
+          {product.badges.length > 0 ? (
+            <div className="mt-3 flex flex-wrap gap-2">
+              {product.badges.map((badge) => (
+                <span
+                  key={badge.id}
+                  className={`rounded-full px-2.5 py-1 text-[10px] font-semibold tracking-wide uppercase ${badgeToneClass(
+                    badge.tone,
+                  )}`}
+                >
+                  {badge.label}
+                </span>
+              ))}
+            </div>
+          ) : null}
           {product.description ? (
             <p className="mt-3 text-sm leading-relaxed whitespace-pre-line text-muted">
               {product.description}

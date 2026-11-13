@@ -9,13 +9,14 @@ time. Every feature ships with a unit test and a Playwright journey.
 
 ## Status
 
-Phase 3 complete. Phase 4 is in progress: per-variant sales and the home-page promotion carousel are
-live. A shopper can browse, choose a parent branch and child, add to cart, check out with a UAE
-address, and receive an order with a lookup link. They can also create an account with saved
-delivery and billing addresses, see their order history, and claim a guest order with its lookup
-token. An admin can sign in with TOTP, build only the variant branches that exist, set sale prices
-and windows, manage products, images, and carousel slides, and review customers and their orders.
-Payments are simulated behind a provider interface. See [`docs/ROADMAP.md`](docs/ROADMAP.md).
+Phase 3 complete. Phase 4 is in progress: per-variant sales, the home-page promotion carousel, and
+category, collection, and badge merchandising are live. A shopper can browse, choose a parent branch
+and child, add to cart, check out with a UAE address, and receive an order with a lookup link. They
+can also create an account with saved delivery and billing addresses, see their order history, and
+claim a guest order with its lookup token. An admin can sign in with TOTP, build only the variant
+branches that exist, set sale prices and windows, manage products, images, carousel slides,
+categories, collections, and badges, and review customers and their orders. Payments are simulated
+behind a provider interface. See [`docs/ROADMAP.md`](docs/ROADMAP.md).
 
 ## Stack
 

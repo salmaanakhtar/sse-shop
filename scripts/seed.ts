@@ -1,6 +1,12 @@
-import { eq } from "drizzle-orm";
+import { eq, inArray } from "drizzle-orm";
 import { db, sql } from "../src/server/db/client";
 import {
+  badges,
+  categories,
+  collectionProducts,
+  collections,
+  productBadges,
+  productCategories,
   productOptionValues,
   productOptions,
   products,
@@ -184,6 +190,127 @@ async function seedLowStockProduct() {
   });
 }
 
+async function seedTaxonomy() {
+  await db
+    .delete(categories)
+    .where(inArray(categories.slug, ["apparel", "tops", "accessories"]));
+  await db
+    .delete(collections)
+    .where(inArray(collections.slug, ["featured", "daily-offers"]));
+  await db.delete(badges).where(inArray(badges.label, ["Best Seller", "New"]));
+
+  const [apparel] = await db
+    .insert(categories)
+    .values({
+      name: "Apparel",
+      slug: "apparel",
+      description: "Everyday clothing, cut for the UAE climate.",
+      position: 0,
+    })
+    .returning({ id: categories.id });
+  const [tops] = await db
+    .insert(categories)
+    .values({
+      name: "Tops",
+      slug: "tops",
+      description: "Tees and layers.",
+      parentId: apparel?.id ?? null,
+      position: 0,
+    })
+    .returning({ id: categories.id });
+  const [accessories] = await db
+    .insert(categories)
+    .values({
+      name: "Accessories",
+      slug: "accessories",
+      description: "The finishing pieces.",
+      position: 1,
+    })
+    .returning({ id: categories.id });
+
+  const [tee] = await db
+    .select({ id: products.id })
+    .from(products)
+    .where(eq(products.slug, DEMO_SLUG))
+    .limit(1);
+  const [cap] = await db
+    .select({ id: products.id })
+    .from(products)
+    .where(eq(products.slug, "sample-cap"))
+    .limit(1);
+
+  if (tops && tee) {
+    await db
+      .insert(productCategories)
+      .values({ productId: tee.id, categoryId: tops.id })
+      .onConflictDoNothing();
+  }
+  if (accessories && cap) {
+    await db
+      .insert(productCategories)
+      .values({ productId: cap.id, categoryId: accessories.id })
+      .onConflictDoNothing();
+  }
+
+  const [featured] = await db
+    .insert(collections)
+    .values({
+      name: "Featured",
+      slug: "featured",
+      description: "A short edit of pieces we reach for.",
+      position: 0,
+    })
+    .returning({ id: collections.id });
+  const [daily] = await db
+    .insert(collections)
+    .values({
+      name: "Daily Offers",
+      slug: "daily-offers",
+      description: "Small prices for the everyday.",
+      position: 1,
+    })
+    .returning({ id: collections.id });
+
+  if (featured) {
+    const rows = [tee?.id, cap?.id]
+      .filter((id): id is string => Boolean(id))
+      .map((productId, position) => ({ collectionId: featured.id, productId, position }));
+    if (rows.length > 0) {
+      await db.insert(collectionProducts).values(rows).onConflictDoNothing();
+    }
+  }
+  if (daily && cap) {
+    await db
+      .insert(collectionProducts)
+      .values({ collectionId: daily.id, productId: cap.id, position: 0 })
+      .onConflictDoNothing();
+  }
+
+  const [bestSeller] = await db
+    .insert(badges)
+    .values({ label: "Best Seller", tone: "brand", position: 0 })
+    .returning({ id: badges.id });
+  const [newBadge] = await db
+    .insert(badges)
+    .values({ label: "New", tone: "success", position: 1 })
+    .returning({ id: badges.id });
+
+  if (bestSeller && tee) {
+    await db
+      .insert(productBadges)
+      .values({ productId: tee.id, badgeId: bestSeller.id })
+      .onConflictDoNothing();
+  }
+  if (newBadge && cap) {
+    await db
+      .insert(productBadges)
+      .values({ productId: cap.id, badgeId: newBadge.id })
+      .onConflictDoNothing();
+  }
+
+  console.info("seeded categories, collections, and badges");
+}
+
 async function seedAdmin() {
   const email = process.env.ADMIN_EMAIL?.trim().toLowerCase();
   const password = process.env.ADMIN_PASSWORD;
@@ -219,6 +346,7 @@ async function main() {
   await seedAdmin();
   await seedDemoProduct();
   await seedLowStockProduct();
+  await seedTaxonomy();
   console.info("done");
 }
 

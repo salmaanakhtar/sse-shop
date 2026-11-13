@@ -7,6 +7,7 @@ import {
   jsonb,
   pgEnum,
   pgTable,
+  primaryKey,
   text,
   timestamp,
   uniqueIndex,
@@ -417,6 +418,102 @@ export const promotions = pgTable(
     updatedAt: updatedAt(),
   },
   (table) => [index("promotions_active_position_idx").on(table.active, table.position)],
+);
+
+/* ─────────────────────── taxonomy and merchandising ─────────────────────── */
+
+export const categories = pgTable(
+  "categories",
+  {
+    id: id(),
+    parentId: text("parent_id"),
+    name: text("name").notNull(),
+    slug: text("slug").notNull().unique(),
+    description: text("description").notNull().default(""),
+    position: integer("position").notNull().default(0),
+    active: boolean("active").notNull().default(true),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (table) => [
+    index("categories_parent_id_idx").on(table.parentId),
+    foreignKey({
+      name: "categories_parent_fk",
+      columns: [table.parentId],
+      foreignColumns: [table.id],
+    }).onDelete("set null"),
+  ],
+);
+
+export const productCategories = pgTable(
+  "product_categories",
+  {
+    productId: text("product_id")
+      .notNull()
+      .references(() => products.id, { onDelete: "cascade" }),
+    categoryId: text("category_id")
+      .notNull()
+      .references(() => categories.id, { onDelete: "cascade" }),
+  },
+  (table) => [
+    primaryKey({ columns: [table.productId, table.categoryId] }),
+    index("product_categories_category_id_idx").on(table.categoryId),
+  ],
+);
+
+export const collections = pgTable("collections", {
+  id: id(),
+  name: text("name").notNull(),
+  slug: text("slug").notNull().unique(),
+  description: text("description").notNull().default(""),
+  position: integer("position").notNull().default(0),
+  active: boolean("active").notNull().default(true),
+  createdAt: createdAt(),
+  updatedAt: updatedAt(),
+});
+
+export const collectionProducts = pgTable(
+  "collection_products",
+  {
+    collectionId: text("collection_id")
+      .notNull()
+      .references(() => collections.id, { onDelete: "cascade" }),
+    productId: text("product_id")
+      .notNull()
+      .references(() => products.id, { onDelete: "cascade" }),
+    position: integer("position").notNull().default(0),
+  },
+  (table) => [
+    primaryKey({ columns: [table.collectionId, table.productId] }),
+    index("collection_products_product_id_idx").on(table.productId),
+  ],
+);
+
+export const badges = pgTable("badges", {
+  id: id(),
+  label: text("label").notNull().unique(),
+  /** brand | neutral | success | warning; validated by the admin action. */
+  tone: text("tone").notNull().default("brand"),
+  position: integer("position").notNull().default(0),
+  active: boolean("active").notNull().default(true),
+  createdAt: createdAt(),
+  updatedAt: updatedAt(),
+});
+
+export const productBadges = pgTable(
+  "product_badges",
+  {
+    productId: text("product_id")
+      .notNull()
+      .references(() => products.id, { onDelete: "cascade" }),
+    badgeId: text("badge_id")
+      .notNull()
+      .references(() => badges.id, { onDelete: "cascade" }),
+  },
+  (table) => [
+    primaryKey({ columns: [table.productId, table.badgeId] }),
+    index("product_badges_badge_id_idx").on(table.badgeId),
+  ],
 );
 
 export const auditLog = pgTable(

@@ -49,13 +49,13 @@ see `docs/TESTING.md`.
 
 ```
 src/
-  app/                routes: (storefront), admin, api
+  app/                routes: (storefront), account, admin, api
   components/ui/      shadcn primitives, edited in place
-  components/storefront/  storefront sections
+  components/storefront/  storefront sections and account forms
   components/admin/       admin screens
   server/
     db/               schema.ts, client.ts, migrations/
-    services/         catalog, cart, checkout, orders, inventory, payments/, mail/
+    services/         catalog, cart, orders, settings, variants, addresses, customers, payments/, mail/
     auth/             better-auth config, session helpers, guards
   lib/                money, slugs, result, dates — pure, importable anywhere
 tests/
@@ -89,6 +89,8 @@ pnpm db:seed          # deterministic demo data
 - Every action validates input with Zod on its first line, then returns a discriminated result
   (`{ ok: true, data }` / `{ ok: false, error }`). Log unexpected errors; return a generic message.
 - Import `@/server/**` from server code only. `@/lib/**` stays pure so client bundles can use it.
+- A customer-owned row is read or mutated only through a query that includes the session user id.
+  An id from a form proves nothing; an order is claimed only with its lookup token.
 - Derive types from the schema (`typeof products.$inferSelect`) rather than restating shapes.
 - Entity ids are UUID v7. Only `orders.number` is sequential and human-readable.
 - Migrations are generated, reviewed as SQL, and committed together with the schema change.
@@ -96,6 +98,16 @@ pnpm db:seed          # deterministic demo data
 
 ## Working agreement
 
+- **Every push is a handoff.** Assume the next session starts on another device with no chat
+  history and no local files. The repository alone must be enough to continue: setup works from
+  `README.md` and `.env.example`, migrations and the seed cover the database, `docs/ROADMAP.md`
+  names the current phase and open questions, and any in-flight work is written down with its
+  branch, next step, and blockers. Machine-local state that cannot be committed (secrets, database
+  contents, uploads) is documented with where to get it or how to regenerate it. A push that needs
+  a file or a memory left on this machine is not finished.
+- **Commit and push when the slice is done.** Do not stop to ask whether to commit. A feature,
+  fix, docs change, or test change is finished only when it is committed with a conventional
+  message and pushed to the remote, with a clean working tree.
 - One feature per pull request, small enough to review in one sitting.
 - Conventional commits: `feat:`, `fix:`, `chore:`, `docs:`, `test:`.
 - Update the docs a change invalidates in the same pull request.

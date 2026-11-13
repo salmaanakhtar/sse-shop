@@ -12,6 +12,8 @@ const envSchema = z.object({
     .string()
     .min(32, "BETTER_AUTH_SECRET must be at least 32 characters; generate one with `openssl rand -base64 32`"),
   BETTER_AUTH_URL: z.string().min(1, "BETTER_AUTH_URL is required"),
+  /** Extra origins allowed to call Better Auth, comma separated. */
+  BETTER_AUTH_TRUSTED_ORIGINS: z.string().optional(),
 
   NEXT_PUBLIC_STORE_URL: z.string().default("http://localhost:3000"),
   ADMIN_HOST: z.string().default("admin.localhost"),

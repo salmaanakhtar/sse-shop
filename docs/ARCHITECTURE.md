@@ -165,6 +165,10 @@ building/villa, optional PO box, optional notes. Postal codes are not used.
 - Passwords are hashed by Better Auth (scrypt) and never logged.
 - Sessions are database rows; the cookie carries an opaque token, `httpOnly`, `Secure`,
   `SameSite=Lax`. Admin sessions expire in 8 hours, customer sessions in 30 days.
+- Better Auth trusts an explicit list of origins: the storefront URL, the admin host derived from
+  `ADMIN_HOST`, and anything in `BETTER_AUTH_TRUSTED_ORIGINS`. An origin that is not listed is
+  rejected with `INVALID_ORIGIN`. Session cookies are host-scoped, so an admin signs in on the host
+  they will use — `admin.<domain>` in production.
 - CSRF defence in depth: `SameSite=Lax` plus an Origin/Host check helper called by every mutating
   action.
 - Admin requires TOTP. A control is checked once per session to avoid prompting on every action.

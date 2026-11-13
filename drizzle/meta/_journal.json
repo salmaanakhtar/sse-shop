@@ -71,6 +71,13 @@
       "when": 1794564756718,
       "tag": "0009_drop_promotion_href",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1794566538258,
+      "tag": "0010_wishlists_and_theme",
+      "breakpoints": true
     }
   ]
 }

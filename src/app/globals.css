@@ -22,3 +22,43 @@
     -webkit-font-smoothing: antialiased;
   }
 }
+
+/* Dark mode is scoped to the storefront shell so the admin stays light. */
+.storefront-shell {
+  color-scheme: light;
+}
+
+.storefront-shell[data-theme="dark"] {
+  color-scheme: dark;
+  --color-brand: #c026d3;
+  --color-brand-soft: #3b0764;
+  --color-ink: #f4f4f5;
+  --color-muted: #a1a1aa;
+  --color-line: #27272a;
+  --color-surface: #18181b;
+  --color-page: #09090b;
+}
+
+@media (prefers-color-scheme: dark) {
+  .storefront-shell[data-theme="system"] {
+    color-scheme: dark;
+    --color-brand: #c026d3;
+    --color-brand-soft: #3b0764;
+    --color-ink: #f4f4f5;
+    --color-muted: #a1a1aa;
+    --color-line: #27272a;
+    --color-surface: #18181b;
+    --color-page: #09090b;
+  }
+}
+
+/* Match the page behind the shell so overscroll never flashes light. */
+body:has(.storefront-shell[data-theme="dark"]) {
+  background: #09090b;
+}
+
+@media (prefers-color-scheme: dark) {
+  body:has(.storefront-shell[data-theme="system"]) {
+    background: #09090b;
+  }
+}

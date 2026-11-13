@@ -8,6 +8,7 @@ export const metadata = { title: "Account" };
 const nav = [
   { href: "/account", label: "Overview" },
   { href: "/account/orders", label: "Orders" },
+  { href: "/account/wishlists", label: "Wishlist" },
   { href: "/account/addresses", label: "Addresses" },
 ];
 

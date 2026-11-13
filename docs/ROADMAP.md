@@ -3,9 +3,9 @@
 Sequenced so every phase leaves a working store. A phase is done when its completion criteria
 hold, not when the code is written.
 
-**Current:** Phase 4 complete. Sales, promotions, categories, collections, and badges are live; Phase 5
-(wishlist) is next. The final phase is a full UI redesign of layout, theme, and design language.
-No-code control is a continuous background stream, not a numbered phase.
+**Current:** Phase 4 complete. Phase 5 complete. Phase 6 in progress — dark mode is live; Arabic
+translation, RTL, and numerals are next. The final phase is a full UI redesign of layout, theme, and
+design language. No-code control is a continuous background stream, not a numbered phase.
 
 ## Phase 0 — Foundation
 
@@ -103,28 +103,39 @@ shareable collections.
 
 ## Phase 5 — Wishlist
 
-- Private named wishlists per customer; account-only.
-- One price-drop email per wishlisted variant after the price first falls below the price at the
-  time it was added. Sale prices count. No repeat until the variant is removed and added again.
-- Deduplicate the same variant across a customer's lists so one drop sends one email.
-- Checkout from a wishlist and move an item into the cart.
+**Status: complete.**
+
+- **Lists (done):** private named wishlists per customer, account-only. Every customer has one
+  default “Saved” list plus optional named lists. The product detail page saves the selected
+  variant to one or more lists through a small selector; signed-out shoppers are prompted to sign
+  in. Lists can be created, renamed, and deleted, except the default.
+- **Price alerts (done):** one email per customer and variant when the effective price first falls
+  below the highest price at which it was saved. Sale prices count. Alerts are claimed atomically,
+  deduplicated across all of a customer's lists, and reset only after the variant is removed from
+  every list. Checks run lazily on wishlist/product reads and after an admin price or sale change.
+  Real email delivery still waits for Phase 7; the console mailer is used now.
+- **Checkout (done):** the customer selects items in a list, adds them to the cart, and continues to
+  checkout. Unavailable items stay visible and removable but cannot be selected.
 
 **Done when** a price change produces exactly one email for the first qualifying drop, and the
-wishlist survives sign-in on another device.
+wishlist survives sign-in on another device. Both are covered by integration and Playwright tests.
 
 **Note:** real email delivery lands in Phase 7. Until then, alerts use the console mailer in
 development.
 
 ## Phase 6 — Experience
 
-- **Dark mode:** storefront follows the operating system by default; the customer can override and
-  the choice persists. Admin stays light for now.
+**Status: in progress — dark mode shipped; Arabic next.**
+
+- **Dark mode (done):** the storefront follows the operating system by default. The customer can
+  choose Auto, Light, or Dark; the cookie persists per browser and a signed-in preference follows
+  them to another device. The palette is scoped to the storefront, so admin stays light.
 - **Arabic:** interface-only translation with a language toggle, RTL layout, and per-customer
   choice of Arabic-Indic or Latin numerals for prices. Product and category content stays English
   initially; admin stays English.
 
 **Done when** both themes and both languages render correctly, prices keep the same integer value,
-and a customer's choices survive a return visit.
+and a customer's choices survive a return visit. Dark mode is complete; Arabic is not.
 
 ## Phase 7 — Real money and mail
 
@@ -222,13 +233,17 @@ These shape upcoming work. Answers land in `CONTEXT.md`, an ADR, or this file.
 - **Sales:** per-variant sale price with an Asia/Dubai schedule; the effective price is the lower
   active price, used by the storefront, cart, checkout, and order snapshot, with a countdown and an
   audit entry.
-- **Wishlist:** private named lists; first qualifying drop sends one email, including sale prices.
+- **Wishlist:** private named lists with one default “Saved” list; the product detail page saves the
+  selected variant to one or more lists. One alert per customer and variant, using the highest saved
+  price across lists, with an atomic claim row and lazy checks. Selected items add to the cart, then
+  checkout.
 - **Carousel:** manually managed slides with image, headline, CTA, schedule, active flag, and
   ordering. A slide targets a category, collection, or product by id; categories and collections use
   a dropdown and products use a selector modal. The storefront resolves the slug at read time. It
   auto-advances, pauses on hover/focus, and has arrows and dots.
 - **Arabic:** interface-only first, per-customer numerals, storefront only.
-- **Dark mode:** customer toggle with system default; admin stays light.
+- **Dark mode:** Auto, Light, or Dark with system default; cookie for guests and account persistence
+  for signed-in customers; storefront only.
 - **Roadmap order:** accounts → variations/images → sales/promotions → categories/collections →
   wishlist → dark mode → Arabic → real payments/email → hardening → full UI redesign. No-code control
   is continuous.

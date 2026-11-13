@@ -14,6 +14,8 @@ const envSchema = z.object({
   BETTER_AUTH_URL: z.string().min(1, "BETTER_AUTH_URL is required"),
   /** Extra origins allowed to call Better Auth, comma separated. */
   BETTER_AUTH_TRUSTED_ORIGINS: z.string().optional(),
+  /** Keep true in production; the Playwright server turns it off to run many sign-ins. */
+  BETTER_AUTH_RATE_LIMIT: z.enum(["true", "false"]).default("true"),
 
   NEXT_PUBLIC_STORE_URL: z.string().default("http://localhost:3000"),
   ADMIN_HOST: z.string().default("admin.localhost"),

@@ -1,10 +1,12 @@
 import Link from "next/link";
+import { ThemeSwitcher } from "@/components/storefront/theme-switcher";
+import type { ThemePreference } from "@/lib/theme";
 import { getAuthSession } from "@/server/auth/guard";
 import { getCartItemCount } from "@/server/services/cart";
 import { listCategoryTree } from "@/server/services/categories";
 import { getStoreSettings } from "@/server/services/settings";
 
-export async function SiteHeader() {
+export async function SiteHeader({ theme }: { theme: ThemePreference }) {
   const [cartCount, settings, session, categories] = await Promise.all([
     getCartItemCount(),
     getStoreSettings(),
@@ -19,7 +21,8 @@ export async function SiteHeader() {
           {settings.name}
         </Link>
 
-        <nav className="flex items-center gap-6 text-sm">
+        <nav className="flex items-center gap-5 text-sm">
+          <ThemeSwitcher value={theme} />
           <Link
             href={session ? "/account" : "/account/sign-in"}
             className="text-muted transition-colors hover:text-ink"

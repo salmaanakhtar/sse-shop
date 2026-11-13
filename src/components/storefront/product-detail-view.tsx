@@ -12,8 +12,15 @@ import {
 } from "@/lib/variants";
 import { badgeToneClass } from "@/lib/badges";
 import type { ProductDetail } from "@/server/services/catalog";
+import type { WishlistStateForProduct } from "@/server/services/wishlists";
 
-export function ProductDetailView({ product }: { product: ProductDetail }) {
+export function ProductDetailView({
+  product,
+  wishlist,
+}: {
+  product: ProductDetail;
+  wishlist: WishlistStateForProduct | null;
+}) {
   const tree = useMemo(() => buildVariantTree(product.nodes), [product.nodes]);
 
   const [selectedIds, setSelectedIds] = useState<string[]>(() => {
@@ -126,6 +133,7 @@ export function ProductDetailView({ product }: { product: ProductDetail }) {
               nodes={product.nodes}
               selectedIds={selectedIds}
               onSelectedIdsChange={handleSelection}
+              wishlist={wishlist}
             />
           </div>
         </div>

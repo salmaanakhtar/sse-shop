@@ -31,6 +31,10 @@ import {
   getVariantTree,
   updateVariantNode,
 } from "../services/variant-tree";
+import {
+  checkWishlistPriceDropsForVariant,
+  checkWishlistPriceDropsForVariants,
+} from "../services/wishlists";
 
 function backToProduct(productId: string, error?: string, anchor?: string): never {
   const query = error ? `?error=${encodeURIComponent(error)}` : "";
@@ -504,6 +508,10 @@ export async function updateVariantAction(formData: FormData): Promise<void> {
     backToProduct(productId, "Could not save the variant. Is the SKU unique?", "variants");
   }
 
+  await checkWishlistPriceDropsForVariant(variantId).catch((error) => {
+    console.error("wishlist price check failed", error);
+  });
+
   revalidatePath(`/admin/products/${productId}`);
   revalidatePath("/");
   backToProduct(productId, undefined, "variants");
@@ -583,6 +591,10 @@ export async function updateVariantSaleAction(formData: FormData): Promise<void>
     });
   });
 
+  await checkWishlistPriceDropsForVariant(variantId).catch((error) => {
+    console.error("wishlist price check failed", error);
+  });
+
   revalidatePath(`/admin/products/${productId}`);
   revalidatePath("/");
   backToProduct(productId, undefined, "variants");
@@ -613,6 +625,10 @@ export async function bulkUpdateVariantsAction(formData: FormData): Promise<void
   });
 
   if (!result.ok) backToProduct(productId, result.error, "variants");
+
+  await checkWishlistPriceDropsForVariants(variantIds).catch((error) => {
+    console.error("wishlist price check failed", error);
+  });
 
   revalidatePath(`/admin/products/${productId}`);
   revalidatePath("/");

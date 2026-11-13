@@ -1,13 +1,14 @@
 import { headers } from "next/headers";
 import { notFound, redirect } from "next/navigation";
+import { cache } from "react";
 import { env } from "@/lib/env";
 import { auth } from "./index";
 
 const requiresTwoFactor = env.ADMIN_REQUIRE_TWO_FACTOR === "true";
 
-export async function getAuthSession() {
-  return auth.api.getSession({ headers: await headers() });
-}
+export const getAuthSession = cache(async () =>
+  auth.api.getSession({ headers: await headers() }),
+);
 
 /**
  * Page guard. Middleware routes the admin host, but every page and action

@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import { SiteFooter, SiteHeader } from "@/components/storefront/site-header";
+import { getThemePreference } from "@/server/services/preferences";
 import { getStoreSettings } from "@/server/services/settings";
 
 // Every storefront page renders a cart-aware header, so nothing here can be
@@ -7,11 +8,15 @@ import { getStoreSettings } from "@/server/services/settings";
 export const dynamic = "force-dynamic";
 
 export default async function StorefrontLayout({ children }: { children: ReactNode }) {
-  const settings = await getStoreSettings();
+  const [settings, theme] = await Promise.all([getStoreSettings(), getThemePreference()]);
 
   return (
-    <div className="flex min-h-screen flex-col">
-      <SiteHeader />
+    <div
+      id="storefront"
+      data-theme={theme}
+      className="storefront-shell flex min-h-screen flex-col bg-page text-ink"
+    >
+      <SiteHeader theme={theme} />
       <main className="flex-1">{children}</main>
       <SiteFooter storeName={settings.name} />
     </div>

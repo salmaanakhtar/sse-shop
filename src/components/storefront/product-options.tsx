@@ -4,10 +4,12 @@ import { useRouter } from "next/navigation";
 import { useMemo, useState, useTransition } from "react";
 import { addToCartAction } from "@/app/(storefront)/cart-actions";
 import { SaleCountdown } from "@/components/storefront/sale-countdown";
+import { WishlistSaveButton } from "@/components/storefront/wishlist-save-button";
 import { Button } from "@/components/ui/button";
 import { formatMoney } from "@/lib/money";
 import { activeSalePrice, discountPercent } from "@/lib/sale";
 import { cn } from "@/lib/utils";
+import type { WishlistStateForProduct } from "@/server/services/wishlists";
 import {
   buildVariantTree,
   firstAvailableLeaf,
@@ -28,9 +30,16 @@ type Props = {
   nodes: VariantNodeView[];
   selectedIds: string[];
   onSelectedIdsChange: (ids: string[]) => void;
+  wishlist: WishlistStateForProduct | null;
 };
 
-export function ProductOptions({ options, nodes, selectedIds, onSelectedIdsChange }: Props) {
+export function ProductOptions({
+  options,
+  nodes,
+  selectedIds,
+  onSelectedIdsChange,
+  wishlist,
+}: Props) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [message, setMessage] = useState<{ kind: "ok" | "error"; text: string } | null>(null);
@@ -180,6 +189,16 @@ export function ProductOptions({ options, nodes, selectedIds, onSelectedIdsChang
           >
             {message.text}
           </p>
+        ) : null}
+
+        {variant ? (
+          <WishlistSaveButton
+            key={variant.id}
+            variantId={variant.id}
+            lists={wishlist?.lists ?? []}
+            selectedListIds={wishlist?.memberships[variant.id] ?? []}
+            signedIn={Boolean(wishlist)}
+          />
         ) : null}
       </div>
     </div>

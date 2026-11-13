@@ -51,6 +51,10 @@ without replacing it.
 15. **Merchandising** - admin creates a parent category and a child, assigns a product, and sees the
     navbar and both category pages; creates a collection, adds the product, and sees the home row and
     collection page; creates a badge, assigns it, and sees it on the card and detail page.
+16. **Wishlist** - a customer creates a named list, saves the selected variant to the default and
+    named list, opens the list, selects the item, and lands on checkout with it in the cart.
+17. **Dark mode** - a customer signs in, chooses Dark, reloads and keeps it, then signs in from a
+    fresh browser context and sees the saved account preference.
 
 ## Vitest setup
 
@@ -161,6 +165,17 @@ assignment, and the badges on a catalog card. The admin e2e creates the parent/c
 collection, and the badge, then checks the navbar, category pages, home row, collection page, card,
 and detail page.
 
+Wishlist tests cover default-list idempotence, named-list creation and renaming, duplicate names,
+the default-delete guard, multi-list membership, keeping the first saved price, one alert per
+customer and variant, no repeat while any list still holds it, reset after removing it from every
+list, sale-price drops, and alert cleanup when a list is deleted. The mailer is a mock; the tests
+assert one message and its content. The Playwright journey creates a named list, saves to two lists,
+opens one, and checks out.
+
+Theme tests cover accepted values and cookie-versus-account precedence. The Playwright journey
+checks the system default, switches to dark, reloads to prove the cookie persists, and signs in from
+a fresh context to prove the account preference follows the customer.
+
 Rules that keep unit tests honest:
 
 - Time comes from an injected clock or `vi.setSystemTime`. No `new Date()` in tested code.
@@ -206,14 +221,17 @@ known catalog with predictable prices, a small category tree, two collections, t
 user whose password and TOTP secret come from env vars, and a low-stock variant used by the
 stock-limit spec.
 
+The Playwright server sets `BETTER_AUTH_RATE_LIMIT=false` because the suite signs in several
+customers from one IP. Production keeps the default rate limit on.
+
 Admin authentication is captured once into `tests/e2e/.auth/admin.json` via `storageState`, using a
 setup project that runs first. The setup signs in through the real form, enrols TOTP when the
 admin config requires it, and generates codes with `otplib`; the file is gitignored. Do not sign in
 through the UI in every spec; that tests the form six times and makes flakes stack up.
 
 The account specs create customers with a unique `customer-…@example.com` address. Global setup
-deletes those customers, their carts, sessions, and addresses between runs, so a rerun starts clean
-without touching the seeded admin.
+deletes those customers, their carts, sessions, addresses, wishlists, and theme preferences between
+runs, so a rerun starts clean without touching the seeded admin.
 
 Locator rules:
 

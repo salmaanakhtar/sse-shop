@@ -41,6 +41,8 @@ export const users = pgTable("users", {
   role: userRole("role").notNull().default("customer"),
   /** E.164, e.g. +971501234567. Optional; delivery addresses carry their own. */
   phone: text("phone"),
+  /** system | light | dark; the storefront cookie overrides it per browser. */
+  themePreference: text("theme_preference").notNull().default("system"),
   twoFactorEnabled: boolean("two_factor_enabled").notNull().default(false),
   /** Set when a customer deletes their account; the row is a tombstone for orders. */
   deletedAt: timestamp("deleted_at", { withTimezone: true, mode: "date" }),
@@ -304,6 +306,77 @@ export const customerAddresses = pgTable(
     uniqueIndex("customer_addresses_default_billing_uq")
       .on(table.userId)
       .where(sql`${table.isDefaultBilling}`),
+  ],
+);
+
+/* ─────────────────────────── wishlists ─────────────────────────── */
+
+/**
+ * Every customer owns one default list named "Saved"; extra lists are optional.
+ * The partial unique index keeps exactly one default per customer.
+ */
+export const wishlists = pgTable(
+  "wishlists",
+  {
+    id: id(),
+    userId: text("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    name: text("name").notNull(),
+    isDefault: boolean("is_default").notNull().default(false),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (table) => [
+    index("wishlists_user_id_idx").on(table.userId),
+    uniqueIndex("wishlists_default_uq").on(table.userId).where(sql`${table.isDefault}`),
+    uniqueIndex("wishlists_user_name_uq").on(table.userId, table.name),
+  ],
+);
+
+/**
+ * `added_price_minor` is the effective price at the moment the variant was
+ * saved. It is the threshold for the one price-drop alert.
+ */
+export const wishlistItems = pgTable(
+  "wishlist_items",
+  {
+    wishlistId: text("wishlist_id")
+      .notNull()
+      .references(() => wishlists.id, { onDelete: "cascade" }),
+    variantId: text("variant_id")
+      .notNull()
+      .references(() => variants.id, { onDelete: "cascade" }),
+    addedPriceMinor: integer("added_price_minor").notNull(),
+    createdAt: createdAt(),
+  },
+  (table) => [
+    primaryKey({ columns: [table.wishlistId, table.variantId] }),
+    index("wishlist_items_variant_id_idx").on(table.variantId),
+  ],
+);
+
+/**
+ * One alert per customer and variant, across all named lists. The row is
+ * removed only when the customer no longer has the variant in any list, so a
+ * removal and re-add can alert again.
+ */
+export const wishlistAlerts = pgTable(
+  "wishlist_alerts",
+  {
+    userId: text("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    variantId: text("variant_id")
+      .notNull()
+      .references(() => variants.id, { onDelete: "cascade" }),
+    sentAt: timestamp("sent_at", { withTimezone: true, mode: "date" })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [
+    primaryKey({ columns: [table.userId, table.variantId] }),
+    index("wishlist_alerts_variant_id_idx").on(table.variantId),
   ],
 );
 

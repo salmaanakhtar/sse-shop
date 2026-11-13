@@ -47,11 +47,11 @@ rules.
 
 ## Data model
 
-Twenty-six tables, deliberately narrow. Core tables carry `created_at`; most carry `updated_at`; join
-tables stay minimal.
+Twenty-nine tables, deliberately narrow. Core tables carry `created_at`; most carry `updated_at`;
+join tables stay minimal.
 | Table | Holds | Notes |
 | --- | --- | --- |
-| `users` | Admin and customer identity | `role` is `admin` or `customer`; `phone`; `deleted_at` tombstones a deleted customer |
+| `users` | Admin and customer identity | `role` is `admin` or `customer`; `phone`; `theme_preference`; `deleted_at` tombstones a deleted customer |
 | `sessions` | Session records | Token stored hashed, never raw |
 | `accounts` | Password credentials | Better Auth |
 | `verifications` | Short-lived tokens | Email verification, password reset |
@@ -69,6 +69,9 @@ tables stay minimal.
 | `badges` | Reusable card label | `label` unique; tone and `position` |
 | `product_badges` | Product ↔ badge | Many-to-many; composite primary key |
 | `customer_addresses` | Saved delivery and billing addresses | one default of each per customer, partial unique indexes |
+| `wishlists` | Named private lists | one default per customer; unique name per customer |
+| `wishlist_items` | Saved variants | composite key; stores the effective price when saved |
+| `wishlist_alerts` | One alert per customer and variant | prevents repeat mail across named lists |
 | `carts` | One basket per shopper token | Token hashed; `expires_at`; `user_id` links a signed-in cart |
 | `cart_items` | Variants in a cart | Unique on `(cart_id, variant_id)` |
 | `orders` | Placed order and its totals | `number` unique and sequential; `user_id` links the owner; `billing_address` snapshot |
@@ -101,6 +104,12 @@ tables stay minimal.
   order. An inactive or empty collection is omitted from the home page.
 - A badge label is unique and only active badges render. A product can carry several badges, shown
   top-left on its card; the sale flag stays top-right.
+- Every customer has at most one default wishlist, and it cannot be deleted. A variant may appear in
+  several lists; the first saved price is kept per item.
+- A price-drop alert is claimed by a unique `(user_id, variant_id)` row before mail is sent, so two
+  concurrent reads cannot send twice. Removing the variant from every list releases the claim.
+- The storefront theme is scoped to `.storefront-shell`; the admin inherits the light palette even
+  when the shopper chose dark.
 - Stored order totals must be reproducible from their lines. If they disagree, the bug is in
   placement, not in the display.
 - A cart is consumed when its order is placed; it never becomes the same cart again.
@@ -240,6 +249,41 @@ several badges. Every create, update, delete, reorder, and assignment writes an 
   exposes previous/next and dot controls. A single slide renders without controls.
 - because destinations are entity ids, a slide cannot become an open redirect or a `javascript:`
   link.
+
+## Wishlists and price alerts
+
+Wishlists are account-only and private:
+
+- `wishlists` holds named lists. `ensureDefaultWishlist` lazily creates the one default list,
+  “Saved”; the partial unique index makes that safe under concurrency. Extra lists are created,
+  renamed, and deleted by the customer.
+- `wishlist_items` stores variants, not products, plus `added_price_minor` — the effective price at
+  the moment the variant was saved. Saving the same variant to another list keeps the first item's
+  threshold; the product detail dialog can save to several lists at once.
+- The save control is on the product detail page because the customer is choosing a variant. It
+  opens a small selector with the customer's lists. Signed-out shoppers see a sign-in prompt.
+- A wishlist page lets the customer select items, add them to the cart, and continue to checkout.
+  Unavailable items stay visible and removable but cannot be selected.
+
+Price alerts are evaluated lazily, because there is no scheduler yet:
+
+- the wishlist index and detail pages check the current customer; a product page checks that
+  customer's items for the product; an admin price or sale change checks the affected variants.
+- `wishlist_alerts` is a `(user_id, variant_id)` claim row. The evaluator inserts it with
+  `on_conflict_do_nothing` before calling the mailer, so concurrent reads cannot send duplicates.
+  A failed send deletes the claim so a later read can retry.
+- the effective price (including an active sale) must fall below the highest saved price across the
+  customer's lists. One email covers all lists. Deleting the last wishlist item for that variant
+  removes the claim, so removing and re-adding can alert again.
+- mail uses the console driver until Phase 7.
+
+## Storefront theme
+
+The storefront supports Auto, Light, and Dark. Auto follows `prefers-color-scheme`; an explicit
+choice is stored in an httpOnly cookie and, for a signed-in customer, on `users.theme_preference`.
+The cookie wins on that browser; otherwise the account preference applies. The palette is applied
+as CSS variables on `.storefront-shell`, so the admin stays light regardless of the shopper's
+choice. The theme switcher sits in the storefront header.
 
 ## Cart and checkout
 

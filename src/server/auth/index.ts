@@ -57,6 +57,9 @@ export const auth = betterAuth({
     minPasswordLength: 12,
     autoSignIn: true,
   },
+  rateLimit: {
+    enabled: env.BETTER_AUTH_RATE_LIMIT === "true",
+  },
   session: {
     expiresIn: 60 * 60 * 24 * 30,
     updateAge: 60 * 60 * 24,

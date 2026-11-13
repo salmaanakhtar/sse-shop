@@ -178,13 +178,15 @@ subheadline, a call to action, a destination, and a schedule.
 ## Wishlist
 
 **Wishlist**:
-A named, private list of variants owned by one customer.
+A named, private list of variants owned by one customer. Every customer has one default list
+named Saved for one-click saves, and may create extra lists such as Gifts or Eid.
 _Avoid_: Favourites, saved items
 
 **Wishlist alert**:
-The one price-drop email sent for a wishlisted variant after its price first falls below the price
-at the time it was added. Sale prices count; the alert does not repeat until the variant is
-removed and added again.
+The one price-drop email sent for a wishlisted variant after its effective price first falls below
+the price when it was saved. Sale prices count. The threshold is the highest saved price across the
+customer's lists; one email covers all lists, and it does not repeat until the variant is removed
+from every list and saved again.
 _Avoid_: Price watch, notification
 
 ## Experience
@@ -193,6 +195,11 @@ _Avoid_: Price watch, notification
 A customer-selected storefront theme that follows the operating system by default. The admin
 stays light for now.
 _Avoid_: Night theme
+
+**Theme preference**:
+The customer's choice of Auto, Light, or Dark. A browser cookie persists it for guests and wins on
+that device; a signed-in customer's saved preference follows them to another browser.
+_Avoid_: Color scheme, skin
 
 **Locale**:
 The customer's chosen storefront language. The first Arabic release translates the interface

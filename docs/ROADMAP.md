@@ -237,7 +237,10 @@ and a customer's choices survive a return visit. Both are complete and covered b
 
 ## Phase 7 — Real money and mail
 
-Previously Phase 2; moved behind the storefront work.
+**Status: in progress.** Order lifecycle, manual refunds, VAT invoices, shipping zones, stock and
+cart notifications, marketing email, and analytics are complete. Stripe, real SMTP delivery,
+email verification, and self-service password reset remain, deliberately deferred to the
+deploy-ready stage.
 
 - Stripe Checkout behind the existing `PaymentProvider` interface, webhook-verified and idempotent.
 - Real transactional email: order confirmation, shipping notice, verification, password reset.

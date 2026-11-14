@@ -24,8 +24,10 @@ their order history, review a purchased product, request cancellation or return,
 invoice, and claim a guest order with its lookup token. An admin can sign in with TOTP, build only
 the variant branches that exist, set sale prices and windows, manage products, images, carousel
 slides, categories, collections, badges, homepage sections, legal pages, and reviews, fulfil orders
-with tracking, approve returns, record refunds, issue invoices, and review customers and their
-orders. Payments are simulated behind a provider interface. See
+with tracking, approve returns, record refunds, issue invoices, edit shipping bands, run campaigns,
+and review customers and their orders. Payments are simulated behind a provider interface, and mail
+goes to the console. Phase 7 is otherwise complete; Stripe, real SMTP delivery, email verification,
+password reset, hardening, and the full UI redesign remain. See
 [`docs/ROADMAP.md`](docs/ROADMAP.md).
 
 ## Stack

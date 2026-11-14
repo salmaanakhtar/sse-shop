@@ -203,6 +203,50 @@ async function seedLowStockProduct() {
   });
 }
 
+async function seedSoldOutProduct() {
+  await db.delete(products).where(eq(products.slug, "sold-out-tote"));
+
+  const [product] = await db
+    .insert(products)
+    .values({
+      slug: "sold-out-tote",
+      title: "Sold Out Tote",
+      description: "Single-variant product seeded for back-in-stock testing.",
+      status: "active",
+      publishedAt: new Date(),
+    })
+    .returning({ id: products.id });
+  if (!product) throw new Error("failed to insert the sold-out product");
+
+  const [variant] = await db
+    .insert(variants)
+    .values({
+      productId: product.id,
+      sku: "TOTE-ONE",
+      title: "Default",
+      priceMinor: 9_000,
+      stockQty: 0,
+      weightGrams: 300,
+    })
+    .returning({ id: variants.id });
+  if (!variant) throw new Error("failed to insert the sold-out variant");
+
+  await db.insert(variantNodes).values({
+    productId: product.id,
+    parentId: null,
+    optionId: null,
+    optionValueId: null,
+    label: "Default",
+    position: 0,
+    active: true,
+    defaultPriceMinor: 9_000,
+    defaultStockQty: 0,
+    variantId: variant.id,
+  });
+
+  console.info("seeded sold-out-tote");
+}
+
 async function seedTaxonomy() {
   const [apparel] = await db
     .insert(categories)
@@ -678,6 +722,7 @@ async function main() {
   await seedAdmin();
   await seedDemoProduct();
   await seedLowStockProduct();
+  await seedSoldOutProduct();
   await seedTaxonomy();
   await seedShippingZones();
   await seedLegalPages();

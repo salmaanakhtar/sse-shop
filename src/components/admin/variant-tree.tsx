@@ -463,6 +463,19 @@ function BranchInspector({
               Used for emirate weight bands. Blank ships in the lightest band.
             </p>
           </div>
+          <div>
+            <Label htmlFor={`inspector-low-stock-${node.variant.id}`}>
+              Low-stock threshold override
+            </Label>
+            <Input
+              id={`inspector-low-stock-${node.variant.id}`}
+              name="lowStockThreshold"
+              type="number"
+              min={0}
+              placeholder="Use the store threshold"
+              defaultValue={node.variant.lowStockThreshold ?? ""}
+            />
+          </div>
           <label className="flex items-center gap-2 text-sm">
             <input
               type="checkbox"

@@ -177,6 +177,8 @@ export const variants = pgTable(
     saleEndsAt: timestamp("sale_ends_at", { withTimezone: true, mode: "date" }),
     stockQty: integer("stock_qty").notNull().default(0),
     weightGrams: integer("weight_grams"),
+    /** Null uses the store-wide low-stock threshold from settings. */
+    lowStockThreshold: integer("low_stock_threshold"),
     position: integer("position").notNull().default(0),
     active: boolean("active").notNull().default(true),
     createdAt: createdAt(),
@@ -422,6 +424,47 @@ export const wishlistAlerts = pgTable(
   ],
 );
 
+/* ─────────────────────── notifications ─────────────────────── */
+
+/** A guest or customer waiting for one variant to return to stock. */
+export const stockAlerts = pgTable(
+  "stock_alerts",
+  {
+    id: id(),
+    variantId: text("variant_id")
+      .notNull()
+      .references(() => variants.id, { onDelete: "cascade" }),
+    email: text("email").notNull(),
+    /** Set when the alert came from a signed-in customer. */
+    userId: text("user_id").references(() => users.id, { onDelete: "set null" }),
+    consentAt: timestamp("consent_at", { withTimezone: true, mode: "date" }).notNull().defaultNow(),
+    notifiedAt: timestamp("notified_at", { withTimezone: true, mode: "date" }),
+    createdAt: createdAt(),
+  },
+  (table) => [
+    uniqueIndex("stock_alerts_variant_email_uq").on(table.variantId, table.email),
+    index("stock_alerts_pending_idx").on(table.variantId, table.notifiedAt),
+  ],
+);
+
+/**
+ * One open low-stock alert per variant. The row is removed when stock rises
+ * above the threshold, so the next crossing sends exactly one more email.
+ */
+export const lowStockAlerts = pgTable(
+  "low_stock_alerts",
+  {
+    id: id(),
+    variantId: text("variant_id")
+      .notNull()
+      .unique()
+      .references(() => variants.id, { onDelete: "cascade" }),
+    stockQty: integer("stock_qty").notNull(),
+    createdAt: createdAt(),
+  },
+  (table) => [index("low_stock_alerts_created_at_idx").on(table.createdAt)],
+);
+
 /* ─────────────────────────── carts ─────────────────────────── */
 
 export const carts = pgTable(
@@ -455,6 +498,20 @@ export const cartItems = pgTable(
   },
   (table) => [uniqueIndex("cart_items_cart_variant_uq").on(table.cartId, table.variantId)],
 );
+
+/** One recovery email per signed-in cart; the unique cart id enforces it. */
+export const abandonedCartEmails = pgTable("abandoned_cart_emails", {
+  id: id(),
+  cartId: text("cart_id")
+    .notNull()
+    .unique()
+    .references(() => carts.id, { onDelete: "cascade" }),
+  userId: text("user_id")
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  sentAt: timestamp("sent_at", { withTimezone: true, mode: "date" }).notNull().defaultNow(),
+  createdAt: createdAt(),
+});
 
 /* ─────────────────────────── orders ─────────────────────────── */
 

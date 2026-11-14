@@ -12,8 +12,8 @@ continuous background stream, not a numbered phase.
 **Completion program:** security/foundation fixes, admin settings, homepage sections, legal pages,
 Arabic routing/RTL/numerals, search/filter/sort/pagination, SEO metadata/sitemap/JSON-LD, verified
 reviews, related products, order operations, the payment lifecycle, manual refunds, VAT invoices,
-and emirate shipping zones are in place. Back-in-stock/low-stock/abandoned-cart notifications,
-marketing email, and the analytics dashboard remain.
+emirate shipping zones, and stock/cart notifications are in place. Marketing email and the
+analytics dashboard remain.
 
 ## Phase 0 — Foundation
 
@@ -186,6 +186,22 @@ and a customer's choices survive a return visit. Dark mode is complete; Arabic i
 - Unit tests cover band boundaries, open-ended bands, gaps, thresholds, and weight validation.
   Integration tests cover zone resolution, fallback, overlap rejection, and quoting all emirates.
   A Playwright journey changes a Fujairah band and checks the checkout total and placed order.
+
+## Commerce completion — Stock and cart notifications
+
+**Status: complete.**
+
+- **Back-in-stock:** guest or signed-in capture on a sold-out variant, one-off consent, one email
+  when stock returns, and a pending count in admin.
+- **Low stock:** one internal email per threshold crossing, with a global threshold and per-variant
+  overrides. The crossing resets above the threshold; failed mail retries on the next stock change.
+- **Abandoned carts:** signed-in carts with marketing consent, at least one item, and no activity for
+  the configured delay. One email per cart; run manually from `/admin` until a scheduler exists.
+- **Hooks:** stock changes after checkout, admin edits, cancellations, and returns all run the same
+  service, so alerts are not tied to one code path.
+- **Coverage:** unit/integration tests for capture, deduplication, notification, threshold overrides,
+  crossing reset, consent, and one-email-per-cart; a Playwright journey captures a sold-out alert and
+  clears it after an admin restock.
 
 ## Phase 7 — Real money and mail
 

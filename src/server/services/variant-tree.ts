@@ -41,6 +41,7 @@ type NodeRow = {
   variantSaleEndsAt: Date | null;
   variantStockQty: number | null;
   variantWeightGrams: number | null;
+  variantLowStockThreshold: number | null;
   variantActive: boolean | null;
 };
 
@@ -69,6 +70,7 @@ async function listNodeRows(productIds: readonly string[]): Promise<NodeRow[]> {
       variantSaleEndsAt: variants.saleEndsAt,
       variantStockQty: variants.stockQty,
       variantWeightGrams: variants.weightGrams,
+      variantLowStockThreshold: variants.lowStockThreshold,
       variantActive: variants.active,
     })
     .from(variantNodes)
@@ -90,6 +92,7 @@ function toView(row: NodeRow): VariantNodeView {
           saleEndsAt: row.variantSaleEndsAt,
           stockQty: row.variantStockQty ?? 0,
           weightGrams: row.variantWeightGrams,
+          lowStockThreshold: row.variantLowStockThreshold,
           active: row.variantActive ?? false,
         }
       : null;

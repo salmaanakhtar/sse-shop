@@ -127,6 +127,13 @@
       "when": 1794632499157,
       "tag": "0017_shipping_zones",
       "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "7",
+      "when": 1794633221236,
+      "tag": "0018_notifications",
+      "breakpoints": true
     }
   ]
 }

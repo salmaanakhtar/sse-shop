@@ -305,6 +305,23 @@ The provider's identifier for a charge, written when the provider reports paymen
 provider it is a local placeholder.
 _Avoid_: Transaction id, charge id
 
+## Notifications
+
+**Back-in-stock alert**:
+A guest or customer's one-off request to be emailed when a specific sold-out variant returns. The
+email happens once; the consent covers that single message, not marketing.
+_Avoid_: Waitlist, stock subscription
+
+**Low-stock alert**:
+An internal email to the store when a variant falls to its threshold. One alert per crossing; the
+crossing resets when stock rises above the threshold.
+_Avoid_: Inventory warning, restock alert
+
+**Abandoned cart**:
+A signed-in cart with items, marketing consent, no completed order, and no activity for the
+configured number of hours. One recovery email is sent per cart.
+_Avoid_: Lost cart, recovery
+
 ## Running the store
 
 **Settings**:

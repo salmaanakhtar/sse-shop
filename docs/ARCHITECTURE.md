@@ -47,7 +47,7 @@ rules.
 
 ## Data model
 
-Thirty-nine tables, deliberately narrow. Core tables carry `created_at`; most carry `updated_at`;
+Forty-two tables, deliberately narrow. Core tables carry `created_at`; most carry `updated_at`;
 join tables stay minimal.
 | Table | Holds | Notes |
 | --- | --- | --- |
@@ -73,6 +73,9 @@ join tables stay minimal.
 | `wishlists` | Named private lists | one default per customer; unique name per customer |
 | `wishlist_items` | Saved variants | composite key; stores the effective price when saved |
 | `wishlist_alerts` | One alert per customer and variant | prevents repeat mail across named lists |
+| `stock_alerts` | Back-in-stock requests | unique on `(variant_id, email)`; one email then marked notified |
+| `low_stock_alerts` | Open low-stock crossing per variant | row removed above threshold so the next crossing alerts again |
+| `abandoned_cart_emails` | One recovery email per cart | unique cart id |
 | `carts` | One basket per shopper token | Token hashed; `expires_at`; `user_id` links a signed-in cart |
 | `cart_items` | Variants in a cart | Unique on `(cart_id, variant_id)` |
 | `orders` | Placed order, totals, and fulfillment state | `number` unique and sequential; status/payment state; tracking; invoice number; refund total; cancellation/return timestamps |
@@ -444,6 +447,24 @@ pending ──► confirmed ──► processing ──► shipped ──► del
   does not consume a tax-invoice sequence.
 - Persian/Arabic customer names cannot be encoded by the built-in PDF fonts; the PDF route replaces
   unsupported glyphs rather than failing. Embedding a Unicode font is the later fix.
+
+## Stock and cart notifications
+
+- **Back-in-stock:** a sold-out variant shows a form on the product page. The request stores a
+  lowercased email with its consent time and is unique per variant and email. A later restock sends
+  one email per pending request and marks it notified. Signed-in requests use the account email.
+- **Low stock:** `processStockChanges` runs after checkout, admin stock edits, cancellation, and
+  return restock. For each affected variant it compares stock with the per-variant override or the
+  store threshold, sends one admin email per crossing, and deletes the open row when stock rises
+  above the threshold. A failed send deletes the row so the next run can retry.
+- **Abandoned carts:** signed-in only, marketing consent required, at least one item, no activity
+  for `cart.abandoned_hours` (4 by default), not expired, and not already emailed. Activity is the
+  later of the cart and its newest item timestamp.
+- With no scheduler yet, `/admin` exposes a manual "Send abandoned-cart emails" and "Check low stock
+  now" action and shows pending back-in-stock and eligible-cart counts. The services are the seam a
+  cron job will call later.
+- Mail still goes through the console driver; every message is a plain-text body built in the
+  service. Real delivery is deferred to the deploy-ready phase.
 
 ## Customer accounts and addresses
 

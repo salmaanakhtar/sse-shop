@@ -8,6 +8,7 @@ export type VariantLeaf = {
   saleEndsAt: Date | string | null;
   stockQty: number;
   weightGrams: number | null;
+  lowStockThreshold: number | null;
   active: boolean;
 };
 

@@ -64,6 +64,8 @@ without replacing it.
     approves the return, records a partial refund, issues a tax invoice, and downloads the PDF.
 21. **Shipping zones** - an admin changes an emirate weight band; a shopper selects that emirate at
     checkout, sees the band charge in the total, and the placed order keeps it.
+22. **Stock alerts** - a shopper requests a back-in-stock email for a sold-out variant, admin shows
+    one pending request, an admin restock clears it.
 
 ## Vitest setup
 
@@ -200,6 +202,12 @@ free-delivery threshold, and negative weight rejection at the pure layer; zone c
 rejection, inactive fallback, unconfigured-emirate fallback, all-seven-emirate quotes, and band
 deletion at the service layer. The Playwright journey changes a Fujairah band, checks the checkout
 delivery charge and total, and places the order.
+
+Notification tests cover one back-in-stock request per variant and email, refusal for an in-stock
+item, one send and a notified mark after restock, one low-stock email per crossing, threshold
+reset, per-variant overrides, and abandoned-cart consent, one-email-per-cart, and activity cutoff.
+The Playwright journey captures a sold-out alert, checks the admin pending count, restocks, and sees
+the count clear.
 
 Theme tests cover accepted values and cookie-versus-account precedence. The Playwright journey
 checks the system default, switches to dark, reloads to prove the cookie persists, and signs in from

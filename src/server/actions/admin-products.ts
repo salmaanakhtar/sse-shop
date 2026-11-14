@@ -21,6 +21,7 @@ import {
 } from "../db/schema";
 import { storeProductImage, uploadsRoot } from "../media/storage";
 import { slugify } from "../services/catalog";
+import { processStockChanges } from "../services/notifications";
 import {
   bulkUpdateVariantLeaves,
   copyVariantChildren,
@@ -427,6 +428,10 @@ export async function createLeafVariantAction(formData: FormData): Promise<void>
 
   if (!result.ok) backToProduct(productId, result.error, "variants");
 
+  await processStockChanges([result.data.variantId]).catch((error) => {
+    console.error("stock notifications failed", error);
+  });
+
   revalidatePath(`/admin/products/${productId}`);
   revalidatePath("/");
   backToProduct(productId, undefined, "variants");
@@ -460,6 +465,10 @@ export async function createDefaultVariantAction(formData: FormData): Promise<vo
 
   if (!result.ok) backToProduct(productId, result.error, "variants");
 
+  await processStockChanges([result.data.variantId]).catch((error) => {
+    console.error("stock notifications failed", error);
+  });
+
   revalidatePath(`/admin/products/${productId}`);
   revalidatePath("/");
   backToProduct(productId, undefined, "variants");
@@ -482,6 +491,11 @@ export async function updateVariantAction(formData: FormData): Promise<void> {
   const weightGrams = readOptionalWeight(formData, "weightGrams");
   if (weightGrams === "invalid") {
     backToProduct(productId, "Enter a valid weight in grams", "variants");
+  }
+
+  const lowStockThreshold = readOptionalStock(formData, "lowStockThreshold");
+  if (lowStockThreshold === "invalid") {
+    backToProduct(productId, "Enter a valid low-stock threshold", "variants");
   }
 
   const sku = String(formData.get("sku") ?? "").trim();
@@ -513,6 +527,7 @@ export async function updateVariantAction(formData: FormData): Promise<void> {
           priceMinor: price,
           stockQty: stock,
           weightGrams,
+          lowStockThreshold,
           sku,
           title: title || "Default",
           active,
@@ -534,6 +549,10 @@ export async function updateVariantAction(formData: FormData): Promise<void> {
 
   await checkWishlistPriceDropsForVariant(variantId).catch((error) => {
     console.error("wishlist price check failed", error);
+  });
+
+  await processStockChanges([variantId]).catch((error) => {
+    console.error("stock notifications failed", error);
   });
 
   revalidatePath(`/admin/products/${productId}`);
@@ -652,6 +671,10 @@ export async function bulkUpdateVariantsAction(formData: FormData): Promise<void
 
   await checkWishlistPriceDropsForVariants(variantIds).catch((error) => {
     console.error("wishlist price check failed", error);
+  });
+
+  await processStockChanges(variantIds).catch((error) => {
+    console.error("stock notifications failed", error);
   });
 
   revalidatePath(`/admin/products/${productId}`);

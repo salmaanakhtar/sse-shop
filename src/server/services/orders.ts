@@ -20,6 +20,7 @@ import {
 } from "../db/schema";
 import { mailer } from "../mail";
 import { paymentProvider } from "../payments";
+import { processStockChanges } from "./notifications";
 import { readCartIdForCheckout } from "./cart";
 import { getStoreSettings } from "./settings";
 import { resolveShippingRate } from "./shipping";
@@ -385,6 +386,10 @@ export async function placeOrder(input: {
       });
   }
 
+  await processStockChanges(committed.lines.map((line) => line.variantId)).catch((error) => {
+    console.error("stock notifications after checkout failed", error);
+  });
+
   return ok({
     number: committed.number,
     lookupToken: lookup.token,
@@ -628,8 +633,9 @@ async function addOrderEvent(
   await tx.insert(orderEvents).values({ orderId, type, message, actorUserId });
 }
 
-async function restockOrder(tx: OrderTx, orderId: string): Promise<void> {
+async function restockOrder(tx: OrderTx, orderId: string): Promise<string[]> {
   const items = await tx.select().from(orderItems).where(eq(orderItems.orderId, orderId));
+  const variantIds: string[] = [];
   for (const item of items) {
     if (!item.variantId) continue;
     await tx
@@ -639,7 +645,9 @@ async function restockOrder(tx: OrderTx, orderId: string): Promise<void> {
         updatedAt: new Date(),
       })
       .where(eq(variants.id, item.variantId));
+    variantIds.push(item.variantId);
   }
+  return variantIds;
 }
 
 async function sendShippingEmail(order: typeof orders.$inferSelect): Promise<void> {
@@ -753,13 +761,18 @@ export async function cancelOrder(
     return fail("This order can no longer be cancelled. Use the return flow.");
   }
 
+  let restocked: string[] = [];
   await db.transaction(async (tx) => {
-    await restockOrder(tx, id);
+    restocked = await restockOrder(tx, id);
     await tx
       .update(orders)
       .set({ status: "cancelled", cancelledAt: new Date(), updatedAt: new Date() })
       .where(eq(orders.id, id));
     await addOrderEvent(tx, id, "cancelled", "Order cancelled and stock restored.", actorUserId);
+  });
+
+  await processStockChanges(restocked).catch((error) => {
+    console.error("stock notifications after cancellation failed", error);
   });
 
   return ok({ status: "cancelled" });
@@ -890,13 +903,18 @@ export async function approveOrderReturn(
     return fail("Only a requested return can be approved.");
   }
 
+  let restocked: string[] = [];
   await db.transaction(async (tx) => {
-    await restockOrder(tx, id);
+    restocked = await restockOrder(tx, id);
     await tx
       .update(orders)
       .set({ status: "returned", returnReceivedAt: new Date(), updatedAt: new Date() })
       .where(eq(orders.id, id));
     await addOrderEvent(tx, id, "returned", "Return received and stock restored.", actorUserId);
+  });
+
+  await processStockChanges(restocked).catch((error) => {
+    console.error("stock notifications after return failed", error);
   });
 
   return ok({ status: "returned" });

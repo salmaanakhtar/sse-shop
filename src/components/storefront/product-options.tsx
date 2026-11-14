@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useMemo, useState, useTransition } from "react";
 import { addToCartAction } from "@/app/(storefront)/cart-actions";
+import { BackInStockForm } from "@/components/storefront/back-in-stock-form";
 import { SaleCountdown } from "@/components/storefront/sale-countdown";
 import { useStorePreferences } from "@/components/storefront/store-preferences";
 import { WishlistSaveButton } from "@/components/storefront/wishlist-save-button";
@@ -187,6 +188,8 @@ export function ProductOptions({
               ? t("product.adding")
               : t("product.addToCart")}
         </Button>
+
+        {soldOut && variant ? <BackInStockForm key={variant.id} variantId={variant.id} /> : null}
 
         {message ? (
           <p

@@ -43,6 +43,7 @@ content. For a truly fresh run, drop and recreate `sse_shop_manual`, then migrat
 | `pnpm lint` | Pass |
 | Vitest unit + integration | 26 files, 154 tests, pass |
 | Playwright journeys | 27, pass on a pristine database and on repeat runs |
+| Admin TOTP-required enrolment + admin suite | 8 targeted tests, pass with `ADMIN_REQUIRE_TWO_FACTOR=true` |
 | Production `next build` with no database reachable | Pass |
 | Docker image build | Pass |
 | Container boot, startup migrations, health, home, admin sign-in, sitemap | Pass |

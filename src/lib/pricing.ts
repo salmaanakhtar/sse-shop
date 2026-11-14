@@ -19,7 +19,10 @@ export type CartTotals = {
 
 export type PriceCartInput = {
   lines: readonly PricedLine[];
-  shipping: ShippingSettings;
+  /** Compute the charge from the flat rule. Ignored when `shippingMinor` is set. */
+  shipping?: ShippingSettings;
+  /** An already-resolved charge, e.g. from an emirate zone and weight band. */
+  shippingMinor?: number;
   /** Basis points: 500 = 5%. */
   taxRateBp: number;
   discountMinor?: number;
@@ -42,7 +45,19 @@ export function priceCart(input: PriceCartInput): CartTotals {
     subtotalMinor += line.unitPriceMinor * line.quantity;
   }
 
-  const shippingMinor = shippingFor(subtotalMinor, input.shipping);
+  let shippingMinor: number;
+  if (input.shippingMinor !== undefined) {
+    if (!Number.isInteger(input.shippingMinor) || input.shippingMinor < 0) {
+      throw new TypeError(
+        `shipping must be a non-negative integer, received ${input.shippingMinor}`,
+      );
+    }
+    shippingMinor = input.shippingMinor;
+  } else if (input.shipping) {
+    shippingMinor = shippingFor(subtotalMinor, input.shipping);
+  } else {
+    throw new TypeError("priceCart needs either a shipping rule or a resolved shipping charge");
+  }
   const gross = subtotalMinor + shippingMinor;
 
   const requestedDiscount = input.discountMinor ?? 0;

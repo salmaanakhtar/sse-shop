@@ -22,6 +22,7 @@ import { mailer } from "../mail";
 import { paymentProvider } from "../payments";
 import { readCartIdForCheckout } from "./cart";
 import { getStoreSettings } from "./settings";
+import { resolveShippingRate } from "./shipping";
 
 export type { Address };
 
@@ -156,7 +157,14 @@ export async function placeOrder(input: {
     discountMinor: number;
     taxMinor: number;
     totalMinor: number;
-    lines: { variantId: string; sku: string; title: string; unitPriceMinor: number; quantity: number }[];
+    lines: {
+      variantId: string;
+      sku: string;
+      title: string;
+      unitPriceMinor: number;
+      quantity: number;
+      weightGrams: number;
+    }[];
   };
 
   let committed: Committed;
@@ -192,6 +200,7 @@ export async function placeOrder(input: {
           saleStartsAt: variants.saleStartsAt,
           saleEndsAt: variants.saleEndsAt,
           stockQty: variants.stockQty,
+          weightGrams: variants.weightGrams,
           active: variants.active,
           productTitle: products.title,
           productStatus: products.status,
@@ -224,18 +233,30 @@ export async function placeOrder(input: {
           title: `${variant.productTitle} — ${variant.variantTitle}`,
           unitPriceMinor: effectivePriceMinor(variant.priceMinor, variant, now),
           quantity: item.quantity,
+          weightGrams: variant.weightGrams ?? 0,
         });
       }
+
+      const subtotalMinor = lines.reduce(
+        (sum, line) => sum + line.unitPriceMinor * line.quantity,
+        0,
+      );
+      const weightGrams = lines.reduce(
+        (sum, line) => sum + line.weightGrams * line.quantity,
+        0,
+      );
+      const delivery = await resolveShippingRate(
+        address.data.emirate,
+        subtotalMinor,
+        weightGrams,
+      );
 
       const totals = priceCart({
         lines: lines.map((line) => ({
           unitPriceMinor: line.unitPriceMinor,
           quantity: line.quantity,
         })),
-        shipping: {
-          flatRateMinor: settings.shippingFlatRateMinor,
-          freeThresholdMinor: settings.shippingFreeThresholdMinor,
-        },
+        shippingMinor: delivery.rateMinor,
         taxRateBp: settings.taxRateBp,
       });
 

@@ -40,6 +40,7 @@ type NodeRow = {
   variantSaleStartsAt: Date | null;
   variantSaleEndsAt: Date | null;
   variantStockQty: number | null;
+  variantWeightGrams: number | null;
   variantActive: boolean | null;
 };
 
@@ -67,6 +68,7 @@ async function listNodeRows(productIds: readonly string[]): Promise<NodeRow[]> {
       variantSaleStartsAt: variants.saleStartsAt,
       variantSaleEndsAt: variants.saleEndsAt,
       variantStockQty: variants.stockQty,
+      variantWeightGrams: variants.weightGrams,
       variantActive: variants.active,
     })
     .from(variantNodes)
@@ -87,6 +89,7 @@ function toView(row: NodeRow): VariantNodeView {
           saleStartsAt: row.variantSaleStartsAt,
           saleEndsAt: row.variantSaleEndsAt,
           stockQty: row.variantStockQty ?? 0,
+          weightGrams: row.variantWeightGrams,
           active: row.variantActive ?? false,
         }
       : null;
@@ -492,6 +495,7 @@ export async function createLeafVariant(input: {
   priceMinor: number;
   stockQty: number;
   sku?: string;
+  weightGrams?: number | null;
 }): Promise<Result<{ variantId: string }>> {
   const product = await requireProduct(input.productId);
   if (!product) return fail("Product not found.");
@@ -537,6 +541,7 @@ export async function createLeafVariant(input: {
         title: labels.join(" / ") || "Default",
         priceMinor: input.priceMinor,
         stockQty: input.stockQty,
+        weightGrams: input.weightGrams ?? null,
         position: node.position,
         active: node.active,
       })
@@ -611,6 +616,7 @@ export async function createDefaultVariant(input: {
   priceMinor: number;
   stockQty: number;
   sku?: string;
+  weightGrams?: number | null;
 }): Promise<Result<{ variantId: string }>> {
   const product = await requireProduct(input.productId);
   if (!product) return fail("Product not found.");
@@ -652,6 +658,7 @@ export async function createDefaultVariant(input: {
         title: "Default",
         priceMinor: input.priceMinor,
         stockQty: input.stockQty,
+        weightGrams: input.weightGrams ?? null,
         position: 0,
         active: true,
       })

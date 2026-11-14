@@ -448,6 +448,21 @@ function BranchInspector({
               />
             </div>
           </div>
+          <div>
+            <Label htmlFor={`inspector-weight-${node.variant.id}`}>Weight (grams)</Label>
+            <Input
+              id={`inspector-weight-${node.variant.id}`}
+              name="weightGrams"
+              type="number"
+              min={0}
+              placeholder="e.g. 250"
+              defaultValue={node.variant.weightGrams ?? ""}
+              data-testid="variant-weight"
+            />
+            <p className="mt-1 text-[11px] text-muted">
+              Used for emirate weight bands. Blank ships in the lightest band.
+            </p>
+          </div>
           <label className="flex items-center gap-2 text-sm">
             <input
               type="checkbox"
@@ -489,6 +504,16 @@ function BranchInspector({
               min={0}
               required
               defaultValue={node.defaultStockQty ?? 10}
+            />
+          </div>
+          <div>
+            <Label htmlFor={`inspector-leaf-weight-${node.id}`}>Weight (grams)</Label>
+            <Input
+              id={`inspector-leaf-weight-${node.id}`}
+              name="weightGrams"
+              type="number"
+              min={0}
+              placeholder="e.g. 250"
             />
           </div>
           <div>
@@ -722,6 +747,16 @@ export function VariantTreeEditor({
         <div className="w-28">
           <Label htmlFor="default-stock">Stock</Label>
           <Input id="default-stock" name="stock" type="number" min={0} placeholder="10" required />
+        </div>
+        <div className="w-32">
+          <Label htmlFor="default-weight">Weight (g)</Label>
+          <Input
+            id="default-weight"
+            name="weightGrams"
+            type="number"
+            min={0}
+            placeholder="250"
+          />
         </div>
         <div className="w-44">
           <Label htmlFor="default-sku">SKU (optional)</Label>

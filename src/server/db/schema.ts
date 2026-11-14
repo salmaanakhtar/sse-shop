@@ -816,6 +816,45 @@ export const counters = pgTable("counters", {
   updatedAt: updatedAt(),
 });
 
+/* ─────────────────────────── shipping ─────────────────────────── */
+
+/** One zone per emirate. The zone owns the free-delivery threshold. */
+export const shippingZones = pgTable(
+  "shipping_zones",
+  {
+    id: id(),
+    emirate: text("emirate").notNull().unique(),
+    name: text("name").notNull().default(""),
+    freeThresholdMinor: integer("free_threshold_minor").notNull().default(20_000),
+    active: boolean("active").notNull().default(true),
+    position: integer("position").notNull().default(0),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (table) => [index("shipping_zones_active_idx").on(table.active, table.position)],
+);
+
+/**
+ * Weight bands inside a zone. `maxWeightGrams` is inclusive; null means the
+ * band is open-ended. The admin keeps bands non-overlapping and contiguous.
+ */
+export const shippingBands = pgTable(
+  "shipping_bands",
+  {
+    id: id(),
+    zoneId: text("zone_id")
+      .notNull()
+      .references(() => shippingZones.id, { onDelete: "cascade" }),
+    minWeightGrams: integer("min_weight_grams").notNull(),
+    maxWeightGrams: integer("max_weight_grams"),
+    rateMinor: integer("rate_minor").notNull(),
+    position: integer("position").notNull().default(0),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (table) => [index("shipping_bands_zone_idx").on(table.zoneId, table.minWeightGrams)],
+);
+
 /**
  * Fixed-window counters for public mutations. A database-backed limiter keeps
  * a single VPS restart from resetting abuse protection.

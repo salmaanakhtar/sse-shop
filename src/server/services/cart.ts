@@ -31,6 +31,8 @@ export type CartLine = {
   regularPriceMinor: number;
   quantity: number;
   stockQty: number;
+  /** Null until the merchant records a weight in the variant editor. */
+  weightGrams: number | null;
   lineTotalMinor: number;
   imageKey: string | null;
   available: boolean;
@@ -42,6 +44,8 @@ export type CartView = {
   totals: CartTotals;
   currency: "AED";
   itemCount: number;
+  /** Sum of line weights; checkout maps it to an emirate band. */
+  weightGrams: number;
 };
 
 function hashToken(token: string): string {
@@ -256,6 +260,7 @@ export async function loadCart(cartId: string): Promise<CartView> {
       saleStartsAt: variants.saleStartsAt,
       saleEndsAt: variants.saleEndsAt,
       stockQty: variants.stockQty,
+      weightGrams: variants.weightGrams,
       variantActive: variants.active,
       productId: products.id,
       productTitle: products.title,
@@ -303,6 +308,7 @@ export async function loadCart(cartId: string): Promise<CartView> {
       regularPriceMinor: row.priceMinor,
       quantity: row.quantity,
       stockQty: row.stockQty,
+      weightGrams: row.weightGrams,
       lineTotalMinor: unitPriceMinor * row.quantity,
       imageKey: imageByProduct.get(row.productId) ?? null,
       available:
@@ -325,6 +331,10 @@ export async function loadCart(cartId: string): Promise<CartView> {
     totals,
     currency: "AED",
     itemCount: lines.reduce((sum, line) => sum + line.quantity, 0),
+    weightGrams: lines.reduce(
+      (sum, line) => sum + Math.max(0, line.weightGrams ?? 0) * line.quantity,
+      0,
+    ),
   };
 }
 

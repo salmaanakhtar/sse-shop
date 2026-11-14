@@ -312,12 +312,23 @@ Store-wide configuration the admin changes without a deploy — name, theme, con
 shipping rules.
 _Avoid_: Config, options, preferences
 
+**Shipping zone**:
+The delivery rules for one emirate: whether it is active, its free-delivery threshold, and its
+weight bands.
+_Avoid_: Region, governorate
+
+**Weight band**:
+A weight range inside a shipping zone with one delivery charge. Bands are contiguous and do not
+overlap; the top band may be open-ended.
+_Avoid_: Tier, slab
+
 **Shipping rate**:
-The flat amount charged for delivery, waived once an order reaches the free-shipping threshold.
+The amount charged for delivery. It comes from the emirate zone and cart weight; the store flat rate
+is the fallback when a zone is inactive or no band covers the weight.
 _Avoid_: Delivery fee, postage, P&P
 
 **Free-shipping threshold**:
-The item subtotal at which shipping becomes free.
+The item subtotal at which shipping becomes free, set per zone.
 _Avoid_: Minimum order, free delivery limit
 
 **Audit Entry**:

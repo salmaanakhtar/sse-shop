@@ -7,6 +7,7 @@ export type VariantLeaf = {
   saleStartsAt: Date | string | null;
   saleEndsAt: Date | string | null;
   stockQty: number;
+  weightGrams: number | null;
   active: boolean;
 };
 

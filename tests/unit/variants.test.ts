@@ -30,6 +30,7 @@ const leaf = (id: string, label: string, stockQty: number): VariantNodeView => (
     saleStartsAt: null,
     saleEndsAt: null,
     stockQty,
+    weightGrams: 250,
     active: true,
   },
 });

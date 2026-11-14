@@ -13,7 +13,7 @@ Phase 4 and Phase 5 are complete. Phase 6 is in progress: dark mode is live and 
 `/ar`/RTL/numeral foundation is shipped, with translation QA and secondary account copy still
 pending. Per-variant sales, promotion pages, category/collection/badge merchandising, search,
 SEO, verified reviews, related products, admin-editable settings, homepage sections, legal pages,
-order operations, and VAT invoices are live. A shopper can browse, search and filter, choose a
+order operations, VAT invoices, and emirate shipping zones with weight bands are live. A shopper can browse, search and filter, choose a
 parent branch and child, save variants to named wishlists, receive one console-mailed price-drop
 alert, add a wishlist selection to the cart, check out with a UAE address, and receive an order
 with a lookup link. They can also create an account with saved delivery and billing addresses, see

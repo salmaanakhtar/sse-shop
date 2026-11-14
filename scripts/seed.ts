@@ -8,6 +8,8 @@ import {
   homeSections,
   pages,
   productBadges,
+  shippingBands,
+  shippingZones,
   productCategories,
   productOptionValues,
   productOptions,
@@ -132,6 +134,7 @@ async function seedDemoProduct() {
           title: `${colour} / ${size}`,
           priceMinor,
           stockQty: 25,
+          weightGrams: 250,
           position: colourIndex * 2 + sizeIndex,
         })
         .returning({ id: variants.id });
@@ -180,6 +183,7 @@ async function seedLowStockProduct() {
       title: "Default",
       priceMinor: 4_500,
       stockQty: 2,
+      weightGrams: 100,
     })
     .returning({ id: variants.id });
 
@@ -382,6 +386,115 @@ async function seedTaxonomy() {
   console.info("seeded categories, collections, and badges");
 }
 
+const SHIPPING_ZONES: {
+  emirate: string;
+  freeThresholdMinor: number;
+  bands: [number, number | null, number][];
+}[] = [
+  {
+    emirate: "Abu Dhabi",
+    freeThresholdMinor: 25_000,
+    bands: [
+      [0, 2_000, 2_500],
+      [2_001, 5_000, 3_500],
+      [5_001, null, 4_500],
+    ],
+  },
+  {
+    emirate: "Dubai",
+    freeThresholdMinor: 20_000,
+    bands: [
+      [0, 2_000, 2_000],
+      [2_001, 5_000, 3_000],
+      [5_001, null, 4_000],
+    ],
+  },
+  {
+    emirate: "Sharjah",
+    freeThresholdMinor: 20_000,
+    bands: [
+      [0, 2_000, 2_000],
+      [2_001, 5_000, 3_000],
+      [5_001, null, 4_000],
+    ],
+  },
+  {
+    emirate: "Ajman",
+    freeThresholdMinor: 20_000,
+    bands: [
+      [0, 2_000, 2_000],
+      [2_001, 5_000, 3_000],
+      [5_001, null, 4_000],
+    ],
+  },
+  {
+    emirate: "Umm Al Quwain",
+    freeThresholdMinor: 30_000,
+    bands: [
+      [0, 2_000, 3_000],
+      [2_001, 5_000, 4_000],
+      [5_001, null, 5_000],
+    ],
+  },
+  {
+    emirate: "Ras Al Khaimah",
+    freeThresholdMinor: 30_000,
+    bands: [
+      [0, 2_000, 3_000],
+      [2_001, 5_000, 4_000],
+      [5_001, null, 5_000],
+    ],
+  },
+  {
+    emirate: "Fujairah",
+    freeThresholdMinor: 30_000,
+    bands: [
+      [0, 2_000, 3_000],
+      [2_001, 5_000, 4_000],
+      [5_001, null, 5_000],
+    ],
+  },
+];
+
+async function seedShippingZones() {
+  for (const [index, zone] of SHIPPING_ZONES.entries()) {
+    const [row] = await db
+      .insert(shippingZones)
+      .values({
+        emirate: zone.emirate,
+        name: zone.emirate,
+        freeThresholdMinor: zone.freeThresholdMinor,
+        active: true,
+        position: index,
+      })
+      .onConflictDoUpdate({
+        target: shippingZones.emirate,
+        set: { freeThresholdMinor: zone.freeThresholdMinor, updatedAt: new Date() },
+      })
+      .returning({ id: shippingZones.id });
+    if (!row) throw new Error(`failed to seed the ${zone.emirate} shipping zone`);
+
+    const [existing] = await db
+      .select({ id: shippingBands.id })
+      .from(shippingBands)
+      .where(eq(shippingBands.zoneId, row.id))
+      .limit(1);
+    if (existing) continue;
+
+    await db.insert(shippingBands).values(
+      zone.bands.map(([min, max, rate], position) => ({
+        zoneId: row.id,
+        minWeightGrams: min,
+        maxWeightGrams: max,
+        rateMinor: rate,
+        position,
+      })),
+    );
+  }
+
+  console.info("seeded shipping zones and weight bands");
+}
+
 async function seedLegalPages() {
   const existing = await db.select({ slug: pages.slug }).from(pages);
   const existingSlugs = new Set(existing.map((row) => row.slug));
@@ -566,6 +679,7 @@ async function main() {
   await seedDemoProduct();
   await seedLowStockProduct();
   await seedTaxonomy();
+  await seedShippingZones();
   await seedLegalPages();
   await seedHomeContent();
   console.info("done");

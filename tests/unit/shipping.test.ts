@@ -1,5 +1,12 @@
 import { describe, expect, it } from "vitest";
-import { amountUntilFreeShipping, DEFAULT_SHIPPING, shippingFor } from "@/lib/shipping";
+import {
+  amountUntilFreeShipping,
+  bandForWeight,
+  DEFAULT_SHIPPING,
+  shippingFor,
+  zoneShippingFor,
+  type ShippingBand,
+} from "@/lib/shipping";
 
 const settings = { flatRateMinor: 2_000, freeThresholdMinor: 20_000 };
 
@@ -44,5 +51,56 @@ describe("amountUntilFreeShipping", () => {
 
   it("reports zero when shipping is always free", () => {
     expect(amountUntilFreeShipping(1_000, { flatRateMinor: 0, freeThresholdMinor: 0 })).toBe(0);
+  });
+});
+
+const bands: ShippingBand[] = [
+  { minWeightGrams: 0, maxWeightGrams: 2_000, rateMinor: 2_000 },
+  { minWeightGrams: 2_001, maxWeightGrams: 5_000, rateMinor: 3_000 },
+  { minWeightGrams: 5_001, maxWeightGrams: null, rateMinor: 4_000 },
+];
+
+describe("bandForWeight", () => {
+  it("matches inclusive band boundaries", () => {
+    expect(bandForWeight(bands, 0)?.rateMinor).toBe(2_000);
+    expect(bandForWeight(bands, 2_000)?.rateMinor).toBe(2_000);
+    expect(bandForWeight(bands, 2_001)?.rateMinor).toBe(3_000);
+    expect(bandForWeight(bands, 5_000)?.rateMinor).toBe(3_000);
+  });
+
+  it("treats a null maximum as the open-ended top band", () => {
+    expect(bandForWeight(bands, 5_001)?.rateMinor).toBe(4_000);
+    expect(bandForWeight(bands, 50_000)?.rateMinor).toBe(4_000);
+  });
+
+  it("returns null when a gap leaves the weight uncovered", () => {
+    expect(bandForWeight([{ minWeightGrams: 0, maxWeightGrams: 1_000, rateMinor: 2_000 }], 1_001)).toBeNull();
+  });
+});
+
+describe("zoneShippingFor", () => {
+  const zone = { freeThresholdMinor: 20_000, bands };
+
+  it("charges the band for the cart weight", () => {
+    expect(zoneShippingFor(5_000, 1_500, zone)).toBe(2_000);
+    expect(zoneShippingFor(5_000, 3_000, zone)).toBe(3_000);
+    expect(zoneShippingFor(5_000, 8_000, zone)).toBe(4_000);
+  });
+
+  it("waives the charge at the zone threshold", () => {
+    expect(zoneShippingFor(19_999, 3_000, zone)).toBe(3_000);
+    expect(zoneShippingFor(20_000, 3_000, zone)).toBe(0);
+  });
+
+  it("returns null instead of guessing when no band matches", () => {
+    const gapZone = {
+      freeThresholdMinor: 20_000,
+      bands: [{ minWeightGrams: 0, maxWeightGrams: 1_000, rateMinor: 2_000 }],
+    };
+    expect(zoneShippingFor(5_000, 2_000, gapZone)).toBeNull();
+  });
+
+  it("rejects a negative weight", () => {
+    expect(() => zoneShippingFor(5_000, -1, zone)).toThrow(TypeError);
   });
 });

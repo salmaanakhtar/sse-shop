@@ -105,4 +105,22 @@ describe("priceCart", () => {
       priceCart({ lines: [{ unitPriceMinor: -1, quantity: 1 }], shipping, taxRateBp }),
     ).toThrow(TypeError);
   });
+
+  it("uses a resolved zone charge instead of the flat rule", () => {
+    const totals = priceCart({
+      lines: [{ unitPriceMinor: 10_000, quantity: 1 }],
+      shipping,
+      shippingMinor: 3_500,
+      taxRateBp,
+    });
+
+    expect(totals.shippingMinor).toBe(3_500);
+    expect(totals.totalMinor).toBe(13_500);
+  });
+
+  it("requires either a shipping rule or a resolved charge", () => {
+    expect(() =>
+      priceCart({ lines: [{ unitPriceMinor: 1_000, quantity: 1 }], taxRateBp }),
+    ).toThrow(TypeError);
+  });
 });

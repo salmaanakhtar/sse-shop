@@ -61,6 +61,14 @@ function readOptionalStock(formData: FormData, name: string): number | null | "i
   return Number.isInteger(value) && value >= 0 ? value : "invalid";
 }
 
+/** Variant weight in grams; blank means "unknown", which ships in the base band. */
+function readOptionalWeight(formData: FormData, name: string): number | null | "invalid" {
+  const raw = String(formData.get(name) ?? "").trim();
+  if (raw === "") return null;
+  const value = Number(raw);
+  return Number.isInteger(value) && value >= 0 && value <= 1_000_000 ? value : "invalid";
+}
+
 export async function createProductAction(formData: FormData): Promise<void> {
   await requireAdminAction();
 
@@ -396,6 +404,7 @@ export async function createLeafVariantAction(formData: FormData): Promise<void>
   const nodeId = requireText(formData.get("nodeId"), "Branch id");
   const priceMinor = readOptionalMoney(formData, "price");
   const stockQty = readOptionalStock(formData, "stock");
+  const weightGrams = readOptionalWeight(formData, "weightGrams");
 
   if (priceMinor === null || priceMinor === "invalid") {
     backToProduct(productId, "Enter a valid price", "variants");
@@ -403,12 +412,16 @@ export async function createLeafVariantAction(formData: FormData): Promise<void>
   if (stockQty === null || stockQty === "invalid") {
     backToProduct(productId, "Enter a valid stock count", "variants");
   }
+  if (weightGrams === "invalid") {
+    backToProduct(productId, "Enter a valid weight in grams", "variants");
+  }
 
   const result = await createLeafVariant({
     productId,
     nodeId,
     priceMinor,
     stockQty,
+    weightGrams,
     sku: String(formData.get("sku") ?? "").trim(),
   });
 
@@ -425,6 +438,7 @@ export async function createDefaultVariantAction(formData: FormData): Promise<vo
   const productId = requireText(formData.get("productId"), "Product id");
   const priceMinor = readOptionalMoney(formData, "price");
   const stockQty = readOptionalStock(formData, "stock");
+  const weightGrams = readOptionalWeight(formData, "weightGrams");
 
   if (priceMinor === null || priceMinor === "invalid") {
     backToProduct(productId, "Enter a valid price", "variants");
@@ -432,11 +446,15 @@ export async function createDefaultVariantAction(formData: FormData): Promise<vo
   if (stockQty === null || stockQty === "invalid") {
     backToProduct(productId, "Enter a valid stock count", "variants");
   }
+  if (weightGrams === "invalid") {
+    backToProduct(productId, "Enter a valid weight in grams", "variants");
+  }
 
   const result = await createDefaultVariant({
     productId,
     priceMinor,
     stockQty,
+    weightGrams,
     sku: String(formData.get("sku") ?? "").trim(),
   });
 
@@ -459,6 +477,11 @@ export async function updateVariantAction(formData: FormData): Promise<void> {
   const stock = Number(formData.get("stock") ?? 0);
   if (!Number.isInteger(stock) || stock < 0) {
     backToProduct(productId, "Enter a valid stock count", "variants");
+  }
+
+  const weightGrams = readOptionalWeight(formData, "weightGrams");
+  if (weightGrams === "invalid") {
+    backToProduct(productId, "Enter a valid weight in grams", "variants");
   }
 
   const sku = String(formData.get("sku") ?? "").trim();
@@ -489,6 +512,7 @@ export async function updateVariantAction(formData: FormData): Promise<void> {
         .set({
           priceMinor: price,
           stockQty: stock,
+          weightGrams,
           sku,
           title: title || "Default",
           active,

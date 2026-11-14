@@ -62,6 +62,8 @@ without replacing it.
 20. **Order operations** - a shopper places a guest order; an admin starts processing, ships with
     tracking, and marks it delivered; the shopper requests a return and sees tracking; the admin
     approves the return, records a partial refund, issues a tax invoice, and downloads the PDF.
+21. **Shipping zones** - an admin changes an emirate weight band; a shopper selects that emirate at
+    checkout, sees the band charge in the total, and the placed order keeps it.
 
 ## Vitest setup
 
@@ -192,6 +194,12 @@ shipping mail, refusing cancellation after dispatch, cancellation restock, custo
 requests, in-window and out-of-window return requests, approval restock, partial and full refunds
 with the total cap, and idempotent, sequential invoice numbering. The Playwright journey drives the
 same path through the admin UI, the guest order page, and the PDF download.
+
+Shipping tests cover inclusive band boundaries, the open-ended top band, an uncovered weight, the
+free-delivery threshold, and negative weight rejection at the pure layer; zone creation, overlap
+rejection, inactive fallback, unconfigured-emirate fallback, all-seven-emirate quotes, and band
+deletion at the service layer. The Playwright journey changes a Fujairah band, checks the checkout
+delivery charge and total, and places the order.
 
 Theme tests cover accepted values and cookie-versus-account precedence. The Playwright journey
 checks the system default, switches to dark, reloads to prove the cookie persists, and signs in from

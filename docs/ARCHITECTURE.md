@@ -47,7 +47,7 @@ rules.
 
 ## Data model
 
-Thirty-seven tables, deliberately narrow. Core tables carry `created_at`; most carry `updated_at`;
+Thirty-nine tables, deliberately narrow. Core tables carry `created_at`; most carry `updated_at`;
 join tables stay minimal.
 | Table | Holds | Notes |
 | --- | --- | --- |
@@ -86,6 +86,8 @@ join tables stay minimal.
 | `settings` | Store configuration | Key → JSONB, changed in admin |
 | `home_sections` | Admin-composed homepage | ordered kind/title/body/config/active |
 | `pages` | Legal and trust pages | slug, trusted HTML, published, SEO fields |
+| `shipping_zones` | One delivery zone per emirate | active flag, free-delivery threshold |
+| `shipping_bands` | Weight ranges inside a zone | non-overlapping; open-ended top band allowed |
 | `rate_limits` | Hashed fixed-window counters | protects public mutations |
 | `counters` | Monotonic sequences | Order numbers come from here, inside the placement transaction |
 
@@ -176,14 +178,27 @@ The single currency is AED. Multi-currency is out of scope until there is a reas
 
 ## Shipping
 
-One flat rate and one free-shipping threshold, both in `settings` (`shipping.flat_rate_minor`,
-`shipping.free_threshold_minor`). Shipping is free when the item subtotal reaches the threshold,
-computed on subtotal before discounts so a discount code cannot silently push an order back into
-paying for shipping.
+Delivery is priced by emirate and cart weight:
 
-The rule lives in `src/lib/shipping.ts` as a pure function taking `(subtotalMinor, settings)` and
-returning a minor amount, which makes it unit-testable without a database. Per-emirate tables and
-carrier rates replace it behind the same function signature.
+- `shipping_zones` has one row per emirate with `active`, `free_threshold_minor`, and position.
+- `shipping_bands` has non-overlapping weight ranges per zone. `max_weight_grams` is inclusive;
+  null is the open-ended top band. Each band carries one charge.
+- Every variant has an optional `weight_grams`, editable in the variant inspector. Null counts as
+  zero, so a missing weight ships in the lightest band rather than making the cart unpriceable.
+- An active zone with a band covering the weight wins. Otherwise the store `settings` flat rate and
+  free-threshold fallback apply, so a half-configured zone never removes a charge silently.
+- Free shipping compares the item subtotal before discounts, at the zone threshold, so a discount
+  cannot push an order back into paying for delivery.
+
+The rules are pure in `src/lib/shipping.ts` (`bandForWeight`, `zoneShippingFor`) and unit-tested
+without a database. `resolveShippingRate` in `src/server/services/shipping.ts` joins the zone tables
+and the fallback. Checkout quotes all seven emirates on the server and recomputes the chosen one at
+placement; the posted expected total must match or the checkout stops. The cart page shows the flat
+fallback because it has no emirate yet.
+
+Admin editing lives at `/admin/shipping`: one card per emirate, free-delivery threshold, active
+flag, and editable bands. Saving validates ranges and rejects overlaps; each change writes an audit
+entry.
 
 ## Variants and the tree
 
@@ -384,8 +399,8 @@ in Postgres behind an httpOnly cookie so a mid-session restart does not lose it,
 checked against the same row the order will lock.
 
 All totals come from one function, `priceCart()` in `src/lib/pricing.ts`: line totals
-from stored prices, shipping from the pure rule, then the VAT component extracted from the
-inclusive total. The cart page renders its result; the checkout action recomputes it and compares
+from stored prices, either the zone-resolved charge or the flat rule, then the VAT component
+extracted from the inclusive total. The cart page renders its result; the checkout action recomputes it and compares
 the shopper's expected total with the fresh one. A mismatch fails the checkout with a "prices
 changed, please review" message rather than charging a number the shopper did not see.
 

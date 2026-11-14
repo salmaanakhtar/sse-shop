@@ -1,13 +1,15 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { CheckoutForm } from "@/components/storefront/checkout-form";
-import type { Address } from "@/lib/address";
+import { EMIRATES, type Address } from "@/lib/address";
 import { localePath, translate } from "@/lib/i18n";
-import { formatMoney } from "@/lib/money";
+import { priceCart } from "@/lib/pricing";
 import { getAuthSession } from "@/server/auth/guard";
 import { getDefaultAddress } from "@/server/services/addresses";
 import { getCartView } from "@/server/services/cart";
-import { getLocale, getNumeralPreference } from "@/server/services/preferences";
+import { getLocale } from "@/server/services/preferences";
+import { getStoreSettings } from "@/server/services/settings";
+import { quoteEmirates, type Emirate } from "@/server/services/shipping";
 
 function toAddress(address: NonNullable<Awaited<ReturnType<typeof getDefaultAddress>>>): Address {
   return {
@@ -23,14 +25,13 @@ function toAddress(address: NonNullable<Awaited<ReturnType<typeof getDefaultAddr
 }
 
 export default async function CheckoutPage() {
-  const [cart, locale, numerals] = await Promise.all([
+  const [cart, locale, settings] = await Promise.all([
     getCartView(),
     getLocale(),
-    getNumeralPreference(),
+    getStoreSettings(),
   ]);
 
   if (!cart || cart.lines.length === 0) redirect(localePath(locale, "/cart"));
-  const money = (minor: number) => formatMoney(minor, { locale, numerals });
 
   const session = await getAuthSession();
   const [shipping, billing] = session
@@ -39,6 +40,29 @@ export default async function CheckoutPage() {
         getDefaultAddress(session.user.id, "billing"),
       ])
     : [null, null];
+
+  const rates = await quoteEmirates(cart.totals.subtotalMinor, cart.weightGrams);
+  const lines = cart.lines.map((line) => ({
+    unitPriceMinor: line.unitPriceMinor,
+    quantity: line.quantity,
+  }));
+  const quotes = Object.fromEntries(
+    EMIRATES.map((emirate) => {
+      const totals = priceCart({
+        lines,
+        shippingMinor: rates[emirate].rateMinor,
+        taxRateBp: settings.taxRateBp,
+      });
+      return [
+        emirate,
+        {
+          shippingMinor: totals.shippingMinor,
+          totalMinor: totals.totalMinor,
+          taxMinor: totals.taxMinor,
+        },
+      ];
+    }),
+  ) as Record<Emirate, { shippingMinor: number; totalMinor: number; taxMinor: number }>;
 
   const blocked = cart.lines.filter((line) => !line.available);
 
@@ -59,67 +83,31 @@ export default async function CheckoutPage() {
       {blocked.length > 0 ? (
         <p role="alert" className="mt-4 rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700">
           Some items are no longer available in the quantity you chose.{" "}
-          <Link href="/cart" className="underline">
+          <Link href={localePath(locale, "/cart")} className="underline">
             Review your cart
           </Link>
           .
         </p>
       ) : null}
 
-      <div className="mt-8 grid gap-10 lg:grid-cols-[1fr_340px]">
-        <CheckoutForm
-          expectedTotalMinor={cart.totals.totalMinor}
-          defaults={{
-            email: session?.user.email ?? "",
-            fullName: shipping?.fullName ?? session?.user.name ?? "",
-            phone: shipping?.phone ?? session?.user.phone ?? "",
-            shipping: shipping ? toAddress(shipping) : null,
-            billing: billing ? toAddress(billing) : null,
-            signedIn: Boolean(session),
-          }}
-        />
-
-        <aside className="h-fit rounded-xl border border-line bg-surface p-5">
-          <h2 className="text-sm font-semibold">{translate(locale, "checkout.yourOrder")}</h2>
-
-          <ul className="mt-4 space-y-3 text-sm">
-            {cart.lines.map((line) => (
-              <li key={line.itemId} className="flex justify-between gap-3">
-                <span className="min-w-0">
-                  <span className="block truncate">{line.productTitle}</span>
-                  <span className="text-xs text-muted">
-                    {line.optionLabel ? `${line.optionLabel} · ` : ""}× {line.quantity}
-                  </span>
-                </span>
-                <span className="shrink-0 tabular-nums">{money(line.lineTotalMinor)}</span>
-              </li>
-            ))}
-          </ul>
-
-          <dl className="mt-4 space-y-2 border-t border-line pt-4 text-sm">
-            <div className="flex justify-between">
-              <dt className="text-muted">{translate(locale, "checkout.subtotal")}</dt>
-              <dd className="tabular-nums">{money(cart.totals.subtotalMinor)}</dd>
-            </div>
-            <div className="flex justify-between">
-              <dt className="text-muted">{translate(locale, "checkout.delivery")}</dt>
-              <dd className="tabular-nums">
-                {cart.totals.shippingMinor === 0
-                  ? translate(locale, "checkout.free")
-                  : money(cart.totals.shippingMinor)}
-              </dd>
-            </div>
-            <div className="flex justify-between border-t border-line pt-3 text-base font-semibold">
-              <dt>{translate(locale, "checkout.total")}</dt>
-              <dd className="tabular-nums">{money(cart.totals.totalMinor)}</dd>
-            </div>
-          </dl>
-
-          <p className="mt-2 text-xs text-muted">
-            {translate(locale, "checkout.includesVat", { amount: money(cart.totals.taxMinor) })}
-          </p>
-        </aside>
-      </div>
+      <CheckoutForm
+        quotes={quotes}
+        subtotalMinor={cart.totals.subtotalMinor}
+        lineItems={cart.lines.map((line) => ({
+          itemId: line.itemId,
+          title: line.productTitle,
+          meta: `${line.optionLabel ? `${line.optionLabel} · ` : ""}× ${line.quantity}`,
+          lineTotalMinor: line.lineTotalMinor,
+        }))}
+        defaults={{
+          email: session?.user.email ?? "",
+          fullName: shipping?.fullName ?? session?.user.name ?? "",
+          phone: shipping?.phone ?? session?.user.phone ?? "",
+          shipping: shipping ? toAddress(shipping) : null,
+          billing: billing ? toAddress(billing) : null,
+          signedIn: Boolean(session),
+        }}
+      />
     </div>
   );
 }

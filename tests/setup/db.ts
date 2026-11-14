@@ -15,6 +15,8 @@ if (!testUrl) {
 process.env.DATABASE_URL = testUrl;
 
 const TRUNCATE_ORDER = [
+  "shipping_bands",
+  "shipping_zones",
   "order_events",
   "refunds",
   "order_items",

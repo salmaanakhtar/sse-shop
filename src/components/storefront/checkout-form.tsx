@@ -18,11 +18,28 @@ export type CheckoutDefaults = {
   signedIn: boolean;
 };
 
+export type CheckoutQuote = {
+  shippingMinor: number;
+  totalMinor: number;
+  taxMinor: number;
+};
+
+export type CheckoutLineView = {
+  itemId: string;
+  title: string;
+  meta: string;
+  lineTotalMinor: number;
+};
+
 export function CheckoutForm({
-  expectedTotalMinor,
+  quotes,
+  subtotalMinor,
+  lineItems,
   defaults,
 }: {
-  expectedTotalMinor: number;
+  quotes: Record<string, CheckoutQuote>;
+  subtotalMinor: number;
+  lineItems: CheckoutLineView[];
   defaults: CheckoutDefaults;
 }) {
   const [state, formAction, pending] = useActionState(checkoutAction, initialState);
@@ -30,13 +47,18 @@ export function CheckoutForm({
   const [billingSame, setBillingSame] = useState(true);
   const [saveShipping, setSaveShipping] = useState(defaults.signedIn);
   const [saveBilling, setSaveBilling] = useState(defaults.signedIn);
+  const [emirate, setEmirate] = useState<string>(defaults.shipping?.emirate ?? "Dubai");
 
   const shipping = defaults.shipping;
   const billing = defaults.billing ?? defaults.shipping;
+  const quote = quotes[emirate] ??
+    quotes.Dubai ?? { shippingMinor: 0, totalMinor: subtotalMinor, taxMinor: 0 };
 
   return (
-    <form action={formAction} className="space-y-6">
-      <input type="hidden" name="expectedTotalMinor" value={expectedTotalMinor} />
+    <form action={formAction} className="mt-8 grid gap-10 lg:grid-cols-[1fr_340px]">
+      <input type="hidden" name="expectedTotalMinor" value={quote.totalMinor} />
+
+      <div className="space-y-6">
 
       <section className="space-y-4">
         <h2 className="text-sm font-semibold">{t("checkout.contact")}</h2>
@@ -90,15 +112,21 @@ export function CheckoutForm({
             id="emirate"
             name="emirate"
             required
-            defaultValue={shipping?.emirate ?? "Dubai"}
+            value={emirate}
+            onChange={(event) => setEmirate(event.target.value)}
             className="w-full rounded-lg border border-line bg-surface px-3 py-2 text-sm focus-visible:border-brand focus-visible:outline-2 focus-visible:outline-offset-0 focus-visible:outline-brand/30"
           >
-            {EMIRATES.map((emirate) => (
-              <option key={emirate} value={emirate}>
-                {emirate}
+            {EMIRATES.map((option) => (
+              <option key={option} value={option}>
+                {option}
               </option>
             ))}
           </select>
+          <p className="mt-1.5 text-xs text-muted">
+            {quote.shippingMinor === 0
+              ? t("checkout.free")
+              : `${t("checkout.delivery")} · ${money(quote.shippingMinor)}`}
+          </p>
         </div>
 
         <div className="grid gap-4 sm:grid-cols-2">
@@ -301,13 +329,49 @@ export function CheckoutForm({
         </p>
       ) : null}
 
-      <Button type="submit" disabled={pending} className="w-full" data-testid="place-order">
-        {pending
-          ? t("checkout.saving")
-          : `${t("checkout.placeOrder")} · ${money(expectedTotalMinor)}`}
-      </Button>
+        <Button type="submit" disabled={pending} className="w-full" data-testid="place-order">
+          {pending ? t("checkout.saving") : `${t("checkout.placeOrder")} · ${money(quote.totalMinor)}`}
+        </Button>
 
-      <p className="text-center text-xs text-muted">{t("checkout.paymentHelp")}</p>
+        <p className="text-center text-xs text-muted">{t("checkout.paymentHelp")}</p>
+      </div>
+
+      <aside className="h-fit rounded-xl border border-line bg-surface p-5">
+        <h2 className="text-sm font-semibold">{t("checkout.yourOrder")}</h2>
+
+        <ul className="mt-4 space-y-3 text-sm">
+          {lineItems.map((line) => (
+            <li key={line.itemId} className="flex justify-between gap-3">
+              <span className="min-w-0">
+                <span className="block truncate">{line.title}</span>
+                <span className="text-xs text-muted">{line.meta}</span>
+              </span>
+              <span className="shrink-0 tabular-nums">{money(line.lineTotalMinor)}</span>
+            </li>
+          ))}
+        </ul>
+
+        <dl className="mt-4 space-y-2 border-t border-line pt-4 text-sm">
+          <div className="flex justify-between">
+            <dt className="text-muted">{t("checkout.subtotal")}</dt>
+            <dd className="tabular-nums">{money(subtotalMinor)}</dd>
+          </div>
+          <div className="flex justify-between">
+            <dt className="text-muted">{t("checkout.delivery")}</dt>
+            <dd className="tabular-nums">
+              {quote.shippingMinor === 0 ? t("checkout.free") : money(quote.shippingMinor)}
+            </dd>
+          </div>
+          <div className="flex justify-between border-t border-line pt-3 text-base font-semibold">
+            <dt>{t("checkout.total")}</dt>
+            <dd className="tabular-nums">{money(quote.totalMinor)}</dd>
+          </div>
+        </dl>
+
+        <p className="mt-2 text-xs text-muted">
+          {t("checkout.includesVat", { amount: money(quote.taxMinor) })}
+        </p>
+      </aside>
     </form>
   );
 }

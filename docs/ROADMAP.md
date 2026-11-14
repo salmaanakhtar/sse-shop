@@ -11,9 +11,9 @@ continuous background stream, not a numbered phase.
 
 **Completion program:** security/foundation fixes, admin settings, homepage sections, legal pages,
 Arabic routing/RTL/numerals, search/filter/sort/pagination, SEO metadata/sitemap/JSON-LD, verified
-reviews, related products, order operations, the payment lifecycle, manual refunds, and VAT invoices
-are in place. Shipping zones, back-in-stock/low-stock/abandoned-cart notifications, marketing email,
-and the analytics dashboard remain.
+reviews, related products, order operations, the payment lifecycle, manual refunds, VAT invoices,
+and emirate shipping zones are in place. Back-in-stock/low-stock/abandoned-cart notifications,
+marketing email, and the analytics dashboard remain.
 
 ## Phase 0 — Foundation
 
@@ -169,6 +169,23 @@ and a customer's choices survive a return visit. Dark mode is complete; Arabic i
   the only implementation until Phase 7.
 - **Coverage:** integration tests for each transition, restock, refund cap, and invoice numbering,
   plus an admin Playwright journey through fulfillment, return approval, refund, and PDF download.
+
+## Commerce completion — Shipping zones
+
+**Status: complete.**
+
+- One zone per emirate with an active flag, a per-zone free-delivery threshold, and non-overlapping
+  weight bands.
+- Variants carry an optional weight in grams, editable in the variant inspector and seeded for the
+  demo products. A missing weight counts as zero and uses the lightest band.
+- Checkout quotes all seven emirates on the server; changing the emirate updates delivery, total,
+  and VAT before submission. Placement re-resolves the charge and rejects a stale expected total.
+- An unconfigured, inactive, or uncovered weight falls back to the store flat rate and threshold.
+- `/admin/shipping` edits thresholds, active state, and bands with overlap validation and audit
+  entries.
+- Unit tests cover band boundaries, open-ended bands, gaps, thresholds, and weight validation.
+  Integration tests cover zone resolution, fallback, overlap rejection, and quoting all emirates.
+  A Playwright journey changes a Fujairah band and checks the checkout total and placed order.
 
 ## Phase 7 — Real money and mail
 

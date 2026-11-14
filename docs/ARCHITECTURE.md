@@ -635,9 +635,11 @@ images are public by design; there is nothing to authorize.
 | `caddy` | 80/443, ACME TLS, serves the uploads volume read-only |
 
 Images are built from the repo. The VPS pulls and restarts on deploy. Secrets come from an env file
-outside the repository with `600` permissions. The runtime entrypoint runs Drizzle migrations before
-starting the standalone server, and the uploads directory is pinned to the shared `/data/uploads`
-volume.
+outside the repository with `600` permissions. The production compose sets `RUN_MIGRATIONS=true`;
+the Next instrumentation hook applies Drizzle migrations once at server boot, before serving
+requests, using the bundled database client. Keep one web replica while migrations run this way. The
+uploads directory is pinned to the shared `/data/uploads` volume. `next build` never opens a database
+connection: the sitemap and all catalog pages are dynamic.
 
 Operationally:
 

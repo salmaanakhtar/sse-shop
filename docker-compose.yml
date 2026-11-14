@@ -11,6 +11,9 @@ services:
     environment:
       DATABASE_URL: postgres://sse_shop:${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD}@db:5432/sse_shop
       UPLOADS_DIR: /data/uploads
+      # Startup migrations run inside the Next server bundle. Keep one web
+      # replica until migrations move to a dedicated deploy job.
+      RUN_MIGRATIONS: "true"
     depends_on:
       db:
         condition: service_healthy

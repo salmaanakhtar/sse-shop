@@ -1,5 +1,9 @@
 import type { MetadataRoute } from "next";
 import { flattenCategoryTree } from "@/lib/categories";
+
+// The catalog is database data. Building must never require a live database, so
+// the sitemap is rendered per request rather than prerendered into the image.
+export const dynamic = "force-dynamic";
 import { listCatalog } from "@/server/services/catalog";
 import { listActiveCollections } from "@/server/services/collections";
 import { listCategoryTree } from "@/server/services/categories";

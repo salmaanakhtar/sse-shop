@@ -3,7 +3,6 @@
 .next
 node_modules
 coverage
-drizzle/meta
 playwright-report
 test-results
 data

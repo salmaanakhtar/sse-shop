@@ -322,6 +322,18 @@ A signed-in cart with items, marketing consent, no completed order, and no activ
 configured number of hours. One recovery email is sent per cart.
 _Avoid_: Lost cart, recovery
 
+## Analytics
+
+**Analytics event**:
+A first-party recorded view or placed order: page view, product view, or order placed. Stored in
+Postgres with the path, optional product/order link, and value.
+_Avoid_: Hit, beacon, pixel
+
+**Visitor hash**:
+A daily rotated pseudonym derived from IP, user agent, and the store secret. It groups events for
+one day without storing the address or setting a tracking cookie.
+_Avoid_: Visitor id, fingerprint
+
 ## Marketing
 
 **Subscriber**:

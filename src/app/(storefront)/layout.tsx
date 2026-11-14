@@ -1,5 +1,6 @@
 import type { CSSProperties, ReactNode } from "react";
 import type { Metadata } from "next";
+import { AnalyticsBeacon } from "@/components/storefront/analytics-beacon";
 import {
   AnnouncementBar,
   SiteFooter,
@@ -74,6 +75,7 @@ export default async function StorefrontLayout({ children }: { children: ReactNo
       className="storefront-shell flex min-h-screen flex-col bg-page text-ink"
     >
       <StorePreferencesProvider locale={locale} numerals={numerals}>
+        <AnalyticsBeacon />
         <AnnouncementBar settings={settings} />
         <SiteHeader
           theme={theme}

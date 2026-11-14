@@ -18,6 +18,7 @@ const TRUNCATE_ORDER = [
   "shipping_bands",
   "shipping_zones",
   "order_events",
+  "analytics_events",
   "refunds",
   "order_items",
   "orders",

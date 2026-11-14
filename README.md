@@ -15,7 +15,8 @@ pending. Per-variant sales, promotion pages, category/collection/badge merchandi
 SEO, verified reviews, related products, admin-editable settings, homepage sections, legal pages,
 order operations, VAT invoices, emirate shipping zones with weight bands, back-in-stock alerts,
 low-stock alerts, abandoned-cart recovery, and consent-based marketing email with double opt-in,
-suppression, and scheduled campaigns are live. A shopper can browse, search and filter, choose a
+suppression, and scheduled campaigns are live, along with a first-party analytics dashboard built
+from Postgres events. A shopper can browse, search and filter, choose a
 parent branch and child, save variants to named wishlists, receive one console-mailed price-drop
 alert, add a wishlist selection to the cart, check out with a UAE address, and receive an order
 with a lookup link. They can also create an account with saved delivery and billing addresses, see

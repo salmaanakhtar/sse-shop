@@ -5,6 +5,7 @@ import { requireAdminPage } from "@/server/auth/guard";
 
 const nav = [
   { href: "/admin", label: "Overview" },
+  { href: "/admin/analytics", label: "Analytics" },
   { href: "/admin/products", label: "Products" },
   { href: "/admin/categories", label: "Categories" },
   { href: "/admin/collections", label: "Collections" },

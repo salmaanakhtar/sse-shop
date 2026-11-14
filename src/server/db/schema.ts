@@ -50,6 +50,11 @@ export const campaignStatus = pgEnum("campaign_status", [
   "cancelled",
 ]);
 export const campaignSendStatus = pgEnum("campaign_send_status", ["queued", "sent", "failed"]);
+export const analyticsEventType = pgEnum("analytics_event_type", [
+  "page_view",
+  "product_view",
+  "order_placed",
+]);
 
 /* ─────────────────────── auth (Better Auth) ───────────────────────
  * Key names are camelCase because the adapter resolves models by these keys;
@@ -699,6 +704,30 @@ export const refunds = pgTable(
     createdAt: createdAt(),
   },
   (table) => [index("refunds_order_id_idx").on(table.orderId)],
+);
+
+/**
+ * First-party analytics. The visitor hash is a daily salted pseudonym, never a
+ * raw IP or user agent; no third-party tracker and no cross-site identifier.
+ */
+export const analyticsEvents = pgTable(
+  "analytics_events",
+  {
+    id: id(),
+    type: analyticsEventType("type").notNull(),
+    path: text("path").notNull(),
+    productId: text("product_id").references(() => products.id, { onDelete: "set null" }),
+    visitorHash: text("visitor_hash").notNull(),
+    userId: text("user_id").references(() => users.id, { onDelete: "set null" }),
+    orderId: text("order_id").references(() => orders.id, { onDelete: "set null" }),
+    valueMinor: integer("value_minor"),
+    createdAt: createdAt(),
+  },
+  (table) => [
+    index("analytics_events_type_created_idx").on(table.type, table.createdAt),
+    index("analytics_events_product_idx").on(table.productId, table.createdAt),
+    index("analytics_events_path_idx").on(table.path, table.createdAt),
+  ],
 );
 
 /* ─────────────────────── operations ─────────────────────── */

@@ -18,8 +18,10 @@ import {
   refunds,
   variants,
 } from "../db/schema";
+import { visitorHash } from "../analytics/visitor";
 import { mailer } from "../mail";
 import { paymentProvider } from "../payments";
+import { recordOrderPlaced } from "./analytics";
 import { processStockChanges } from "./notifications";
 import { readCartIdForCheckout } from "./cart";
 import { getStoreSettings } from "./settings";
@@ -389,6 +391,19 @@ export async function placeOrder(input: {
   await processStockChanges(committed.lines.map((line) => line.variantId)).catch((error) => {
     console.error("stock notifications after checkout failed", error);
   });
+
+  await visitorHash()
+    .then((hash) =>
+      recordOrderPlaced({
+        orderId: committed.orderId,
+        valueMinor: committed.totalMinor,
+        visitorHash: hash,
+        userId: input.userId ?? null,
+      }),
+    )
+    .catch((error) => {
+      console.error("analytics order event failed", error);
+    });
 
   return ok({
     number: committed.number,

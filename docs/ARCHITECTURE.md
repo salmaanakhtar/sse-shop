@@ -47,7 +47,7 @@ rules.
 
 ## Data model
 
-Forty-six tables, deliberately narrow. Core tables carry `created_at`; most carry `updated_at`;
+Forty-seven tables, deliberately narrow. Core tables carry `created_at`; most carry `updated_at`;
 join tables stay minimal.
 | Table | Holds | Notes |
 | --- | --- | --- |
@@ -80,6 +80,7 @@ join tables stay minimal.
 | `email_suppressions` | Hard-blocked addresses | keyed by email; reason recorded |
 | `campaigns` | Marketing email drafts and sends | status, schedule, sent time, recipient count |
 | `campaign_sends` | Campaign outbox | one row per recipient; unique `(campaign_id, email)` |
+| `analytics_events` | First-party views and orders | type, path, product/order link; daily visitor hash |
 | `carts` | One basket per shopper token | Token hashed; `expires_at`; `user_id` links a signed-in cart |
 | `cart_items` | Variants in a cart | Unique on `(cart_id, variant_id)` |
 | `orders` | Placed order, totals, and fulfillment state | `number` unique and sequential; status/payment state; tracking; invoice number; refund total; cancellation/return timestamps |
@@ -469,6 +470,22 @@ pending ──► confirmed ──► processing ──► shipped ──► del
   cron job will call later.
 - Mail still goes through the console driver; every message is a plain-text body built in the
   service. Real delivery is deferred to the deploy-ready phase.
+
+## Analytics
+
+- The storefront mounts a client beacon that posts the current path to `/api/analytics/view` after
+  each navigation. The route caps the body at 2 KB, rate-limits by IP, and stores a `page_view` or,
+  when the path resolves to a product slug, a `product_view` with `product_id`.
+- Placement writes one `order_placed` event with the order id and total. The visitor id is a daily
+  rotated hash of IP, user agent, and the auth secret; no raw address, cookie, referrer, or
+  third-party script is involved.
+- `/admin/analytics` summarizes 7, 30, or 90 days: revenue, orders, AOV, page and product views,
+  orders per page view, low stock, campaign emails, a daily revenue bar chart, top products, and
+  most-viewed pages. Cancelled orders are excluded.
+- Page views are not sessions. Conversion is deliberately labelled “orders / page views” rather than
+  claiming a session-based rate.
+- Events are small rows with three indexes (type/time, product/time, path/time). Retention/pruning
+  is a later deploy concern.
 
 ## Marketing email
 

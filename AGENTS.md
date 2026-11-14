@@ -55,7 +55,7 @@ src/
   components/admin/       admin screens, including the variant tree builder
   server/
     db/               schema.ts, client.ts, migrations/
-    services/         catalog, search, cart, orders, shipping, notifications, marketing, settings, variant-tree, categories, collections, badges, wishlists, preferences, home-sections, pages, reviews, related, addresses, customers, promotions, payments/, mail/
+    services/         catalog, search, cart, orders, shipping, notifications, marketing, analytics, settings, variant-tree, categories, collections, badges, wishlists, preferences, home-sections, pages, reviews, related, addresses, customers, promotions, payments/, mail/
     auth/             better-auth config, session helpers, guards
   lib/                money, sale, slugs, result, dates — pure, importable anywhere
 tests/

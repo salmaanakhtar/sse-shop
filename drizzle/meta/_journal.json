@@ -141,6 +141,13 @@
       "when": 1794633818576,
       "tag": "0019_marketing",
       "breakpoints": true
+    },
+    {
+      "idx": 20,
+      "version": "7",
+      "when": 1794634367992,
+      "tag": "0020_analytics",
+      "breakpoints": true
     }
   ]
 }

@@ -12,8 +12,8 @@ continuous background stream, not a numbered phase.
 **Completion program:** security/foundation fixes, admin settings, homepage sections, legal pages,
 Arabic routing/RTL/numerals, search/filter/sort/pagination, SEO metadata/sitemap/JSON-LD, verified
 reviews, related products, order operations, the payment lifecycle, manual refunds, VAT invoices,
-emirate shipping zones, stock/cart notifications, and marketing email are in place. The analytics
-dashboard remains.
+emirate shipping zones, stock/cart notifications, marketing email, and the first-party analytics
+dashboard are in place.
 
 ## Phase 0 — Foundation
 
@@ -220,6 +220,19 @@ and a customer's choices survive a return visit. Dark mode is complete; Arabic i
 - **Coverage:** integration tests for double opt-in, resubscribe, account consent, suppression,
   per-recipient outbox, retry safety, and due schedules; a Playwright journey subscribes, opts the
   account in, creates, and sends a campaign.
+
+## Commerce completion — Analytics
+
+**Status: complete.**
+
+- First-party Postgres events: page views from a storefront beacon, product views resolved by slug,
+  and order-placed events with totals.
+- Visitors group by a daily rotated hash of IP, user agent, and the auth secret; no cookie, raw
+  address, referrer, or third-party tracker.
+- `/admin/analytics` covers 7/30/90 days: revenue, orders, AOV, page and product views, orders per
+  page view, low stock, campaign emails, a daily revenue chart, top products, and most-viewed pages.
+- Integration tests cover event recording, path validation, summary math, top products, low stock,
+  campaign sends, and range clamping. A Playwright journey posts a beacon and checks the dashboard.
 
 ## Phase 7 — Real money and mail
 

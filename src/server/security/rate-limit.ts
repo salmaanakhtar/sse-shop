@@ -20,6 +20,10 @@ export async function checkRateLimit(
     throw new Error("Rate limit and window must be positive.");
   }
 
+  // Playwright replays the same flows many times from one IP. Production never
+  // sets this; Better Auth has its own switch for the same reason.
+  if (process.env.RATE_LIMITS_DISABLED === "true") return { ok: true };
+
   const expiresAt = new Date(now.getTime() + windowSeconds * 1000);
   const nowIso = now.toISOString();
   const expiresIso = expiresAt.toISOString();

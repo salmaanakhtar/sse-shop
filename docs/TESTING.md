@@ -68,6 +68,8 @@ without replacing it.
     one pending request, an admin restock clears it.
 23. **Marketing** - a visitor subscribes and sees the confirmation message; the admin account opts
     in, creates a campaign, and sends it from the admin.
+24. **Analytics** - a page-view beacon records an event, an invalid path is rejected, and the admin
+    dashboard renders the metrics, chart, and range switch.
 
 ## Vitest setup
 
@@ -217,6 +219,11 @@ personalized outbox row per confirmed and unsuppressed subscriber, retry safety,
 sends, and account-deletion cleanup. The Playwright journey subscribes a visitor, opts the account
 in, and sends a campaign.
 
+Analytics tests cover page and product view recording, rejecting a protocol-relative path, summary
+revenue/orders/AOV, top products, filled daily points, low stock, campaign email counts, and range
+clamping. The Playwright journey posts a valid and an invalid beacon and checks the dashboard and
+range switch.
+
 Theme tests cover accepted values and cookie-versus-account precedence. The Playwright journey
 checks the system default, switches to dark, reloads to prove the cookie persists, and signs in from
 a fresh context to prove the account preference follows the customer.
@@ -266,8 +273,9 @@ known catalog with predictable prices, a small category tree, two collections, t
 user whose password and TOTP secret come from env vars, and a low-stock variant used by the
 stock-limit spec.
 
-The Playwright server sets `BETTER_AUTH_RATE_LIMIT=false` because the suite signs in several
-customers from one IP. Production keeps the default rate limit on.
+The Playwright server sets `BETTER_AUTH_RATE_LIMIT=false` and `RATE_LIMITS_DISABLED=true` because
+the suite signs in several customers and replays the same return/cancel flows from one IP.
+Production keeps both limits on; the integration rate-limit tests exercise the real limiter.
 
 Admin authentication is captured once into `tests/e2e/.auth/admin.json` via `storageState`, using a
 setup project that runs first. The setup signs in through the real form, enrols TOTP when the

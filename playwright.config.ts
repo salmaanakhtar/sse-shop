@@ -41,9 +41,10 @@ export default defineConfig({
         // on the test port that is not the one in .env.local.
         BETTER_AUTH_URL: process.env.E2E_BASE_URL ?? `http://localhost:${PORT}`,
         NEXT_PUBLIC_STORE_URL: process.env.E2E_BASE_URL ?? `http://localhost:${PORT}`,
-        // The suite intentionally signs in several customers; production keeps
-        // the default rate limit on.
+        // The suite intentionally signs in several customers and replays the
+        // same return/cancel flows; production keeps both limits on.
         BETTER_AUTH_RATE_LIMIT: "false",
+        RATE_LIMITS_DISABLED: "true",
       }).filter((entry): entry is [string, string] => typeof entry[1] === "string"),
     ),
   },

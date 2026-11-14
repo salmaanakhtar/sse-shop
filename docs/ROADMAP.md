@@ -3,11 +3,10 @@
 Sequenced so every phase leaves a working store. A phase is done when its completion criteria
 hold, not when the code is written.
 
-**Current:** Phase 4 and Phase 5 are complete. Phase 6 is in progress — dark mode and the Arabic
-route/RTL/numeral foundation are shipped; translation QA and secondary account copy remain.
-Phase 7 (money and mail), Phase 8 (hardening), and Phase 9 (full UI redesign) are still open. The
-final phase is a full UI redesign of layout, theme, and design language. No-code control is a
-continuous background stream, not a numbered phase.
+**Current:** Phase 4, Phase 5, and Phase 6 are complete. Phase 7 (money and mail), Phase 8
+(hardening), and Phase 9 (full UI redesign) are still open. The final phase is a full UI redesign of
+layout, theme, and design language. No-code control is a continuous background stream, not a
+numbered phase.
 
 **Completion program:** security/foundation fixes, admin settings, homepage sections, legal pages,
 Arabic routing/RTL/numerals, search/filter/sort/pagination, SEO metadata/sitemap/JSON-LD, verified
@@ -134,19 +133,21 @@ development.
 
 ## Phase 6 — Experience
 
-**Status: in progress — dark mode and the Arabic route/RTL/numeral foundation are shipped;
-translation QA and secondary copy remain.**
+**Status: complete.**
 
 - **Dark mode (done):** the storefront follows the operating system by default. The customer can
   choose Auto, Light, or Dark; the cookie persists per browser and a signed-in preference follows
   them to another device. The palette is scoped to the storefront, so admin stays light.
-- **Arabic (in progress):** `/ar` URLs with hreflang, Modern Standard Arabic for the shell, home,
-  product, cart, checkout, wishlist, and auth surfaces, RTL layout, and a Latin/Arabic-Indic numeral
-  toggle. Product content, category names, admin, and emails remain English. Account/order detail
-  and some secondary strings still fall back to English.
+- **Arabic (done):** `/ar` URLs with hreflang, Modern Standard Arabic for the shell, home, product,
+  cart, checkout, wishlist, auth, account, orders, returns, addresses, reviews, stock alerts, and
+  newsletter surfaces; RTL layout; and a Latin/Arabic-Indic numeral toggle. Product content,
+  category names, admin, invoices, and emails remain English by decision. Server validation
+  messages and the admin panel still fall back to English.
+- Translation QA is covered by the `/ar` Playwright journey across home, product, sign-in, cart, and
+  newsletter, plus numeral and language switching.
 
 **Done when** both themes and both languages render correctly, prices keep the same integer value,
-and a customer's choices survive a return visit. Dark mode is complete; Arabic is not.
+and a customer's choices survive a return visit. Both are complete and covered by tests.
 
 ## Commerce completion — Order operations
 

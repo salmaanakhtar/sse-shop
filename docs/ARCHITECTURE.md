@@ -351,9 +351,10 @@ English is served at the normal paths. Arabic is served under `/ar`:
   no locale cookie exists.
 - Numerals are a separate preference (`latin` or `arabic`) stored in a cookie and
   `users.numeral_style`. `formatMoney` and `formatDateFor` accept the locale and numeral style.
-- Product content, category names, admin, and emails remain English. Account, checkout, and
-  secondary copy are progressively covered by the dictionary; untranslated strings fall back to
-  English rather than disappearing.
+- Storefront copy is covered through the shell, shopping flow, account, orders, returns, addresses,
+  reviews, stock alerts, and newsletter. Product content, category names, admin, invoices, and
+  emails remain English by decision. Server validation messages and the admin panel still fall back
+  to English rather than disappearing.
 
 ## Search and SEO
 

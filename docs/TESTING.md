@@ -55,8 +55,9 @@ without replacing it.
     named list, opens the list, selects the item, and lands on checkout with it in the cart.
 17. **Dark mode** - a customer signs in, chooses Dark, reloads and keeps it, then signs in from a
     fresh browser context and sees the saved account preference.
-18. **Arabic** - `/ar` renders RTL with Arabic navigation, the product page uses Arabic copy, the
-    numeral toggle switches to Arabic-Indic digits, and the language switch returns to English.
+18. **Arabic** - `/ar` renders RTL with Arabic navigation, product, sign-in, cart, and newsletter
+    copy; the numeral toggle switches to Arabic-Indic digits; and the language switch returns to
+    English with the `/ar` prefix removed.
 19. **Search and SEO** - the header search opens `/search`, returns the matching product, and the
     sitemap, robots file, and Product JSON-LD are present.
 20. **Order operations** - a shopper places a guest order; an admin starts processing, ships with

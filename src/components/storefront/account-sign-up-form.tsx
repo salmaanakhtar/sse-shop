@@ -4,9 +4,11 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState, type FormEvent } from "react";
 import { mergeCartAfterSignInAction } from "@/app/(storefront)/account/actions";
+import { useStorePreferences } from "@/components/storefront/store-preferences";
 import { Button } from "@/components/ui/button";
 import { Input, Label } from "@/components/ui/field";
 import { authClient } from "@/lib/auth-client";
+import { localePath } from "@/lib/i18n";
 
 function safeNext(next: string | undefined): string {
   return next && next.startsWith("/") && !next.startsWith("//") && !next.includes("\\")
@@ -16,6 +18,7 @@ function safeNext(next: string | undefined): string {
 
 export function AccountSignUpForm({ next }: { next?: string }) {
   const router = useRouter();
+  const { t, locale } = useStorePreferences();
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
   const target = safeNext(next);
@@ -31,7 +34,7 @@ export function AccountSignUpForm({ next }: { next?: string }) {
 
     if (password !== confirmPassword) {
       setPending(false);
-      setError("The passwords do not match.");
+      setError(t("auth.passwordMismatch"));
       return;
     }
 
@@ -46,7 +49,7 @@ export function AccountSignUpForm({ next }: { next?: string }) {
 
     if (result.error) {
       setPending(false);
-      setError(result.error.message ?? "Could not create the account.");
+      setError(result.error.message ?? t("auth.createFailed"));
       return;
     }
 
@@ -56,24 +59,24 @@ export function AccountSignUpForm({ next }: { next?: string }) {
       // The account exists; a cart merge failure must not strand the shopper.
       console.error("cart merge after sign-up failed", mergeError);
     }
-    router.replace(target);
+    router.replace(localePath(locale, target));
     router.refresh();
   }
 
   return (
     <form onSubmit={onSubmit} className="space-y-4">
       <div>
-        <Label htmlFor="name">Name</Label>
+        <Label htmlFor="name">{t("auth.name")}</Label>
         <Input id="name" name="name" required autoComplete="name" maxLength={120} />
       </div>
 
       <div>
-        <Label htmlFor="email">Email</Label>
+        <Label htmlFor="email">{t("auth.email")}</Label>
         <Input id="email" name="email" type="email" required autoComplete="email" />
       </div>
 
       <div>
-        <Label htmlFor="phone">Mobile (optional)</Label>
+        <Label htmlFor="phone">{t("auth.mobileOptional")}</Label>
         <Input
           id="phone"
           name="phone"
@@ -86,7 +89,7 @@ export function AccountSignUpForm({ next }: { next?: string }) {
       </div>
 
       <div>
-        <Label htmlFor="password">Password</Label>
+        <Label htmlFor="password">{t("auth.password")}</Label>
         <Input
           id="password"
           name="password"
@@ -95,11 +98,11 @@ export function AccountSignUpForm({ next }: { next?: string }) {
           minLength={12}
           autoComplete="new-password"
         />
-        <p className="mt-1.5 text-xs text-muted">At least 12 characters.</p>
+        <p className="mt-1.5 text-xs text-muted">{t("auth.passwordHelp")}</p>
       </div>
 
       <div>
-        <Label htmlFor="confirmPassword">Confirm password</Label>
+        <Label htmlFor="confirmPassword">{t("auth.confirmPassword")}</Label>
         <Input
           id="confirmPassword"
           name="confirmPassword"
@@ -117,22 +120,20 @@ export function AccountSignUpForm({ next }: { next?: string }) {
       ) : null}
 
       <Button type="submit" disabled={pending} className="w-full">
-        {pending ? "Creating account…" : "Create account"}
+        {pending ? t("auth.creating") : t("auth.createSubmit")}
       </Button>
 
       <p className="text-center text-xs text-muted">
-        Already have an account?{" "}
+        {t("auth.alreadyHave")}{" "}
         <Link
-          href={`/account/sign-in${target !== "/account" ? `?next=${encodeURIComponent(target)}` : ""}`}
+          href={`${localePath(locale, "/account/sign-in")}${target !== "/account" ? `?next=${encodeURIComponent(target)}` : ""}`}
           className="underline underline-offset-4 hover:text-ink"
         >
-          Sign in
+          {t("auth.signIn")}
         </Link>
       </p>
 
-      <p className="text-center text-xs text-muted">
-        Email verification is not required yet. Order lookup links still use their own token.
-      </p>
+      <p className="text-center text-xs text-muted">{t("auth.verifyNote")}</p>
     </form>
   );
 }

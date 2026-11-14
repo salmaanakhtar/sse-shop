@@ -24,41 +24,42 @@ export default async function NewsletterPage({
   return (
     <div className="mx-auto flex min-h-[60vh] max-w-lg flex-col justify-center px-6 py-16">
       <div className="rounded-xl border border-line bg-surface p-6">
-        <p className="text-xs font-semibold tracking-[0.18em] text-brand uppercase">Newsletter</p>
-        <h1 className="mt-3 text-xl font-semibold tracking-tight">Occasional news, no noise</h1>
-        <p className="mt-1 text-sm text-muted">
-          New pieces and offers, sent rarely. We confirm the address first, and every email has a
-          one-click unsubscribe.
+        <p className="text-xs font-semibold tracking-[0.18em] text-brand uppercase">
+          {translate(locale, "newsletter.label")}
         </p>
+        <h1 className="mt-3 text-xl font-semibold tracking-tight">
+          {translate(locale, "newsletter.title")}
+        </h1>
+        <p className="mt-1 text-sm text-muted">{translate(locale, "newsletter.body")}</p>
 
         {status === "sent" ? (
           <p role="status" className="mt-4 rounded-lg bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
-            Check your inbox. The confirmation link finishes the subscription.
+            {translate(locale, "newsletter.checkInbox")}
           </p>
         ) : null}
         {status === "already" ? (
           <p role="status" className="mt-4 rounded-lg bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
-            That address is already subscribed.
+            {translate(locale, "newsletter.already")}
           </p>
         ) : null}
         {confirmed === "1" ? (
           <p role="status" className="mt-4 rounded-lg bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
-            Subscription confirmed. Thanks for opting in.
+            {translate(locale, "newsletter.confirmed")}
           </p>
         ) : null}
         {confirmed === "0" ? (
           <p role="alert" className="mt-4 rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700">
-            That confirmation link is invalid or already used.
+            {translate(locale, "newsletter.invalid")}
           </p>
         ) : null}
         {unsubscribed === "1" ? (
           <p role="status" className="mt-4 rounded-lg bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
-            You are unsubscribed and will not receive campaigns.
+            {translate(locale, "newsletter.unsubscribed")}
           </p>
         ) : null}
         {unsubscribed === "0" ? (
           <p role="alert" className="mt-4 rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700">
-            That unsubscribe link is invalid.
+            {translate(locale, "newsletter.unsubscribeInvalid")}
           </p>
         ) : null}
         {error ? (
@@ -69,11 +70,11 @@ export default async function NewsletterPage({
 
         <form action={subscribeNewsletterAction} className="mt-6 space-y-4">
           <div>
-            <Label htmlFor="newsletter-name">Name (optional)</Label>
+            <Label htmlFor="newsletter-name">{translate(locale, "newsletter.name")}</Label>
             <Input id="newsletter-name" name="name" autoComplete="name" maxLength={120} />
           </div>
           <div>
-            <Label htmlFor="newsletter-email">Email</Label>
+            <Label htmlFor="newsletter-email">{translate(locale, "newsletter.email")}</Label>
             <Input
               id="newsletter-email"
               name="email"
@@ -84,22 +85,22 @@ export default async function NewsletterPage({
           </div>
           <label className="flex items-start gap-2 text-xs text-muted">
             <input type="checkbox" name="consent" required className="mt-0.5 size-4" />
-            I agree to receive occasional marketing emails. I can unsubscribe at any time.
+            {translate(locale, "newsletter.consent")}
           </label>
           <Button type="submit" className="w-full">
-            Subscribe
+            {translate(locale, "newsletter.submit")}
           </Button>
         </form>
 
         <p className="mt-4 text-xs text-muted">
-          Already have an account?{" "}
+          {translate(locale, "newsletter.manage")}{" "}
           <Link
             href={localePath(locale, "/account")}
             className="underline underline-offset-4 hover:text-ink"
           >
-            Manage marketing preferences
+            {translate(locale, "newsletter.manageLink")}
           </Link>{" "}
-          there instead.
+          {translate(locale, "newsletter.manageSuffix")}
         </p>
       </div>
 

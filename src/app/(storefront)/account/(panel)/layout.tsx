@@ -21,7 +21,9 @@ export default async function AccountLayout({ children }: { children: ReactNode 
     <div className="mx-auto max-w-5xl px-6 py-10">
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
-          <p className="text-xs font-semibold tracking-[0.18em] text-brand uppercase">Account</p>
+          <p className="text-xs font-semibold tracking-[0.18em] text-brand uppercase">
+          {translate(locale, "nav.account")}
+        </p>
           <h1 className="mt-2 text-2xl font-semibold tracking-tight">{session.user.name}</h1>
           <p className="mt-1 text-sm text-muted">{session.user.email}</p>
         </div>

@@ -9,9 +9,9 @@ time. Every feature ships with a unit test and a Playwright journey.
 
 ## Status
 
-Phase 4 and Phase 5 are complete. Phase 6 is in progress: dark mode is live and the Arabic
-`/ar`/RTL/numeral foundation is shipped, with translation QA and secondary account copy still
-pending. Per-variant sales, promotion pages, category/collection/badge merchandising, search,
+Phase 4, Phase 5, and Phase 6 are complete. Dark mode and the Arabic `/ar`/RTL/numeral storefront
+are live across the shopping, account, order, and newsletter surfaces. Per-variant sales,
+promotion pages, category/collection/badge merchandising, search,
 SEO, verified reviews, related products, admin-editable settings, homepage sections, legal pages,
 order operations, VAT invoices, emirate shipping zones with weight bands, back-in-stock alerts,
 low-stock alerts, abandoned-cart recovery, and consent-based marketing email with double opt-in,

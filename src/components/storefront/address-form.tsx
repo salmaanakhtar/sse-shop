@@ -1,6 +1,7 @@
 import { Button } from "@/components/ui/button";
 import { Input, Label, Textarea } from "@/components/ui/field";
 import { EMIRATES } from "@/lib/address";
+import { translate, type Locale } from "@/lib/i18n";
 
 export type AddressFormValues = {
   id?: string;
@@ -22,11 +23,13 @@ export function AddressForm({
   values,
   submitLabel,
   error,
+  locale = "en",
 }: {
   action: (formData: FormData) => void | Promise<void>;
   values?: AddressFormValues;
   submitLabel: string;
   error?: string;
+  locale?: Locale;
 }) {
   return (
     <form action={action} className="space-y-5 rounded-xl border border-line bg-surface p-6">
@@ -40,7 +43,7 @@ export function AddressForm({
 
       <div className="grid gap-4 sm:grid-cols-2">
         <div>
-          <Label htmlFor="label">Label (optional)</Label>
+          <Label htmlFor="label">{translate(locale, "addresses.label")}</Label>
           <Input
             id="label"
             name="label"
@@ -50,7 +53,7 @@ export function AddressForm({
           />
         </div>
         <div>
-          <Label htmlFor="fullName">Recipient name</Label>
+          <Label htmlFor="fullName">{translate(locale, "addresses.recipient")}</Label>
           <Input
             id="fullName"
             name="fullName"
@@ -64,7 +67,7 @@ export function AddressForm({
 
       <div className="grid gap-4 sm:grid-cols-2">
         <div>
-          <Label htmlFor="phone">Mobile</Label>
+          <Label htmlFor="phone">{translate(locale, "checkout.mobile")}</Label>
           <Input
             id="phone"
             name="phone"
@@ -78,7 +81,7 @@ export function AddressForm({
           />
         </div>
         <div>
-          <Label htmlFor="emirate">Emirate</Label>
+          <Label htmlFor="emirate">{translate(locale, "checkout.emirate")}</Label>
           <select
             id="emirate"
             name="emirate"
@@ -97,7 +100,7 @@ export function AddressForm({
 
       <div className="grid gap-4 sm:grid-cols-2">
         <div>
-          <Label htmlFor="building">Building or villa</Label>
+          <Label htmlFor="building">{translate(locale, "checkout.building")}</Label>
           <Input
             id="building"
             name="building"
@@ -108,7 +111,7 @@ export function AddressForm({
           />
         </div>
         <div>
-          <Label htmlFor="street">Street</Label>
+          <Label htmlFor="street">{translate(locale, "checkout.street")}</Label>
           <Input
             id="street"
             name="street"
@@ -122,7 +125,7 @@ export function AddressForm({
 
       <div className="grid gap-4 sm:grid-cols-2">
         <div>
-          <Label htmlFor="area">Area or community (optional)</Label>
+          <Label htmlFor="area">{translate(locale, "checkout.area")}</Label>
           <Input
             id="area"
             name="area"
@@ -133,7 +136,7 @@ export function AddressForm({
           />
         </div>
         <div>
-          <Label htmlFor="poBox">PO Box (optional)</Label>
+          <Label htmlFor="poBox">{translate(locale, "checkout.poBox")}</Label>
           <Input
             id="poBox"
             name="poBox"
@@ -145,7 +148,7 @@ export function AddressForm({
       </div>
 
       <div>
-        <Label htmlFor="notes">Delivery notes (optional)</Label>
+        <Label htmlFor="notes">{translate(locale, "checkout.notes")}</Label>
         <Textarea
           id="notes"
           name="notes"
@@ -164,7 +167,7 @@ export function AddressForm({
             defaultChecked={values?.isDefaultShipping ?? false}
             className="size-4"
           />
-          Default delivery address
+          {translate(locale, "addresses.deliveryDefault")}
         </label>
         <label className="flex items-center gap-2">
           <input
@@ -173,7 +176,7 @@ export function AddressForm({
             defaultChecked={values?.isDefaultBilling ?? false}
             className="size-4"
           />
-          Default billing address
+          {translate(locale, "addresses.billingDefault")}
         </label>
       </div>
 

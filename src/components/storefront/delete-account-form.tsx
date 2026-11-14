@@ -5,18 +5,20 @@ import {
   deleteAccountAction,
   type DeleteAccountState,
 } from "@/app/(storefront)/account/actions";
+import { useStorePreferences } from "@/components/storefront/store-preferences";
 import { Button } from "@/components/ui/button";
 import { Input, Label } from "@/components/ui/field";
 
 const initialState: DeleteAccountState = null;
 
 export function DeleteAccountForm() {
+  const { t } = useStorePreferences();
   const [state, formAction, pending] = useActionState(deleteAccountAction, initialState);
 
   return (
     <form action={formAction} className="space-y-4">
       <div>
-        <Label htmlFor="password">Current password</Label>
+        <Label htmlFor="password">{t("delete.passwordCurrent")}</Label>
         <Input
           id="password"
           name="password"
@@ -27,7 +29,7 @@ export function DeleteAccountForm() {
       </div>
 
       <div>
-        <Label htmlFor="confirmation">Type DELETE to confirm</Label>
+        <Label htmlFor="confirmation">{t("delete.confirmType")}</Label>
         <Input id="confirmation" name="confirmation" required autoComplete="off" />
       </div>
 
@@ -38,7 +40,7 @@ export function DeleteAccountForm() {
       ) : null}
 
       <Button type="submit" variant="danger" disabled={pending}>
-        {pending ? "Deleting…" : "Delete my account"}
+        {pending ? t("delete.deleting") : t("delete.submit")}
       </Button>
     </form>
   );

@@ -5,6 +5,7 @@ import {
   claimOrderAction,
   type ClaimState,
 } from "@/app/(storefront)/account/orders/claim/actions";
+import { useStorePreferences } from "@/components/storefront/store-preferences";
 import { Button } from "@/components/ui/button";
 import { Input, Label } from "@/components/ui/field";
 
@@ -19,6 +20,7 @@ export function ClaimOrderForm({
   token?: string;
   compact?: boolean;
 }) {
+  const { t } = useStorePreferences();
   const [state, formAction, pending] = useActionState(claimOrderAction, initialState);
 
   return (
@@ -31,20 +33,18 @@ export function ClaimOrderForm({
       ) : (
         <>
           <div>
-            <Label htmlFor="number">Order number</Label>
+            <Label htmlFor="number">{t("claim.number")}</Label>
             <Input id="number" name="number" required placeholder="SS-2026-000001" />
           </div>
           <div>
-            <Label htmlFor="token">Lookup token</Label>
+            <Label htmlFor="token">{t("claim.token")}</Label>
             <Input
               id="token"
               name="token"
               required
               placeholder="The t= value from your order link"
             />
-            <p className="mt-1.5 text-xs text-muted">
-              It is the long value after <code>?t=</code> in the confirmation link.
-            </p>
+            <p className="mt-1.5 text-xs text-muted">{t("claim.tokenHelp")}</p>
           </div>
         </>
       )}
@@ -56,7 +56,7 @@ export function ClaimOrderForm({
       ) : null}
 
       <Button type="submit" disabled={pending} variant={compact ? "secondary" : "primary"}>
-        {pending ? "Saving…" : "Save this order to my account"}
+        {pending ? t("claim.saving") : t("claim.save")}
       </Button>
     </form>
   );

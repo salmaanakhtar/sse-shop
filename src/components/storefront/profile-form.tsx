@@ -5,6 +5,7 @@ import {
   updateProfileAction,
   type ProfileState,
 } from "@/app/(storefront)/account/actions";
+import { useStorePreferences } from "@/components/storefront/store-preferences";
 import { Button } from "@/components/ui/button";
 import { Input, Label } from "@/components/ui/field";
 
@@ -19,25 +20,24 @@ export function ProfileForm({
   email: string;
   phone: string;
 }) {
+  const { t } = useStorePreferences();
   const [state, formAction, pending] = useActionState(updateProfileAction, initialState);
 
   return (
     <form action={formAction} className="space-y-4">
       <div>
-        <Label htmlFor="name">Name</Label>
+        <Label htmlFor="name">{t("profile.name")}</Label>
         <Input id="name" name="name" required defaultValue={name} maxLength={120} />
       </div>
 
       <div>
-        <Label htmlFor="email">Email</Label>
+        <Label htmlFor="email">{t("profile.email")}</Label>
         <Input id="email" defaultValue={email} disabled />
-        <p className="mt-1.5 text-xs text-muted">
-          Email changes arrive with verification. Contact the store if you need it changed.
-        </p>
+        <p className="mt-1.5 text-xs text-muted">{t("profile.emailHelp")}</p>
       </div>
 
       <div>
-        <Label htmlFor="phone">Mobile</Label>
+        <Label htmlFor="phone">{t("profile.phone")}</Label>
         <Input
           id="phone"
           name="phone"
@@ -62,7 +62,7 @@ export function ProfileForm({
       ) : null}
 
       <Button type="submit" disabled={pending} size="sm">
-        {pending ? "Saving…" : "Save profile"}
+        {pending ? t("profile.saving") : t("profile.save")}
       </Button>
     </form>
   );

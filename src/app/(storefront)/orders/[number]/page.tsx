@@ -2,10 +2,12 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ClaimOrderForm } from "@/components/storefront/claim-order-form";
 import { OrderAftercare } from "@/components/storefront/order-aftercare";
-import { OrderDetail, ORDER_STATUS_LABEL } from "@/components/storefront/order-detail";
+import { OrderDetail, orderStatusLabel } from "@/components/storefront/order-detail";
 import { buttonClass } from "@/components/ui/button";
+import { formatDateFor, localePath, translate } from "@/lib/i18n";
 import { getAuthSession } from "@/server/auth/guard";
 import { getOrderForGuest } from "@/server/services/orders";
+import { getLocale, getNumeralPreference } from "@/server/services/preferences";
 import { getStoreSettings } from "@/server/services/settings";
 
 export default async function OrderPage({
@@ -21,10 +23,12 @@ export default async function OrderPage({
     cancelled?: string;
   }>;
 }) {
-  const [{ number }, query, settings] = await Promise.all([
+  const [{ number }, query, settings, locale, numerals] = await Promise.all([
     params,
     searchParams,
     getStoreSettings(),
+    getLocale(),
+    getNumeralPreference(),
   ]);
   const { t } = query;
 
@@ -42,22 +46,22 @@ export default async function OrderPage({
   return (
     <div className="mx-auto max-w-3xl px-6 py-12">
       <p className="text-xs font-semibold tracking-[0.18em] text-brand uppercase">
-        Order confirmed
+        {translate(locale, "order.confirmed")}
       </p>
       <h1 className="mt-3 text-2xl font-semibold tracking-tight">{order.number}</h1>
       <p className="mt-2 text-sm text-muted">
-        {ORDER_STATUS_LABEL[order.status] ?? order.status} · placed{" "}
-        {order.placedAt.toLocaleDateString("en-AE", {
-          day: "numeric",
-          month: "long",
-          year: "numeric",
+        {orderStatusLabel(locale, order.status)} ·{" "}
+        {translate(locale, "order.placedOn", {
+          date: formatDateFor(order.placedAt, locale, numerals),
         })}
       </p>
 
-      <OrderDetail order={order}>
+      <OrderDetail order={order} locale={locale} numerals={numerals}>
         <OrderAftercare
           order={order}
           token={t}
+          locale={locale}
+          numerals={numerals}
           returnWindowDays={settings.returnWindowDays}
           returnError={query.returnError}
           cancelError={query.cancelError}
@@ -68,53 +72,50 @@ export default async function OrderPage({
         <div className="mt-6 space-y-4">
           {claimable && session ? (
             <section className="rounded-xl border border-line bg-surface p-5">
-              <h2 className="text-sm font-semibold">Save this order to your account</h2>
-              <p className="mt-2 text-sm text-muted">
-                Keep it in your order history on this and other devices. The token proves you own
-                this lookup link.
-              </p>
+              <h2 className="text-sm font-semibold">{translate(locale, "order.saveToAccount")}</h2>
+              <p className="mt-2 text-sm text-muted">{translate(locale, "order.saveHelp")}</p>
               <div className="mt-4">
                 <ClaimOrderForm number={order.number} token={t} compact />
               </div>
             </section>
           ) : claimable ? (
             <section className="rounded-xl border border-line bg-surface p-5">
-              <h2 className="text-sm font-semibold">Keep this order</h2>
-              <p className="mt-2 text-sm text-muted">
-                Sign in or create an account to save this order to your history.
-              </p>
+              <h2 className="text-sm font-semibold">{translate(locale, "order.claimTitle")}</h2>
+              <p className="mt-2 text-sm text-muted">{translate(locale, "order.claimBody")}</p>
               <Link
-                href={`/account/sign-in?next=${encodeURIComponent(returnTo)}`}
+                href={`${localePath(locale, "/account/sign-in")}?next=${encodeURIComponent(returnTo)}`}
                 className={buttonClass("secondary", "sm", "mt-4")}
               >
-                Sign in to save
+                {translate(locale, "order.signInToSave")}
               </Link>
             </section>
           ) : ownedByViewer ? (
             <p className="text-sm text-muted">
-              This order is in your account.{" "}
+              {translate(locale, "order.inAccount")}{" "}
               <Link
-                href={`/account/orders/${encodeURIComponent(order.number)}`}
+                href={localePath(locale, `/account/orders/${encodeURIComponent(order.number)}`)}
                 className="underline underline-offset-4 hover:text-ink"
               >
-                View it in your order history
+                {translate(locale, "order.viewInHistory")}
               </Link>
               .
             </p>
           ) : null}
 
           <section className="rounded-xl border border-line bg-surface p-5">
-            <h2 className="text-sm font-semibold">Keep this link</h2>
+            <h2 className="text-sm font-semibold">{translate(locale, "order.keepLink")}</h2>
             <p className="mt-2 text-sm text-muted">
-              This page is your way back into the order without an account. It was also sent to{" "}
-              {order.email}.
+              {translate(locale, "order.keepLinkBody", { email: order.email })}
             </p>
           </section>
         </div>
       </OrderDetail>
 
-      <Link href="/" className={buttonClass("secondary", "md", "mt-8")}>
-        Continue shopping
+      <Link
+        href={localePath(locale, "/")}
+        className={buttonClass("secondary", "md", "mt-8")}
+      >
+        {translate(locale, "order.continueShopping")}
       </Link>
     </div>
   );

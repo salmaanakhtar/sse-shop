@@ -36,7 +36,7 @@ export function AccountSignInForm({ next }: { next?: string }) {
 
     if (result.error) {
       setPending(false);
-      setError(result.error.message ?? "Sign-in failed.");
+      setError(result.error.message ?? t("auth.signInFailed"));
       return;
     }
 
@@ -44,7 +44,7 @@ export function AccountSignInForm({ next }: { next?: string }) {
       ?.twoFactorRedirect;
     if (needsSecondFactor) {
       setPending(false);
-      setError("This account needs two-step verification. Sign in on the admin host.");
+      setError(t("auth.twoStep"));
       return;
     }
 
@@ -100,7 +100,7 @@ export function AccountSignInForm({ next }: { next?: string }) {
       </p>
 
       <p className="text-center text-xs text-muted">
-        Password reset is not available yet. Contact the store if you are locked out.
+        {t("auth.resetNote")}
       </p>
     </form>
   );

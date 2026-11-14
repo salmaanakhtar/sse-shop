@@ -19,6 +19,7 @@ export default async function globalSetup() {
 
   await db.delete(schema.products).where(like(schema.products.slug, "playwright-%"));
   await db.delete(schema.promotions);
+  await db.delete(schema.homeSections).where(like(schema.homeSections.title, "Playwright Picks%"));
   await db.delete(schema.categories).where(like(schema.categories.slug, "playwright-%"));
   await db.delete(schema.collections).where(like(schema.collections.slug, "playwright-%"));
   await db.delete(schema.badges).where(like(schema.badges.label, "Playwright %"));

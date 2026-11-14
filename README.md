@@ -62,6 +62,10 @@ pnpm db:seed                      # one demo product with two options and four v
 pnpm dev                          # http://localhost:3000
 ```
 
+For a fresh database, set `ADMIN_EMAIL`/`ADMIN_PASSWORD` (12+ characters) and set
+`E2E_ADMIN_EMAIL`/`E2E_ADMIN_PASSWORD` to the same values; the Playwright suite signs in with the
+`E2E_*` pair while the seed creates the `ADMIN_*` pair.
+
 | Command | What it does |
 | --- | --- |
 | `pnpm test` | Unit, component, and integration tests |

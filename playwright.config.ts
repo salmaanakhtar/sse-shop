@@ -17,6 +17,11 @@ export default defineConfig({
     screenshot: "only-on-failure",
     video: "retain-on-failure",
   },
+  // Server actions followed by a redirect can take a few seconds on a loaded
+  // Windows host with a full worker pool. Production CI is faster; the looser
+  // assertion window avoids false failures without hiding a real error, which
+  // still fails the 30-second test.
+  expect: { timeout: 15_000 },
   globalSetup: "./tests/e2e/global-setup.ts",
   projects: [
     { name: "setup", testMatch: /.*\.setup\.ts/ },

@@ -71,7 +71,7 @@ function readOptionalWeight(formData: FormData, name: string): number | null | "
 }
 
 export async function createProductAction(formData: FormData): Promise<void> {
-  await requireAdminAction();
+  const session = await requireAdminAction();
 
   const title = String(formData.get("title") ?? "").trim();
   if (title.length < 2) redirect("/admin/products/new?error=Give+the+product+a+name");
@@ -99,12 +99,20 @@ export async function createProductAction(formData: FormData): Promise<void> {
 
   if (!created) redirect("/admin/products/new?error=Could+not+create+the+product");
 
+  await db.insert(auditLog).values({
+    actorUserId: session.user.id,
+    action: "product.create",
+    entity: "products",
+    entityId: created.id,
+    after: { title, slug, status: "draft" },
+  });
+
   revalidatePath("/admin/products");
   redirect(`/admin/products/${created.id}`);
 }
 
 export async function updateProductAction(formData: FormData): Promise<void> {
-  await requireAdminAction();
+  const session = await requireAdminAction();
 
   const id = requireText(formData.get("id"), "Product id");
   const title = String(formData.get("title") ?? "").trim();
@@ -126,26 +134,37 @@ export async function updateProductAction(formData: FormData): Promise<void> {
 
   if (clash && clash.id !== id) backToProduct(id, "That URL slug is already taken", "details");
 
+  const [before] = await db.select().from(products).where(eq(products.id, id)).limit(1);
+  if (!before) backToProduct(id, "That product could not be found.", "details");
+
+  const description = String(formData.get("description") ?? "").trim();
+
   await db
     .update(products)
     .set({
       title,
       slug,
-      description: String(formData.get("description") ?? "").trim(),
+      description,
       status,
-      publishedAt:
-        status === "active"
-          ? ((
-              await db
-                .select({ publishedAt: products.publishedAt })
-                .from(products)
-                .where(eq(products.id, id))
-                .limit(1)
-            )[0]?.publishedAt ?? new Date())
-          : null,
+      publishedAt: status === "active" ? (before.publishedAt ?? new Date()) : null,
       updatedAt: new Date(),
     })
     .where(eq(products.id, id));
+
+  await db.insert(auditLog).values({
+    actorUserId: session.user.id,
+    action: "product.update",
+    entity: "products",
+    entityId: id,
+    before: {
+      title: before.title,
+      slug: before.slug,
+      description: before.description,
+      status: before.status,
+      publishedAt: before.publishedAt,
+    },
+    after: { title, slug, description, status, publishedAt: status === "active" ? (before.publishedAt ?? new Date()) : null },
+  });
 
   revalidatePath("/admin/products");
   revalidatePath(`/admin/products/${id}`);
@@ -475,7 +494,7 @@ export async function createDefaultVariantAction(formData: FormData): Promise<vo
 }
 
 export async function updateVariantAction(formData: FormData): Promise<void> {
-  await requireAdminAction();
+  const session = await requireAdminAction();
 
   const productId = requireText(formData.get("productId"), "Product id");
   const variantId = requireText(formData.get("variantId"), "Variant id");
@@ -505,7 +524,7 @@ export async function updateVariantAction(formData: FormData): Promise<void> {
   const active = formData.get("active") === "on";
 
   const [current] = await db
-    .select({ salePriceMinor: variants.salePriceMinor })
+    .select()
     .from(variants)
     .where(and(eq(variants.id, variantId), eq(variants.productId, productId)))
     .limit(1);
@@ -553,6 +572,31 @@ export async function updateVariantAction(formData: FormData): Promise<void> {
 
   await processStockChanges([variantId]).catch((error) => {
     console.error("stock notifications failed", error);
+  });
+
+  await db.insert(auditLog).values({
+    actorUserId: session.user.id,
+    action: "variant.update",
+    entity: "variants",
+    entityId: variantId,
+    before: {
+      priceMinor: current.priceMinor,
+      stockQty: current.stockQty,
+      sku: current.sku,
+      title: current.title,
+      weightGrams: current.weightGrams,
+      lowStockThreshold: current.lowStockThreshold,
+      active: current.active,
+    },
+    after: {
+      priceMinor: price,
+      stockQty: stock,
+      sku,
+      title: title || "Default",
+      weightGrams,
+      lowStockThreshold,
+      active,
+    },
   });
 
   revalidatePath(`/admin/products/${productId}`);
@@ -644,7 +688,7 @@ export async function updateVariantSaleAction(formData: FormData): Promise<void>
 }
 
 export async function bulkUpdateVariantsAction(formData: FormData): Promise<void> {
-  await requireAdminAction();
+  const session = await requireAdminAction();
 
   const productId = requireText(formData.get("productId"), "Product id");
   const variantIds = formData
@@ -659,6 +703,15 @@ export async function bulkUpdateVariantsAction(formData: FormData): Promise<void
   if (stockQty === "invalid") {
     backToProduct(productId, "Enter a valid stock count", "variants");
   }
+
+  const before = await db
+    .select({
+      id: variants.id,
+      priceMinor: variants.priceMinor,
+      stockQty: variants.stockQty,
+    })
+    .from(variants)
+    .where(and(eq(variants.productId, productId), inArray(variants.id, variantIds)));
 
   const result = await bulkUpdateVariantLeaves({
     productId,
@@ -675,6 +728,15 @@ export async function bulkUpdateVariantsAction(formData: FormData): Promise<void
 
   await processStockChanges(variantIds).catch((error) => {
     console.error("stock notifications failed", error);
+  });
+
+  await db.insert(auditLog).values({
+    actorUserId: session.user.id,
+    action: "variant.bulk-update",
+    entity: "products",
+    entityId: productId,
+    before: { variants: before },
+    after: { variantIds, priceMinor, stockQty },
   });
 
   revalidatePath(`/admin/products/${productId}`);

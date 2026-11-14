@@ -32,6 +32,7 @@ export type HomeSectionRecord = typeof homeSections.$inferSelect;
 export type HomeSectionView = {
   id: string;
   kind: HomeSectionKind;
+  active: boolean;
   title: string;
   body: string;
   products: CatalogCard[];
@@ -77,8 +78,10 @@ export async function listHomeSections(activeOnly = false): Promise<HomeSectionR
   return rows;
 }
 
-export async function loadHomeSections(): Promise<HomeSectionView[]> {
-  const sections = await listHomeSections(true);
+export async function loadHomeSections(
+  options: { includeInactive?: boolean } = {},
+): Promise<HomeSectionView[]> {
+  const sections = await listHomeSections(!options.includeInactive);
   if (sections.length === 0) return [];
 
   const [catalog, promotions, categoryTree] = await Promise.all([
@@ -97,6 +100,7 @@ export async function loadHomeSections(): Promise<HomeSectionView[]> {
       views.push({
         id: section.id,
         kind: section.kind,
+        active: section.active,
         title: section.title,
         body: section.body,
         products: [],
@@ -111,6 +115,7 @@ export async function loadHomeSections(): Promise<HomeSectionView[]> {
         views.push({
           id: section.id,
           kind: section.kind,
+          active: section.active,
           title: section.title,
           body: section.body,
           products: [],
@@ -125,6 +130,7 @@ export async function loadHomeSections(): Promise<HomeSectionView[]> {
       views.push({
         id: section.id,
         kind: section.kind,
+        active: section.active,
         title: section.title || "All products",
         body: section.body,
         products: catalog.slice(0, configLimit(section.config)),
@@ -147,6 +153,7 @@ export async function loadHomeSections(): Promise<HomeSectionView[]> {
         views.push({
           id: section.id,
           kind: section.kind,
+          active: section.active,
           title: section.title || collection.name,
           body: section.body || collection.description,
           products,
@@ -169,6 +176,7 @@ export async function loadHomeSections(): Promise<HomeSectionView[]> {
         views.push({
           id: section.id,
           kind: section.kind,
+          active: section.active,
           title: section.title || category.name,
           body: section.body || category.description,
           products,
@@ -185,6 +193,7 @@ export async function loadHomeSections(): Promise<HomeSectionView[]> {
         views.push({
           id: section.id,
           kind: section.kind,
+          active: section.active,
           title: section.title,
           body: section.body,
           products,

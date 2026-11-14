@@ -133,16 +133,21 @@ test("admin builds a category tree, a collection, and a badge", async ({ page })
   await expect(page.getByRole("link", { name: "Playwright Hoodie" })).toBeVisible();
 
   await page.goto("/admin/home");
+  const picksTitle = `Playwright Picks ${Date.now()}`;
   const addSection = page.getByTestId("add-home-section");
   await addSection.locator("#section-kind-new").selectOption("collection");
   await addSection.locator("#section-source-new").selectOption({ label: "Playwright Picks" });
-  await addSection.locator("#section-title-new").fill("Playwright Picks");
+  await addSection.locator("#section-title-new").fill(picksTitle);
   await addSection.getByRole("button", { name: "Add section" }).click();
-  await expect(page).toHaveURL(/\/admin\/home$/);
+  await expect(page.getByRole("heading", { name: picksTitle })).toBeVisible();
+
+  await page.goto("/admin/home/preview");
+  await expect(page.getByText(picksTitle).first()).toBeVisible();
+  await expect(page.getByText("active", { exact: true }).first()).toBeVisible();
 
   await page.goto("/");
   await page.reload();
-  const picks = page.getByRole("region", { name: "Playwright Picks products" });
+  const picks = page.getByRole("region", { name: `${picksTitle} products` });
   await expect(picks.getByRole("link", { name: /Playwright Hoodie/ })).toBeVisible();
 
   await page.goto("/collections/playwright-picks");

@@ -336,8 +336,9 @@ The admin can edit the storefront without a deploy:
   content page. Bodies are trusted admin HTML and are publicly available at `/pages/[slug]`.
 - The footer reads published pages, contact details, VAT copy, and the free-delivery threshold from
   settings instead of hardcoding them.
-- Every settings, section, and page change writes an audit entry. The current implementation does
-  not yet provide a side-by-side preview/draft workflow for homepage sections.
+- Every settings, section, and page change writes an audit entry. `/admin/home/preview` renders
+  active and inactive sections with draft badges and product resolution, so a section can be checked
+  before it is switched on. There is no side-by-side desktop/mobile preview.
 
 ## Arabic and numerals
 
@@ -593,8 +594,9 @@ addresses, order history, and faster checkout.
 4. Action: the individual action re-checks the role, not just the page.
 
 The panel lists customers, orders (read-only for now), reviews, products, taxonomy, promotions,
-homepage sections, pages, and settings. Every admin mutation writes an `audit_log` entry, except
-some older product/media/variant mutations that still need to be brought into coverage.
+homepage sections, pages, and settings. Every admin mutation writes an `audit_log` entry, including product create/update, variant
+create/update/bulk price-stock changes, and sale changes. Option reordering, branch edits, and media
+upload/delete still need to be brought into coverage.
 
 The panel also lists customers: name, email, phone, order count, spend, and last order, with a
 detail page for saved addresses and order history. Customers never reach this host.

@@ -274,8 +274,10 @@ This is a background stream expanded as each feature lands, not a phase with a f
   workflow is still pending.
 - **Content pages (done):** admin-editable Privacy, Terms, Shipping, Returns, Contact, FAQ, Cookies,
   and other pages, with published state and SEO fields.
-- **Preview/draft (partial):** products, promotions, categories, collections, and pages have draft
-  or active states, but there is no side-by-side preview link for homepage drafts yet.
+- **Preview/draft (done):** products, promotions, categories, collections, and pages have draft or
+  active states. `/admin/home/preview` shows active and inactive homepage sections with draft badges
+  and resolved products. A side-by-side desktop/mobile preview and typography tokens remain later
+  polish.
 - Each new configurable feature adds its admin screen and its audit entry here.
 
 ## Phase 9 — Full UI redesign

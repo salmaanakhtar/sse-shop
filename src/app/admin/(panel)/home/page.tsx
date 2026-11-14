@@ -44,9 +44,17 @@ export default async function AdminHomePage({
             Ordered sections. Inactive sections stay in this list but are hidden from shoppers.
           </p>
         </div>
-        <Link href="/" className="text-sm text-muted hover:text-ink">
-          View storefront
-        </Link>
+        <div className="flex items-center gap-3">
+          <Link
+            href="/admin/home/preview"
+            className="text-sm text-muted underline-offset-4 hover:text-ink hover:underline"
+          >
+            Preview (including drafts)
+          </Link>
+          <Link href="/" className="text-sm text-muted hover:text-ink">
+            View storefront
+          </Link>
+        </div>
       </div>
 
       {error ? (

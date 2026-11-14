@@ -47,7 +47,7 @@ rules.
 
 ## Data model
 
-Forty-two tables, deliberately narrow. Core tables carry `created_at`; most carry `updated_at`;
+Forty-six tables, deliberately narrow. Core tables carry `created_at`; most carry `updated_at`;
 join tables stay minimal.
 | Table | Holds | Notes |
 | --- | --- | --- |
@@ -76,6 +76,10 @@ join tables stay minimal.
 | `stock_alerts` | Back-in-stock requests | unique on `(variant_id, email)`; one email then marked notified |
 | `low_stock_alerts` | Open low-stock crossing per variant | row removed above threshold so the next crossing alerts again |
 | `abandoned_cart_emails` | One recovery email per cart | unique cart id |
+| `subscribers` | Newsletter and account opt-ins | pending/subscribed/unsubscribed; hashed confirm token, unsubscribe token |
+| `email_suppressions` | Hard-blocked addresses | keyed by email; reason recorded |
+| `campaigns` | Marketing email drafts and sends | status, schedule, sent time, recipient count |
+| `campaign_sends` | Campaign outbox | one row per recipient; unique `(campaign_id, email)` |
 | `carts` | One basket per shopper token | Token hashed; `expires_at`; `user_id` links a signed-in cart |
 | `cart_items` | Variants in a cart | Unique on `(cart_id, variant_id)` |
 | `orders` | Placed order, totals, and fulfillment state | `number` unique and sequential; status/payment state; tracking; invoice number; refund total; cancellation/return timestamps |
@@ -465,6 +469,40 @@ pending ──► confirmed ──► processing ──► shipped ──► del
   cron job will call later.
 - Mail still goes through the console driver; every message is a plain-text body built in the
   service. Real delivery is deferred to the deploy-ready phase.
+
+## Marketing email
+
+```text
+/ newsletter form ──► subscriber (pending) ──► confirmation email
+                                                    │
+                                         click /newsletter/confirm
+                                                    ▼
+                                              subscribed
+                                                    │
+admin campaign ──► draft ──► scheduled ──► send/process ──► outbox row per recipient
+                                                    │
+                                        unsubscribe link in every email
+                                                    ▼
+                                     unsubscribed + email_suppressions
+```
+
+- Guests subscribe at `/newsletter` with an explicit consent checkbox. A new or returning address
+  becomes `pending`; the confirmation email carries a one-time token whose hash is stored. Only a
+  confirmed subscriber receives campaigns. An already-confirmed address is not mailed again.
+- Signed-in customers toggle marketing consent on `/account`. That is explicit, so the subscriber
+  becomes `subscribed` immediately. Switching it off unsubscribes and suppresses the address.
+- Every campaign email appends a one-click unsubscribe URL built from the subscriber's token.
+  Unsubscribing sets the subscriber to `unsubscribed` and inserts an `email_suppressions` row.
+  A deliberate new opt-in deletes that suppression.
+- Admin campaigns live at `/admin/campaigns`: draft, edit, schedule, send now, cancel, and delete a
+  draft. Scheduled campaigns send when "Process scheduled" runs, until a scheduler exists.
+- Sending reads confirmed, non-suppressed subscribers and inserts one outbox row per recipient
+  before mailing. The unique `(campaign_id, email)` pair makes a retry safe; failures are recorded
+  per recipient without stopping the rest. Placeholders `{name}`, `{email}`, and
+  `{unsubscribe_url}` are rendered per recipient.
+- Account deletion removes the subscriber row and campaign history for that address as personal
+  data.
+- Body and subject are plain text, English, and go through the console mailer until deploy.
 
 ## Customer accounts and addresses
 

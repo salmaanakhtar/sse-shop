@@ -12,8 +12,8 @@ continuous background stream, not a numbered phase.
 **Completion program:** security/foundation fixes, admin settings, homepage sections, legal pages,
 Arabic routing/RTL/numerals, search/filter/sort/pagination, SEO metadata/sitemap/JSON-LD, verified
 reviews, related products, order operations, the payment lifecycle, manual refunds, VAT invoices,
-emirate shipping zones, and stock/cart notifications are in place. Marketing email and the
-analytics dashboard remain.
+emirate shipping zones, stock/cart notifications, and marketing email are in place. The analytics
+dashboard remains.
 
 ## Phase 0 — Foundation
 
@@ -202,6 +202,24 @@ and a customer's choices survive a return visit. Dark mode is complete; Arabic i
 - **Coverage:** unit/integration tests for capture, deduplication, notification, threshold overrides,
   crossing reset, consent, and one-email-per-cart; a Playwright journey captures a sold-out alert and
   clears it after an admin restock.
+
+## Commerce completion — Marketing email
+
+**Status: complete.**
+
+- **Consent:** guest newsletter form with double opt-in; signed-in account toggle that confirms
+  immediately; unsubscribe and suppression; a deliberate new opt-in clears suppression.
+- **Subscribers:** pending/subscribed/unsubscribed, hashed confirmation token, unsubscribe token,
+  source, and consent/confirmation timestamps.
+- **Campaigns:** draft, edit, schedule, send now, cancel, and delete; one outbox row per recipient
+  with a unique campaign/email pair; per-recipient failures recorded; `{name}`, `{email}`, and
+  `{unsubscribe_url}` placeholders.
+- **Delivery:** console mailer until the deploy-ready phase; scheduled campaigns send when the admin
+  runs “Process scheduled”, the seam a cron job will use.
+- **Privacy:** account deletion removes the subscriber and campaign history for that address.
+- **Coverage:** integration tests for double opt-in, resubscribe, account consent, suppression,
+  per-recipient outbox, retry safety, and due schedules; a Playwright journey subscribes, opts the
+  account in, creates, and sends a campaign.
 
 ## Phase 7 — Real money and mail
 

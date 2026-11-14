@@ -322,6 +322,33 @@ A signed-in cart with items, marketing consent, no completed order, and no activ
 configured number of hours. One recovery email is sent per cart.
 _Avoid_: Lost cart, recovery
 
+## Marketing
+
+**Subscriber**:
+An email address that opted in to marketing. `pending` until the double opt-in link is clicked,
+`subscribed` after confirmation, `unsubscribed` after opting out. Account opt-in confirms immediately
+because the customer is signed in and acting explicitly.
+_Avoid_: Member, list entry
+
+**Double opt-in**:
+Confirming a newsletter address by clicking a one-time link before any campaign is sent.
+_Avoid_: Verification, confirmation email
+
+**Suppression**:
+A hard block on an email address after an unsubscribe, bounce, or manual decision. Campaigns filter
+suppressed addresses out; a deliberate new opt-in clears the block.
+_Avoid_: Blacklist, blocklist
+
+**Campaign**:
+A marketing email with a subject, plain-text body, optional schedule, and an audience of confirmed
+subscribers. It moves draft → scheduled → sending → sent, or cancelled.
+_Avoid_: Newsletter, blast, mailing
+
+**Campaign outbox**:
+One row per campaign recipient with its delivery status. The unique campaign/email pair makes a
+retry safe.
+_Avoid_: Queue, batch
+
 ## Running the store
 
 **Settings**:

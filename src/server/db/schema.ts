@@ -37,6 +37,19 @@ export const orderStatus = pgEnum("order_status", [
 ]);
 export const paymentStatus = pgEnum("payment_status", ["unpaid", "paid", "refunded", "failed"]);
 export const reviewStatus = pgEnum("review_status", ["pending", "approved", "rejected"]);
+export const subscriberStatus = pgEnum("subscriber_status", [
+  "pending",
+  "subscribed",
+  "unsubscribed",
+]);
+export const campaignStatus = pgEnum("campaign_status", [
+  "draft",
+  "scheduled",
+  "sending",
+  "sent",
+  "cancelled",
+]);
+export const campaignSendStatus = pgEnum("campaign_send_status", ["queued", "sent", "failed"]);
 
 /* ─────────────────────── auth (Better Auth) ───────────────────────
  * Key names are camelCase because the adapter resolves models by these keys;
@@ -463,6 +476,76 @@ export const lowStockAlerts = pgTable(
     createdAt: createdAt(),
   },
   (table) => [index("low_stock_alerts_created_at_idx").on(table.createdAt)],
+);
+
+/* ─────────────────────── marketing ─────────────────────── */
+
+/**
+ * Newsletter subscribers, including guests. `pending` means double opt-in has
+ * not been confirmed yet; only `subscribed` rows receive campaigns.
+ */
+export const subscribers = pgTable(
+  "subscribers",
+  {
+    id: id(),
+    email: text("email").notNull().unique(),
+    name: text("name").notNull().default(""),
+    status: subscriberStatus("status").notNull().default("pending"),
+    source: text("source").notNull().default("newsletter"),
+    confirmTokenHash: text("confirm_token_hash"),
+    unsubscribeToken: text("unsubscribe_token").notNull().unique(),
+    consentAt: timestamp("consent_at", { withTimezone: true, mode: "date" }),
+    confirmedAt: timestamp("confirmed_at", { withTimezone: true, mode: "date" }),
+    unsubscribedAt: timestamp("unsubscribed_at", { withTimezone: true, mode: "date" }),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (table) => [index("subscribers_status_idx").on(table.status)],
+);
+
+/** Hard block for unsubscribed, bounced, or manually suppressed addresses. */
+export const emailSuppressions = pgTable("email_suppressions", {
+  email: text("email").primaryKey(),
+  reason: text("reason").notNull(),
+  createdAt: createdAt(),
+});
+
+export const campaigns = pgTable(
+  "campaigns",
+  {
+    id: id(),
+    subject: text("subject").notNull(),
+    body: text("body").notNull().default(""),
+    status: campaignStatus("status").notNull().default("draft"),
+    scheduledAt: timestamp("scheduled_at", { withTimezone: true, mode: "date" }),
+    sentAt: timestamp("sent_at", { withTimezone: true, mode: "date" }),
+    recipientCount: integer("recipient_count").notNull().default(0),
+    createdBy: text("created_by").references(() => users.id, { onDelete: "set null" }),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (table) => [index("campaigns_status_scheduled_idx").on(table.status, table.scheduledAt)],
+);
+
+/** The campaign outbox: one row per recipient, unique per campaign. */
+export const campaignSends = pgTable(
+  "campaign_sends",
+  {
+    id: id(),
+    campaignId: text("campaign_id")
+      .notNull()
+      .references(() => campaigns.id, { onDelete: "cascade" }),
+    subscriberId: text("subscriber_id").references(() => subscribers.id, { onDelete: "set null" }),
+    email: text("email").notNull(),
+    status: campaignSendStatus("status").notNull().default("queued"),
+    error: text("error"),
+    sentAt: timestamp("sent_at", { withTimezone: true, mode: "date" }),
+    createdAt: createdAt(),
+  },
+  (table) => [
+    uniqueIndex("campaign_sends_campaign_email_uq").on(table.campaignId, table.email),
+    index("campaign_sends_campaign_idx").on(table.campaignId, table.status),
+  ],
 );
 
 /* ─────────────────────────── carts ─────────────────────────── */

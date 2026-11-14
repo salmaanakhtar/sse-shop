@@ -1,7 +1,9 @@
 import Link from "next/link";
 import { eq } from "drizzle-orm";
 import { redirect } from "next/navigation";
+import { setMarketingConsentAction } from "@/app/(storefront)/account/actions";
 import { ProfileForm } from "@/components/storefront/profile-form";
+import { Button } from "@/components/ui/button";
 import { formatMoney } from "@/lib/money";
 import { requireUserPage } from "@/server/auth/guard";
 import { db } from "@/server/db/client";
@@ -66,6 +68,33 @@ export default async function AccountOverviewPage() {
         <div className="mt-4 max-w-md">
           <ProfileForm name={user.name} email={user.email} phone={user.phone ?? ""} />
         </div>
+      </section>
+
+      <section className="rounded-xl border border-line bg-surface p-6">
+        <h2 className="text-sm font-semibold">Marketing emails</h2>
+        <p className="mt-2 max-w-lg text-sm text-muted">
+          Occasional product news and offers. Abandoned-cart reminders use this permission too.
+          Every campaign has a one-click unsubscribe.
+        </p>
+        <form action={setMarketingConsentAction} className="mt-4 space-y-3">
+          <label className="flex items-center gap-2 text-sm">
+            <input
+              type="checkbox"
+              name="marketingConsent"
+              defaultChecked={user.marketingConsent}
+              className="size-4"
+            />
+            Email me about new products and offers
+          </label>
+          <Button type="submit" size="sm" variant="secondary">
+            Save preference
+          </Button>
+        </form>
+        <p className="mt-3 text-xs text-muted">
+          {user.marketingConsent
+            ? `Opted in${user.marketingConsentAt ? ` on ${user.marketingConsentAt.toLocaleDateString("en-AE")}` : ""}.`
+            : "Not opted in. Transactional order and stock-alert emails still send."}
+        </p>
       </section>
 
       <section className="rounded-xl border border-line bg-surface">

@@ -3,10 +3,12 @@ import { db } from "../db/client";
 import {
   accounts,
   auditLog,
+  campaignSends,
   carts,
   customerAddresses,
   orders,
   sessions,
+  subscribers,
   twoFactors,
   users,
   verifications,
@@ -115,6 +117,9 @@ export async function anonymizeCustomer(
     await tx.delete(wishlistAlerts).where(eq(wishlistAlerts.userId, userId));
     await tx.delete(wishlists).where(eq(wishlists.userId, userId));
     await tx.delete(verifications).where(eq(verifications.identifier, user.email));
+    // Marketing consent and any campaign history are personal data too.
+    await tx.delete(campaignSends).where(eq(campaignSends.email, user.email));
+    await tx.delete(subscribers).where(eq(subscribers.email, user.email));
 
     await tx
       .update(users)

@@ -66,6 +66,8 @@ without replacing it.
     checkout, sees the band charge in the total, and the placed order keeps it.
 22. **Stock alerts** - a shopper requests a back-in-stock email for a sold-out variant, admin shows
     one pending request, an admin restock clears it.
+23. **Marketing** - a visitor subscribes and sees the confirmation message; the admin account opts
+    in, creates a campaign, and sends it from the admin.
 
 ## Vitest setup
 
@@ -208,6 +210,12 @@ item, one send and a notified mark after restock, one low-stock email per crossi
 reset, per-variant overrides, and abandoned-cart consent, one-email-per-cart, and activity cutoff.
 The Playwright journey captures a sold-out alert, checks the admin pending count, restocks, and sees
 the count clear.
+
+Marketing tests cover double opt-in, re-mailing a pending address, confirming once, already-confirmed
+short-circuit, unsubscribe and suppression, deliberate resubscribe, account consent both ways, one
+personalized outbox row per confirmed and unsuppressed subscriber, retry safety, due-only scheduled
+sends, and account-deletion cleanup. The Playwright journey subscribes a visitor, opts the account
+in, and sends a campaign.
 
 Theme tests cover accepted values and cookie-versus-account precedence. The Playwright journey
 checks the system default, switches to dark, reloads to prove the cookie persists, and signs in from

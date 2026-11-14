@@ -11,6 +11,7 @@ import { db } from "@/server/db/client";
 import { users } from "@/server/db/schema";
 import { mergeCartOnSignIn } from "@/server/services/cart";
 import { anonymizeCustomer } from "@/server/services/customers";
+import { setMarketingConsent } from "@/server/services/marketing";
 import {
   LOCALE_COOKIE,
   NUMERALS_COOKIE,
@@ -20,6 +21,15 @@ export type ProfileState = { error?: string; success?: string } | null;
 export type DeleteAccountState = { error?: string } | null;
 
 /** Called by the sign-in and sign-up forms after the session cookie exists. */
+export async function setMarketingConsentAction(formData: FormData): Promise<void> {
+  const session = await requireUserAction();
+  const consent = formData.get("marketingConsent") === "on";
+
+  await setMarketingConsent(session.user.id, consent);
+  revalidatePath("/account");
+  revalidatePath("/", "layout");
+}
+
 export async function mergeCartAfterSignInAction(): Promise<void> {
   const session = await requireUserAction();
   await mergeCartOnSignIn(session.user.id);

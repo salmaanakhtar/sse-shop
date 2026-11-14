@@ -188,6 +188,9 @@ export function SiteFooter({
               {page.title}
             </Link>
           ))}
+          <Link href={localePath(locale, "/newsletter")} className="hover:text-ink">
+            Newsletter
+          </Link>
           {settings.contactEmail ? (
             <a href={`mailto:${settings.contactEmail}`} className="hover:text-ink">
               {translate(locale, "common.contact")}

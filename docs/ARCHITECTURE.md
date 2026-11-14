@@ -47,7 +47,7 @@ rules.
 
 ## Data model
 
-Thirty-five tables, deliberately narrow. Core tables carry `created_at`; most carry `updated_at`;
+Thirty-seven tables, deliberately narrow. Core tables carry `created_at`; most carry `updated_at`;
 join tables stay minimal.
 | Table | Holds | Notes |
 | --- | --- | --- |
@@ -75,8 +75,10 @@ join tables stay minimal.
 | `wishlist_alerts` | One alert per customer and variant | prevents repeat mail across named lists |
 | `carts` | One basket per shopper token | Token hashed; `expires_at`; `user_id` links a signed-in cart |
 | `cart_items` | Variants in a cart | Unique on `(cart_id, variant_id)` |
-| `orders` | Placed order and its totals | `number` unique and sequential; `user_id` links the owner; `billing_address` snapshot |
+| `orders` | Placed order, totals, and fulfillment state | `number` unique and sequential; status/payment state; tracking; invoice number; refund total; cancellation/return timestamps |
 | `order_items` | Snapshot of what was bought | Prices frozen at placement |
+| `order_events` | Order timeline | type, message, optional actor; appended by every lifecycle change |
+| `refunds` | Manual refund records | amount, reason, optional provider reference |
 | `promotions` | Carousel slides and their pages | slug, image, headline, CTA, schedule, order |
 | `promotion_rows` | Ordered rows on a promotion page | category, collection, or hand-picked products |
 | `promotion_row_products` | Hand-picked products in a row | composite key; per-row position |
@@ -393,6 +395,40 @@ and the placement transaction is the seam for it.
 
 UAE addresses collect: full name, phone (`+971`, validated), emirate (one of the seven), street,
 building/villa, optional PO box, optional notes. Postal codes are not used.
+
+## Order operations
+
+```text
+pending ──► confirmed ──► processing ──► shipped ──► delivered ──► return_requested ──► returned
+   │            │             │              │
+   └────────────┴─────────────┴──► cancelled (restock)
+```
+
+- The admin changes status at `/admin/orders/[id]`: start processing, ship with carrier and tracking
+  (customer email), mark delivered, cancel and restock before fulfillment, approve a return and
+  restock, and record refunds.
+- A customer can request cancellation while the order is pending, confirmed, or processing. That
+  request records a timestamp, reason, and event and emails the store; the admin still performs the
+  cancellation so stock changes stay in one place.
+- A customer can request a return after delivery, within `returns.window_days` from store settings
+  (14 by default). The request stores its reason and emails the store; admin approval restocks and
+  moves the order to `returned`.
+- Payment state is provider-agnostic: `unpaid`, `paid`, `refunded`, `failed`, plus a free-text
+  `payment_reference` written by the provider adapter. The mock provider writes a mock reference.
+- Refunds are recorded manually until Stripe lands. `refunds` holds each amount and reason,
+  `orders.refunded_minor` is the running total, and the order becomes `refunded` only when the total
+  is fully refunded. A refund cannot exceed the order total.
+- `order_events` is the customer-visible and admin-visible timeline. Every status transition,
+  cancellation request, return, refund, and invoice writes one.
+- Order confirmation mail is sent only for a paid order. Shipping mail is sent when tracking is
+  recorded. Mail failures are logged and never roll back a committed order change.
+- Tracking and the tax invoice are shown on the guest order page (with its lookup token) and the
+  account order page. An issued invoice has both an HTML page and a generated PDF.
+- `orders.invoice_number` is unique and drawn from a per-year counter: `INV-YYYY-######`. It is
+  separate from the order number and is issued only on demand from the admin, so an unpaid order
+  does not consume a tax-invoice sequence.
+- Persian/Arabic customer names cannot be encoded by the built-in PDF fonts; the PDF route replaces
+  unsupported glyphs rather than failing. Embedding a Unicode font is the later fix.
 
 ## Customer accounts and addresses
 

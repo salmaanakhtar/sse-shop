@@ -59,6 +59,9 @@ without replacing it.
     numeral toggle switches to Arabic-Indic digits, and the language switch returns to English.
 19. **Search and SEO** - the header search opens `/search`, returns the matching product, and the
     sitemap, robots file, and Product JSON-LD are present.
+20. **Order operations** - a shopper places a guest order; an admin starts processing, ships with
+    tracking, and marks it delivered; the shopper requests a return and sees tracking; the admin
+    approves the return, records a partial refund, issues a tax invoice, and downloads the PDF.
 
 ## Vitest setup
 
@@ -183,6 +186,12 @@ rating summaries, and rejection without a paid order. Related-product tests cove
 ranking, shared-collection ranking, fallback, and excluding the current product. The Arabic e2e
 covers `/ar`, RTL, Arabic product copy, the numeral toggle, and switching back to English. The SEO
 e2e covers the search page, sitemap, robots file, and Product JSON-LD.
+
+Order-operation tests cover the processing → shipped → delivered transitions and their events,
+shipping mail, refusing cancellation after dispatch, cancellation restock, customer cancellation
+requests, in-window and out-of-window return requests, approval restock, partial and full refunds
+with the total cap, and idempotent, sequential invoice numbering. The Playwright journey drives the
+same path through the admin UI, the guest order page, and the PDF download.
 
 Theme tests cover accepted values and cookie-versus-account precedence. The Playwright journey
 checks the system default, switches to dark, reloads to prove the cookie persists, and signs in from

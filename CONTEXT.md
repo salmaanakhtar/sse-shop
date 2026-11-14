@@ -270,9 +270,40 @@ _Avoid_: Shipping, delivery, logistics
 One physical dispatch belonging to an order. An order may have more than one.
 _Avoid_: Delivery, package
 
+**Order status**:
+The fulfilment position of an order: `pending`, `confirmed`, `processing`, `shipped`, `delivered`,
+`cancelled`, `return_requested`, or `returned`. `fulfilled` remains for older rows.
+_Avoid_: State, stage
+
+**Order event**:
+One entry in an order's timeline: a status transition, cancellation request, return, refund, invoice,
+or admin note. Events are append-only.
+_Avoid_: Log line, history row
+
+**Cancellation request**:
+A customer's request to cancel an order before it ships. It records a reason and notifies the store;
+an admin performs the cancellation and restock.
+_Avoid_: Cancellation, void
+
+**Return request**:
+A customer's request to return a delivered order inside the configured return window. Admin approval
+records receipt and restocks the items.
+_Avoid_: Refund, exchange, RMA
+
 **Refund**:
-Money returned against a paid order, in whole or in part.
+Money returned against a paid order, in whole or in part. Until Stripe lands it is recorded manually
+against the order; the refund record is the source of truth.
 _Avoid_: Return, credit
+
+**Tax invoice**:
+The VAT document for an order, numbered `INV-YYYY-######` from a per-year counter, separate from the
+order number and issued on demand.
+_Avoid_: Receipt, bill
+
+**Payment reference**:
+The provider's identifier for a charge, written when the provider reports payment. With the mock
+provider it is a local placeholder.
+_Avoid_: Transaction id, charge id
 
 ## Running the store
 

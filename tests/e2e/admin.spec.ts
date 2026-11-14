@@ -259,6 +259,77 @@ test("admin builds a promotion page with category, collection, and product rows"
   await expect(productRow.getByRole("link", { name: /Playwright Hoodie/ })).toBeVisible();
 });
 
+test("admin fulfils an order, handles a return, refunds, and issues an invoice", async ({
+  page,
+  browser,
+}) => {
+  const shopper = await browser.newContext();
+  const shop = await shopper.newPage();
+
+  await shop.goto("/products/essential-tee");
+  await shop.getByTestId("add-to-cart").click();
+  await expect(shop.getByRole("status")).toHaveText("Added to cart.");
+  await shop.goto("/checkout");
+  await shop.getByLabel("Email").fill("order-ops@example.com");
+  await shop.getByLabel("Full name").fill("Order Ops Customer");
+  await shop.getByLabel("Mobile").fill("+971501234567");
+  await shop.getByLabel("Building or villa").fill("Villa 7");
+  await shop.getByLabel("Street").fill("Al Wasl Road");
+  await shop.getByTestId("place-order").click();
+  await expect(shop).toHaveURL(/\/orders\/SS-\d{4}-\d{6}\?t=/);
+
+  const orderUrl = new URL(shop.url());
+  const orderNumber = decodeURIComponent(orderUrl.pathname.split("/").pop() ?? "");
+  const orderPath = `${orderUrl.pathname}${orderUrl.search}`;
+
+  await page.goto("/admin/orders");
+  await page.getByRole("link", { name: orderNumber, exact: true }).click();
+  await expect(page.getByRole("heading", { name: orderNumber })).toBeVisible();
+
+  await page.getByRole("button", { name: "Start processing" }).click();
+  await expect(page.getByText("Order updated.")).toBeVisible();
+
+  await page.locator("#carrier").fill("Aramex");
+  await page.locator("#trackingNumber").fill("ARX-E2E-1");
+  await page.getByRole("button", { name: "Mark shipped & email customer" }).click();
+  await expect(page.getByText("ARX-E2E-1").first()).toBeVisible();
+
+  await page.getByRole("button", { name: "Mark delivered" }).click();
+  await expect(page.getByText("Order delivered.")).toBeVisible();
+
+  await shop.goto(orderPath);
+  await expect(shop.getByText("ARX-E2E-1")).toBeVisible();
+  await shop.getByLabel("Reason").fill("The fabric is not what I expected.");
+  await shop.getByRole("button", { name: "Submit return request" }).click();
+  await expect(shop.getByText("Your return request was sent.")).toBeVisible();
+
+  await page.reload();
+  await page.getByRole("button", { name: "Approve return & restock" }).click();
+  await expect(page.getByText("Return received and stock restored.")).toBeVisible();
+
+  await page.locator("#refund-amount").fill("20.00");
+  await page.locator("#refund-reason").fill("Delivery charge");
+  await page.getByRole("button", { name: "Record refund" }).click();
+  await expect(page.getByText(/20\.00 AED refunded/)).toBeVisible();
+
+  await shop.goto(orderPath);
+  await expect(shop.getByRole("heading", { name: "Refund" })).toBeVisible();
+  await expect(shop.getByText(/AED\s20\.00 has been recorded/)).toBeVisible();
+
+  await page.getByRole("button", { name: "Issue invoice" }).click();
+  await expect(page).toHaveURL(/\/orders\/SS-\d{4}-\d{6}\/invoice$/);
+  await expect(page.getByText(/INV-\d{4}-\d{6}/).first()).toBeVisible();
+
+  const pdfHref = await page.getByRole("link", { name: "Download PDF" }).getAttribute("href");
+  expect(pdfHref).toBeTruthy();
+  const pdf = await page.request.get(pdfHref!);
+  expect(pdf.status()).toBe(200);
+  expect(pdf.headers()["content-type"]).toBe("application/pdf");
+  expect((await pdf.body()).subarray(0, 5).toString()).toBe("%PDF-");
+
+  await shopper.close();
+});
+
 test("admin can open the customer list", async ({ page }) => {
   await page.goto("/admin/customers");
   await expect(page.getByRole("heading", { name: "Customers" })).toBeVisible();

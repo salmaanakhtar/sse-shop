@@ -11,9 +11,11 @@ import {
   cartItems,
   carts,
   counters,
+  orderEvents,
   orderItems,
   orders,
   products,
+  refunds,
   variants,
 } from "../db/schema";
 import { mailer } from "../mail";
@@ -41,18 +43,32 @@ export type OrderLineView = {
 };
 
 export type OrderView = {
+  id: string;
   number: string;
   email: string;
   status: string;
   paymentStatus: string;
+  paymentReference: string | null;
   placedAt: Date;
   subtotalMinor: number;
   shippingMinor: number;
   discountMinor: number;
   taxMinor: number;
   totalMinor: number;
+  refundedMinor: number;
   currency: string;
   userId: string | null;
+  trackingCarrier: string | null;
+  trackingNumber: string | null;
+  invoiceNumber: string | null;
+  fulfilledAt: Date | null;
+  deliveredAt: Date | null;
+  cancelledAt: Date | null;
+  cancellationRequestedAt: Date | null;
+  cancellationReason: string | null;
+  returnRequestedAt: Date | null;
+  returnReceivedAt: Date | null;
+  returnReason: string | null;
   shippingAddress: Address;
   billingAddress: Address | null;
   notes: string | null;
@@ -314,6 +330,7 @@ export async function placeOrder(input: {
     .update(orders)
     .set({
       paymentStatus: payment.status,
+      paymentReference: payment.reference,
       status: payment.status === "paid" ? "confirmed" : "pending",
       updatedAt: new Date(),
     })
@@ -321,28 +338,31 @@ export async function placeOrder(input: {
 
   const orderUrl = `${process.env.NEXT_PUBLIC_STORE_URL ?? "http://localhost:3000"}/orders/${committed.number}?t=${lookup.token}`;
 
-  await mailer
-    .send({
-      to: email.data,
-      subject: `Order ${committed.number} confirmed`,
-      text: [
-        `Thanks for your order.`,
-        ``,
-        ...committed.lines.map(
-          (line) => `${line.quantity} × ${line.title} — ${(line.unitPriceMinor * line.quantity) / 100} AED`,
-        ),
-        ``,
-        `Total: ${committed.totalMinor / 100} AED (including ${committed.taxMinor / 100} AED VAT)`,
-        ``,
-        `View or track your order: ${orderUrl}`,
-        ``,
-        `Keep that link — it is the only way back into the order without an account.`,
-      ].join("\n"),
-    })
-    .catch((error) => {
-      // Mail failing must not fail an order that has already been placed.
-      console.error("order confirmation mail failed", error);
-    });
+  if (payment.status === "paid") {
+    await mailer
+      .send({
+        to: email.data,
+        subject: `Order ${committed.number} confirmed`,
+        text: [
+          `Thanks for your order.`,
+          ``,
+          ...committed.lines.map(
+            (line) =>
+              `${line.quantity} × ${line.title} — ${(line.unitPriceMinor * line.quantity) / 100} AED`,
+          ),
+          ``,
+          `Total: ${committed.totalMinor / 100} AED (including ${committed.taxMinor / 100} AED VAT)`,
+          ``,
+          `View or track your order: ${orderUrl}`,
+          ``,
+          `Keep that link — it is the only way back into the order without an account.`,
+        ].join("\n"),
+      })
+      .catch((error) => {
+        // Mail failing must not fail an order that has already been placed.
+        console.error("order confirmation mail failed", error);
+      });
+  }
 
   return ok({
     number: committed.number,
@@ -357,18 +377,32 @@ function toOrderView(
   items: (typeof orderItems.$inferSelect)[],
 ): OrderView {
   return {
+    id: order.id,
     number: order.number,
     email: order.email,
     status: order.status,
     paymentStatus: order.paymentStatus,
+    paymentReference: order.paymentReference,
     placedAt: order.placedAt,
     subtotalMinor: order.subtotalMinor,
     shippingMinor: order.shippingMinor,
     discountMinor: order.discountMinor,
     taxMinor: order.taxMinor,
     totalMinor: order.totalMinor,
+    refundedMinor: order.refundedMinor,
     currency: order.currency,
     userId: order.userId,
+    trackingCarrier: order.trackingCarrier,
+    trackingNumber: order.trackingNumber,
+    invoiceNumber: order.invoiceNumber,
+    fulfilledAt: order.fulfilledAt,
+    deliveredAt: order.deliveredAt,
+    cancelledAt: order.cancelledAt,
+    cancellationRequestedAt: order.cancellationRequestedAt,
+    cancellationReason: order.cancellationReason,
+    returnRequestedAt: order.returnRequestedAt,
+    returnReceivedAt: order.returnReceivedAt,
+    returnReason: order.returnReason,
     shippingAddress: addressSchema.parse(order.shippingAddress),
     billingAddress: order.billingAddress ? addressSchema.parse(order.billingAddress) : null,
     notes: order.notes,
@@ -512,4 +546,412 @@ export async function claimOrder(input: {
 
 export async function listRecentOrdersForAdmin(limit = 50) {
   return db.select().from(orders).orderBy(sql`${orders.placedAt} desc`).limit(limit);
+}
+
+export type AdminOrderDetail = OrderView & {
+  adminNotes: string | null;
+  events: (typeof orderEvents.$inferSelect)[];
+  refunds: (typeof refunds.$inferSelect)[];
+};
+
+export async function getOrderForAdmin(id: string): Promise<AdminOrderDetail | null> {
+  const [order] = await db.select().from(orders).where(eq(orders.id, id)).limit(1);
+  if (!order) return null;
+
+  const [items, events, refundRows] = await Promise.all([
+    db
+      .select()
+      .from(orderItems)
+      .where(eq(orderItems.orderId, id))
+      .orderBy(asc(orderItems.position)),
+    db
+      .select()
+      .from(orderEvents)
+      .where(eq(orderEvents.orderId, id))
+      .orderBy(desc(orderEvents.createdAt)),
+    db
+      .select()
+      .from(refunds)
+      .where(eq(refunds.orderId, id))
+      .orderBy(desc(refunds.createdAt)),
+  ]);
+
+  return {
+    ...toOrderView(order, items),
+    adminNotes: order.adminNotes,
+    events,
+    refunds: refundRows,
+  };
+}
+
+export async function getOrderForAdminByNumber(
+  number: string,
+): Promise<AdminOrderDetail | null> {
+  const [order] = await db
+    .select({ id: orders.id })
+    .from(orders)
+    .where(eq(orders.number, number))
+    .limit(1);
+  return order ? getOrderForAdmin(order.id) : null;
+}
+
+type OrderTx = Parameters<Parameters<typeof db.transaction>[0]>[0];
+
+async function addOrderEvent(
+  tx: OrderTx,
+  orderId: string,
+  type: string,
+  message: string,
+  actorUserId: string | null,
+): Promise<void> {
+  await tx.insert(orderEvents).values({ orderId, type, message, actorUserId });
+}
+
+async function restockOrder(tx: OrderTx, orderId: string): Promise<void> {
+  const items = await tx.select().from(orderItems).where(eq(orderItems.orderId, orderId));
+  for (const item of items) {
+    if (!item.variantId) continue;
+    await tx
+      .update(variants)
+      .set({
+        stockQty: sql`${variants.stockQty} + ${item.quantity}`,
+        updatedAt: new Date(),
+      })
+      .where(eq(variants.id, item.variantId));
+  }
+}
+
+async function sendShippingEmail(order: typeof orders.$inferSelect): Promise<void> {
+  if (!order.trackingNumber) return;
+  await mailer
+    .send({
+      to: order.email,
+      subject: `Order ${order.number} is on its way`,
+      text: [
+        `Your order is on its way.`,
+        ``,
+        `Carrier: ${order.trackingCarrier || "Store delivery"}`,
+        `Tracking: ${order.trackingNumber}`,
+        ``,
+        `Order number: ${order.number}`,
+      ].join("\n"),
+    })
+    .catch((error) => {
+      console.error("shipping mail failed", error);
+    });
+}
+
+export async function markOrderProcessing(
+  id: string,
+  actorUserId: string,
+): Promise<Result<{ status: string }>> {
+  const [order] = await db.select().from(orders).where(eq(orders.id, id)).limit(1);
+  if (!order) return fail("That order could not be found.");
+  if (!["pending", "confirmed"].includes(order.status)) {
+    return fail("Only a pending or confirmed order can move to processing.");
+  }
+
+  await db.transaction(async (tx) => {
+    await tx
+      .update(orders)
+      .set({ status: "processing", updatedAt: new Date() })
+      .where(eq(orders.id, id));
+    await addOrderEvent(tx, id, "processing", "Order is being prepared.", actorUserId);
+  });
+
+  return ok({ status: "processing" });
+}
+
+export async function markOrderShipped(
+  id: string,
+  input: { carrier: string; trackingNumber: string },
+  actorUserId: string,
+): Promise<Result<{ status: string }>> {
+  const [order] = await db.select().from(orders).where(eq(orders.id, id)).limit(1);
+  if (!order) return fail("That order could not be found.");
+  if (!["processing", "confirmed"].includes(order.status)) {
+    return fail("Only a confirmed or processing order can be shipped.");
+  }
+  if (!input.trackingNumber.trim()) return fail("Enter a tracking number.");
+
+  const [updated] = await db.transaction(async (tx) => {
+    const [row] = await tx
+      .update(orders)
+      .set({
+        status: "shipped",
+        trackingCarrier: input.carrier.trim(),
+        trackingNumber: input.trackingNumber.trim(),
+        fulfilledAt: new Date(),
+        updatedAt: new Date(),
+      })
+      .where(eq(orders.id, id))
+      .returning();
+    if (row) {
+      await addOrderEvent(
+        tx,
+        id,
+        "shipped",
+        `${input.carrier || "Carrier"} · ${input.trackingNumber}`,
+        actorUserId,
+      );
+    }
+    return [row];
+  });
+
+  if (!updated) return fail("That order could not be found.");
+  await sendShippingEmail(updated);
+  return ok({ status: "shipped" });
+}
+
+export async function markOrderDelivered(
+  id: string,
+  actorUserId: string,
+): Promise<Result<{ status: string }>> {
+  const [order] = await db.select().from(orders).where(eq(orders.id, id)).limit(1);
+  if (!order) return fail("That order could not be found.");
+  if (order.status !== "shipped") return fail("Only a shipped order can be delivered.");
+
+  await db.transaction(async (tx) => {
+    await tx
+      .update(orders)
+      .set({ status: "delivered", deliveredAt: new Date(), updatedAt: new Date() })
+      .where(eq(orders.id, id));
+    await addOrderEvent(tx, id, "delivered", "Order delivered.", actorUserId);
+  });
+
+  return ok({ status: "delivered" });
+}
+
+export async function cancelOrder(
+  id: string,
+  actorUserId: string,
+): Promise<Result<{ status: string }>> {
+  const [order] = await db.select().from(orders).where(eq(orders.id, id)).limit(1);
+  if (!order) return fail("That order could not be found.");
+  if (!["pending", "confirmed", "processing"].includes(order.status)) {
+    return fail("This order can no longer be cancelled. Use the return flow.");
+  }
+
+  await db.transaction(async (tx) => {
+    await restockOrder(tx, id);
+    await tx
+      .update(orders)
+      .set({ status: "cancelled", cancelledAt: new Date(), updatedAt: new Date() })
+      .where(eq(orders.id, id));
+    await addOrderEvent(tx, id, "cancelled", "Order cancelled and stock restored.", actorUserId);
+  });
+
+  return ok({ status: "cancelled" });
+}
+
+export async function requestOrderCancellation(input: {
+  number: string;
+  token?: string | null;
+  userId?: string | null;
+  reason: string;
+}): Promise<Result<{ status: string }>> {
+  const order = input.token
+    ? await getOrderForGuest(input.number, input.token)
+    : input.userId
+      ? await getOrderForCustomer(input.number, input.userId)
+      : null;
+
+  if (!order) return fail("That order could not be found.");
+  if (!["pending", "confirmed", "processing"].includes(order.status)) {
+    return fail("This order is already fulfilled or closed. Use the return flow instead.");
+  }
+  if (order.cancellationRequestedAt) {
+    return fail("A cancellation has already been requested for this order.");
+  }
+  if (!input.reason.trim()) return fail("Tell us why you want to cancel the order.");
+
+  const settings = await getStoreSettings();
+
+  await db.transaction(async (tx) => {
+    await tx
+      .update(orders)
+      .set({
+        cancellationRequestedAt: new Date(),
+        cancellationReason: input.reason.trim(),
+        updatedAt: new Date(),
+      })
+      .where(eq(orders.id, order.id));
+    await addOrderEvent(
+      tx,
+      order.id,
+      "cancellation_requested",
+      input.reason.trim(),
+      input.userId ?? null,
+    );
+  });
+
+  await mailer
+    .send({
+      to: settings.contactEmail,
+      subject: `Cancellation requested: ${order.number}`,
+      text: `A cancellation was requested for ${order.number}.\n\nReason: ${input.reason.trim()}\n\nCancel and restock it in the admin.`,
+    })
+    .catch((error) => {
+      console.error("cancellation request mail failed", error);
+    });
+
+  return ok({ status: "cancellation_requested" });
+}
+
+export async function requestOrderReturn(input: {
+  number: string;
+  token?: string | null;
+  userId?: string | null;
+  reason: string;
+}): Promise<Result<{ status: string }>> {
+  const order = input.token
+    ? await getOrderForGuest(input.number, input.token)
+    : input.userId
+      ? await getOrderForCustomer(input.number, input.userId)
+      : null;
+
+  if (!order) return fail("That order could not be found.");
+  if (order.status !== "delivered") {
+    return fail("A return can be requested after the order is delivered.");
+  }
+  if (order.returnRequestedAt) return fail("A return has already been requested.");
+  if (!input.reason.trim()) return fail("Tell us why you want to return the order.");
+
+  const settings = await getStoreSettings();
+  const deliveredAt = order.deliveredAt ?? order.fulfilledAt;
+  if (!deliveredAt) return fail("Delivery date is not available for this order.");
+  const windowDays = settings.returnWindowDays;
+  if (windowDays <= 0) return fail("Returns are not available for this store.");
+  const deadline = new Date(deliveredAt.getTime() + windowDays * 24 * 60 * 60 * 1000);
+  if (Date.now() > deadline.getTime()) {
+    return fail(`The ${windowDays}-day return window has passed.`);
+  }
+
+  await db.transaction(async (tx) => {
+    await tx
+      .update(orders)
+      .set({
+        status: "return_requested",
+        returnRequestedAt: new Date(),
+        returnReason: input.reason.trim(),
+        updatedAt: new Date(),
+      })
+      .where(eq(orders.id, order.id));
+    await addOrderEvent(
+      tx,
+      order.id,
+      "return_requested",
+      input.reason.trim(),
+      input.userId ?? null,
+    );
+  });
+
+  await mailer
+    .send({
+      to: settings.contactEmail,
+      subject: `Return requested: ${order.number}`,
+      text: `A return was requested for ${order.number}.\n\nReason: ${input.reason.trim()}`,
+    })
+    .catch((error) => {
+      console.error("return request mail failed", error);
+    });
+
+  return ok({ status: "return_requested" });
+}
+
+export async function approveOrderReturn(
+  id: string,
+  actorUserId: string,
+): Promise<Result<{ status: string }>> {
+  const [order] = await db.select().from(orders).where(eq(orders.id, id)).limit(1);
+  if (!order) return fail("That order could not be found.");
+  if (order.status !== "return_requested") {
+    return fail("Only a requested return can be approved.");
+  }
+
+  await db.transaction(async (tx) => {
+    await restockOrder(tx, id);
+    await tx
+      .update(orders)
+      .set({ status: "returned", returnReceivedAt: new Date(), updatedAt: new Date() })
+      .where(eq(orders.id, id));
+    await addOrderEvent(tx, id, "returned", "Return received and stock restored.", actorUserId);
+  });
+
+  return ok({ status: "returned" });
+}
+
+export async function refundOrder(
+  id: string,
+  amountMinor: number,
+  reason: string,
+  actorUserId: string,
+): Promise<Result<{ refundedMinor: number }>> {
+  if (!Number.isInteger(amountMinor) || amountMinor <= 0) {
+    return fail("Enter a refund amount greater than zero.");
+  }
+
+  const [order] = await db.select().from(orders).where(eq(orders.id, id)).limit(1);
+  if (!order) return fail("That order could not be found.");
+  if (order.refundedMinor + amountMinor > order.totalMinor) {
+    return fail("The refund cannot exceed the order total.");
+  }
+
+  const newRefunded = order.refundedMinor + amountMinor;
+
+  await db.transaction(async (tx) => {
+    await tx.insert(refunds).values({
+      orderId: id,
+      amountMinor,
+      reason: reason.trim(),
+      actorUserId,
+    });
+    await tx
+      .update(orders)
+      .set({
+        refundedMinor: newRefunded,
+        paymentStatus: newRefunded >= order.totalMinor ? "refunded" : "paid",
+        updatedAt: new Date(),
+      })
+      .where(eq(orders.id, id));
+    await addOrderEvent(
+      tx,
+      id,
+      "refund",
+      `${(amountMinor / 100).toFixed(2)} AED refunded${reason.trim() ? ` · ${reason.trim()}` : ""}`,
+      actorUserId,
+    );
+  });
+
+  return ok({ refundedMinor: newRefunded });
+}
+
+export async function ensureInvoice(
+  id: string,
+  actorUserId?: string | null,
+): Promise<Result<{ invoiceNumber: string }>> {
+  const [order] = await db.select().from(orders).where(eq(orders.id, id)).limit(1);
+  if (!order) return fail("That order could not be found.");
+  if (order.invoiceNumber) return ok({ invoiceNumber: order.invoiceNumber });
+
+  const invoiceNumber = await db.transaction(async (tx) => {
+    const year = new Date().getFullYear();
+    const counterKey = `invoice_number_${year}`;
+    await tx.insert(counters).values({ key: counterKey, value: 0 }).onConflictDoNothing();
+    const [row] = await tx
+      .update(counters)
+      .set({ value: sql`${counters.value} + 1`, updatedAt: new Date() })
+      .where(eq(counters.key, counterKey))
+      .returning({ value: counters.value });
+
+    const number = `INV-${year}-${String(row?.value ?? 1).padStart(6, "0")}`;
+    await tx
+      .update(orders)
+      .set({ invoiceNumber: number, invoiceIssuedAt: new Date(), updatedAt: new Date() })
+      .where(eq(orders.id, id));
+    await addOrderEvent(tx, id, "invoice", `Invoice ${number} issued.`, actorUserId ?? null);
+    return number;
+  });
+
+  return ok({ invoiceNumber });
 }

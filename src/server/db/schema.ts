@@ -24,7 +24,17 @@ const updatedAt = () => timestamp("updated_at", { withTimezone: true, mode: "dat
 
 export const userRole = pgEnum("user_role", ["admin", "customer"]);
 export const productStatus = pgEnum("product_status", ["draft", "active", "archived"]);
-export const orderStatus = pgEnum("order_status", ["pending", "confirmed", "cancelled", "fulfilled"]);
+export const orderStatus = pgEnum("order_status", [
+  "pending",
+  "confirmed",
+  "processing",
+  "shipped",
+  "delivered",
+  "cancelled",
+  "fulfilled",
+  "return_requested",
+  "returned",
+]);
 export const paymentStatus = pgEnum("payment_status", ["unpaid", "paid", "refunded", "failed"]);
 export const reviewStatus = pgEnum("review_status", ["pending", "approved", "rejected"]);
 
@@ -461,6 +471,7 @@ export const orders = pgTable(
     email: text("email").notNull(),
     status: orderStatus("status").notNull().default("pending"),
     paymentStatus: paymentStatus("payment_status").notNull().default("unpaid"),
+    paymentReference: text("payment_reference"),
     currency: text("currency").notNull().default("AED"),
     subtotalMinor: integer("subtotal_minor").notNull(),
     shippingMinor: integer("shipping_minor").notNull().default(0),
@@ -468,6 +479,23 @@ export const orders = pgTable(
     taxMinor: integer("tax_minor").notNull().default(0),
     taxRateBp: integer("tax_rate_bp").notNull().default(500),
     totalMinor: integer("total_minor").notNull(),
+    refundedMinor: integer("refunded_minor").notNull().default(0),
+    trackingCarrier: text("tracking_carrier"),
+    trackingNumber: text("tracking_number"),
+    adminNotes: text("admin_notes"),
+    invoiceNumber: text("invoice_number").unique(),
+    invoiceIssuedAt: timestamp("invoice_issued_at", { withTimezone: true, mode: "date" }),
+    fulfilledAt: timestamp("fulfilled_at", { withTimezone: true, mode: "date" }),
+    deliveredAt: timestamp("delivered_at", { withTimezone: true, mode: "date" }),
+    cancelledAt: timestamp("cancelled_at", { withTimezone: true, mode: "date" }),
+    cancellationRequestedAt: timestamp("cancellation_requested_at", {
+      withTimezone: true,
+      mode: "date",
+    }),
+    cancellationReason: text("cancellation_reason"),
+    returnRequestedAt: timestamp("return_requested_at", { withTimezone: true, mode: "date" }),
+    returnReceivedAt: timestamp("return_received_at", { withTimezone: true, mode: "date" }),
+    returnReason: text("return_reason"),
     shippingAddress: jsonb("shipping_address").notNull(),
     /** Nullable: guest checkout collects a billing address too, but older orders have none. */
     billingAddress: jsonb("billing_address"),
@@ -500,6 +528,37 @@ export const orderItems = pgTable(
     position: integer("position").notNull().default(0),
   },
   (table) => [index("order_items_order_id_idx").on(table.orderId)],
+);
+
+export const orderEvents = pgTable(
+  "order_events",
+  {
+    id: id(),
+    orderId: text("order_id")
+      .notNull()
+      .references(() => orders.id, { onDelete: "cascade" }),
+    type: text("type").notNull(),
+    message: text("message").notNull().default(""),
+    actorUserId: text("actor_user_id").references(() => users.id, { onDelete: "set null" }),
+    createdAt: createdAt(),
+  },
+  (table) => [index("order_events_order_id_idx").on(table.orderId, table.createdAt)],
+);
+
+export const refunds = pgTable(
+  "refunds",
+  {
+    id: id(),
+    orderId: text("order_id")
+      .notNull()
+      .references(() => orders.id, { onDelete: "cascade" }),
+    amountMinor: integer("amount_minor").notNull(),
+    reason: text("reason").notNull().default(""),
+    providerReference: text("provider_reference"),
+    actorUserId: text("actor_user_id").references(() => users.id, { onDelete: "set null" }),
+    createdAt: createdAt(),
+  },
+  (table) => [index("refunds_order_id_idx").on(table.orderId)],
 );
 
 /* ─────────────────────── operations ─────────────────────── */

@@ -1,19 +1,32 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ClaimOrderForm } from "@/components/storefront/claim-order-form";
+import { OrderAftercare } from "@/components/storefront/order-aftercare";
 import { OrderDetail, ORDER_STATUS_LABEL } from "@/components/storefront/order-detail";
 import { buttonClass } from "@/components/ui/button";
 import { getAuthSession } from "@/server/auth/guard";
 import { getOrderForGuest } from "@/server/services/orders";
+import { getStoreSettings } from "@/server/services/settings";
 
 export default async function OrderPage({
   params,
   searchParams,
 }: {
   params: Promise<{ number: string }>;
-  searchParams: Promise<{ t?: string }>;
+  searchParams: Promise<{
+    t?: string;
+    returnError?: string;
+    cancelError?: string;
+    return?: string;
+    cancelled?: string;
+  }>;
 }) {
-  const [{ number }, { t }] = await Promise.all([params, searchParams]);
+  const [{ number }, query, settings] = await Promise.all([
+    params,
+    searchParams,
+    getStoreSettings(),
+  ]);
+  const { t } = query;
 
   if (!t) notFound();
 
@@ -42,6 +55,16 @@ export default async function OrderPage({
       </p>
 
       <OrderDetail order={order}>
+        <OrderAftercare
+          order={order}
+          token={t}
+          returnWindowDays={settings.returnWindowDays}
+          returnError={query.returnError}
+          cancelError={query.cancelError}
+          returnRequested={query.return === "requested"}
+          cancellationRequested={query.cancelled === "requested"}
+        />
+
         <div className="mt-6 space-y-4">
           {claimable && session ? (
             <section className="rounded-xl border border-line bg-surface p-5">

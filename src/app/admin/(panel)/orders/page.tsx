@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { formatMoney } from "@/lib/money";
 import { listRecentOrdersForAdmin } from "@/server/services/orders";
 
@@ -25,7 +26,14 @@ export default async function AdminOrdersPage() {
             <tbody className="divide-y divide-line">
               {recent.map((order) => (
                 <tr key={order.id}>
-                  <td className="px-5 py-3 font-medium">{order.number}</td>
+                  <td className="px-5 py-3 font-medium">
+                    <Link
+                      href={`/admin/orders/${order.id}`}
+                      className="hover:text-brand"
+                    >
+                      {order.number}
+                    </Link>
+                  </td>
                   <td className="hidden max-w-56 truncate px-5 py-3 text-muted sm:table-cell">
                     {order.email}
                   </td>

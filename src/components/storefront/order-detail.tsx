@@ -6,8 +6,13 @@ import type { OrderView } from "@/server/services/orders";
 export const ORDER_STATUS_LABEL: Record<string, string> = {
   pending: "Awaiting payment",
   confirmed: "Confirmed",
+  processing: "Processing",
+  shipped: "Shipped",
+  delivered: "Delivered",
   fulfilled: "On its way",
   cancelled: "Cancelled",
+  return_requested: "Return requested",
+  returned: "Returned",
 };
 
 function sameAddress(a: OrderView["shippingAddress"], b: OrderView["shippingAddress"]): boolean {

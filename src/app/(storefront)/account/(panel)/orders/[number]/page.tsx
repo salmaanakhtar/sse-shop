@@ -1,19 +1,32 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { OrderAftercare } from "@/components/storefront/order-aftercare";
 import { OrderDetail, ORDER_STATUS_LABEL } from "@/components/storefront/order-detail";
 import { buttonClass } from "@/components/ui/button";
 import { requireUserPage } from "@/server/auth/guard";
 import { getOrderForCustomer } from "@/server/services/orders";
+import { getStoreSettings } from "@/server/services/settings";
 
 export const metadata = { title: "Order details" };
 
 export default async function AccountOrderPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ number: string }>;
+  searchParams: Promise<{
+    returnError?: string;
+    cancelError?: string;
+    return?: string;
+    cancelled?: string;
+  }>;
 }) {
   const session = await requireUserPage();
-  const { number } = await params;
+  const [{ number }, query, settings] = await Promise.all([
+    params,
+    searchParams,
+    getStoreSettings(),
+  ]);
 
   const order = await getOrderForCustomer(number, session.user.id);
   if (!order) notFound();
@@ -41,7 +54,16 @@ export default async function AccountOrderPage({
         </Link>
       </div>
 
-      <OrderDetail order={order} />
+      <OrderDetail order={order}>
+        <OrderAftercare
+          order={order}
+          returnWindowDays={settings.returnWindowDays}
+          returnError={query.returnError}
+          cancelError={query.cancelError}
+          returnRequested={query.return === "requested"}
+          cancellationRequested={query.cancelled === "requested"}
+        />
+      </OrderDetail>
     </div>
   );
 }

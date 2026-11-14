@@ -11,8 +11,8 @@ continuous background stream, not a numbered phase.
 
 **Completion program:** security/foundation fixes, admin settings, homepage sections, legal pages,
 Arabic routing/RTL/numerals, search/filter/sort/pagination, SEO metadata/sitemap/JSON-LD, verified
-reviews, and related products are in place. Order operations, payment lifecycle/refunds, VAT
-invoices, shipping zones, back-in-stock/low-stock/abandoned-cart notifications, marketing email,
+reviews, related products, order operations, the payment lifecycle, manual refunds, and VAT invoices
+are in place. Shipping zones, back-in-stock/low-stock/abandoned-cart notifications, marketing email,
 and the analytics dashboard remain.
 
 ## Phase 0 — Foundation
@@ -148,6 +148,28 @@ translation QA and secondary copy remain.**
 **Done when** both themes and both languages render correctly, prices keep the same integer value,
 and a customer's choices survive a return visit. Dark mode is complete; Arabic is not.
 
+## Commerce completion — Order operations
+
+**Status: complete.**
+
+- **Lifecycle:** pending → confirmed → processing → shipped → delivered, with cancellation and the
+  return states. Admin controls live at `/admin/orders/[id]`; every transition writes an order event
+  and an audit entry.
+- **Tracking:** carrier and tracking number, customer email on dispatch, tracking shown on both the
+  guest and account order pages.
+- **Cancellation:** a customer can request cancellation before dispatch; the admin cancels and
+  restocks. Cancelling is refused after shipping, and the return flow takes over.
+- **Returns:** a customer can request a return after delivery inside the configurable return window
+  (14 days by default). Admin approval records receipt and restocks.
+- **Refunds:** recorded manually against the order with a reason, capped at the order total. Full
+  refund moves the payment state to `refunded`. Provider-backed refunds arrive with Stripe.
+- **Invoices:** HTML and PDF tax invoices with `INV-YYYY-######` numbering from a per-year counter,
+  business legal name/TRN/address settings, and invoice access by admin session or order token.
+- **Payments:** the provider-agnostic state machine stores `payment_reference`; the mock provider is
+  the only implementation until Phase 7.
+- **Coverage:** integration tests for each transition, restock, refund cap, and invoice numbering,
+  plus an admin Playwright journey through fulfillment, return approval, refund, and PDF download.
+
 ## Phase 7 — Real money and mail
 
 Previously Phase 2; moved behind the storefront work.
@@ -157,7 +179,7 @@ Previously Phase 2; moved behind the storefront work.
 - Close the account gaps deliberately deferred in Phase 2: email verification and self-service
   password reset.
 - Failed and abandoned payments leave no held stock.
-- Refunds recorded against the order, with an audit entry.
+- Provider-backed refunds; manual refund recording already exists.
 
 **Done when** a test-mode card produces a paid order, a declined card produces a retryable order,
 a replayed webhook changes nothing, and a customer can verify their email and reset a password.

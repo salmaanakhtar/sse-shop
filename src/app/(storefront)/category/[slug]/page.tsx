@@ -1,11 +1,39 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import type { Metadata } from "next";
 import { ProductGrid } from "@/components/storefront/product-grid";
+import { localePath, translate } from "@/lib/i18n";
 import { listCatalog } from "@/server/services/catalog";
 import {
   getActiveCategoryPage,
   listProductsInCategoryTree,
 } from "@/server/services/categories";
+import { getLocale, getNumeralPreference } from "@/server/services/preferences";
+
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ slug: string }>;
+}): Promise<Metadata> {
+  const { slug } = await params;
+  const page = await getActiveCategoryPage(slug);
+  if (!page) return {};
+  const base = process.env.NEXT_PUBLIC_STORE_URL ?? "http://localhost:3000";
+  const canonical = `${base}/category/${page.category.slug}`;
+  return {
+    title: page.category.name,
+    description: page.category.description || undefined,
+    alternates: {
+      canonical,
+      languages: { en: canonical, ar: `${base}/ar/category/${page.category.slug}` },
+    },
+    openGraph: {
+      title: page.category.name,
+      description: page.category.description || undefined,
+      url: canonical,
+    },
+  };
+}
 
 export default async function CategoryPage({
   params,
@@ -16,9 +44,11 @@ export default async function CategoryPage({
   const page = await getActiveCategoryPage(slug);
   if (!page) notFound();
 
-  const [ids, catalog] = await Promise.all([
+  const [ids, catalog, locale, numerals] = await Promise.all([
     listProductsInCategoryTree(page.category),
     listCatalog(),
+    getLocale(),
+    getNumeralPreference(),
   ]);
 
   const idSet = new Set(ids);
@@ -30,8 +60,8 @@ export default async function CategoryPage({
       <nav aria-label="Breadcrumb" className="text-xs text-muted">
         <ol className="flex flex-wrap items-center gap-2">
           <li>
-            <Link href="/" className="hover:text-ink">
-              Home
+            <Link href={localePath(locale, "/")} className="hover:text-ink">
+              {translate(locale, "common.home")}
             </Link>
           </li>
           {path.map((item, index) => (
@@ -40,7 +70,10 @@ export default async function CategoryPage({
               {index === path.length - 1 ? (
                 <span className="text-ink">{item.name}</span>
               ) : (
-                <Link href={`/category/${item.slug}`} className="hover:text-ink">
+                <Link
+                  href={localePath(locale, `/category/${item.slug}`)}
+                  className="hover:text-ink"
+                >
                   {item.name}
                 </Link>
               )}
@@ -57,7 +90,9 @@ export default async function CategoryPage({
           </p>
         ) : null}
         <p className="mt-2 text-xs text-muted">
-          {products.length} {products.length === 1 ? "product" : "products"}
+          {translate(locale, products.length === 1 ? "home.product" : "home.products", {
+            count: products.length,
+          })}
         </p>
       </header>
 
@@ -66,7 +101,7 @@ export default async function CategoryPage({
           {category.children.map((child) => (
             <Link
               key={child.id}
-              href={`/category/${child.slug}`}
+              href={localePath(locale, `/category/${child.slug}`)}
               className="rounded-full border border-line bg-surface px-3 py-1.5 text-sm text-muted transition-colors hover:border-brand/40 hover:text-ink"
             >
               {child.name}
@@ -78,7 +113,9 @@ export default async function CategoryPage({
       <ProductGrid
         products={products}
         label={`${category.name} products`}
-        emptyMessage="No products in this category yet."
+        emptyMessage={translate(locale, "home.empty")}
+        locale={locale}
+        numerals={numerals}
       />
     </div>
   );

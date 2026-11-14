@@ -10,8 +10,10 @@ import {
 import { Button } from "@/components/ui/button";
 import { ConfirmSubmitButton } from "@/components/ui/confirm-submit-button";
 import { Input } from "@/components/ui/field";
+import { localePath, translate } from "@/lib/i18n";
 import { formatMoney } from "@/lib/money";
 import { requireUserPage } from "@/server/auth/guard";
+import { getLocale, getNumeralPreference } from "@/server/services/preferences";
 import {
   checkWishlistPriceDropsForUser,
   getWishlist,
@@ -29,13 +31,18 @@ export default async function WishlistDetailPage({
 }) {
   const session = await requireUserPage();
   const [{ id }, { error }] = await Promise.all([params, searchParams]);
-  const wishlist = await getWishlist(session.user.id, id);
+  const [wishlist, locale, numerals] = await Promise.all([
+    getWishlist(session.user.id, id),
+    getLocale(),
+    getNumeralPreference(),
+  ]);
   if (!wishlist) notFound();
 
   const items = await listWishlistItems(session.user.id, wishlist.id);
   await checkWishlistPriceDropsForUser(session.user.id).catch((checkError) => {
     console.error("wishlist price check failed", checkError);
   });
+  const money = (minor: number) => formatMoney(minor, { locale, numerals });
 
   const availableCount = items.filter((item) => item.available).length;
 
@@ -44,21 +51,23 @@ export default async function WishlistDetailPage({
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
           <Link
-            href="/account/wishlists"
+            href={localePath(locale, "/account/wishlists")}
             className="text-xs text-muted underline-offset-4 hover:text-ink hover:underline"
           >
-            All wishlists
+            {translate(locale, "wishlist.all")}
           </Link>
           <div className="mt-2 flex flex-wrap items-center gap-2">
             <h2 className="text-xl font-semibold tracking-tight">{wishlist.name}</h2>
             {wishlist.isDefault ? (
               <span className="rounded-full bg-brand-soft px-2 py-0.5 text-[10px] font-semibold tracking-wide text-brand uppercase">
-                Default
+                {translate(locale, "wishlist.default")}
               </span>
             ) : null}
           </div>
           <p className="mt-1 text-xs text-muted">
-            {items.length} {items.length === 1 ? "item" : "items"}
+            {translate(locale, items.length === 1 ? "wishlist.item" : "wishlist.items", {
+              count: items.length,
+            })}
           </p>
         </div>
       </div>
@@ -77,7 +86,7 @@ export default async function WishlistDetailPage({
               htmlFor="wishlist-name"
               className="mb-1.5 block text-xs font-semibold tracking-wide text-muted uppercase"
             >
-              List name
+              {translate(locale, "wishlist.listName")}
             </label>
             <Input
               id="wishlist-name"
@@ -89,14 +98,12 @@ export default async function WishlistDetailPage({
             />
           </div>
           <Button type="submit" size="sm" variant="secondary">
-            Save name
+            {translate(locale, "wishlist.saveName")}
           </Button>
         </form>
 
         {wishlist.isDefault ? (
-          <p className="max-w-xs text-xs text-muted">
-            The default list receives one-click saves from product pages.
-          </p>
+          <p className="max-w-xs text-xs text-muted">{translate(locale, "wishlist.defaultHelp")}</p>
         ) : (
           <form action={deleteWishlistAction}>
             <input type="hidden" name="id" value={wishlist.id} />
@@ -105,7 +112,7 @@ export default async function WishlistDetailPage({
               message={`Delete ${wishlist.name}?`}
               className="text-xs text-muted underline-offset-4 hover:text-red-600 hover:underline"
             >
-              Delete list
+              {translate(locale, "wishlist.delete")}
             </ConfirmSubmitButton>
           </form>
         )}
@@ -113,9 +120,12 @@ export default async function WishlistDetailPage({
 
       {items.length === 0 ? (
         <div className="rounded-xl border border-dashed border-line px-6 py-16 text-center">
-          <p className="text-sm text-muted">Nothing saved in this list yet.</p>
-          <Link href="/" className="mt-3 inline-block text-sm text-brand hover:underline">
-            Browse the shop
+          <p className="text-sm text-muted">{translate(locale, "wishlist.empty")}</p>
+          <Link
+            href={localePath(locale, "/")}
+            className="mt-3 inline-block text-sm text-brand hover:underline"
+          >
+            {translate(locale, "wishlist.browse")}
           </Link>
         </div>
       ) : (
@@ -154,31 +164,40 @@ export default async function WishlistDetailPage({
 
               <div className="min-w-40 flex-1">
                 <Link
-                  href={`/products/${item.productSlug}`}
+                  href={localePath(locale, `/products/${item.productSlug}`)}
                   className="text-sm font-medium hover:text-brand"
                 >
                   {item.productTitle}
                 </Link>
                 <p className="mt-0.5 text-xs text-muted">{item.variantTitle}</p>
                 <p className="mt-1 text-xs text-muted">
-                  Saved at {formatMoney(item.addedPriceMinor)}
+                  {translate(locale, "wishlist.savedAt", {
+                    amount: money(item.addedPriceMinor),
+                  })}
                 </p>
                 {item.available ? (
-                  <p className="text-xs text-muted">{item.stockQty} in stock</p>
+                  <p className="text-xs text-muted">
+                    {translate(locale, "wishlist.inStock", { count: item.stockQty })}
+                  </p>
                 ) : (
                   <p className="text-xs text-red-600">
-                    {item.productStatus !== "active" ? "No longer available" : "Sold out"}
+                    {translate(
+                      locale,
+                      item.productStatus !== "active"
+                        ? "wishlist.noLonger"
+                        : "wishlist.soldOut",
+                    )}
                   </p>
                 )}
               </div>
 
               <div className="text-right">
                 <p className="text-sm font-semibold tabular-nums">
-                  {formatMoney(item.currentPriceMinor)}
+                  {money(item.currentPriceMinor)}
                 </p>
                 {item.onSale ? (
                   <p className="text-xs text-muted line-through tabular-nums">
-                    {formatMoney(item.priceMinor)}
+                    {money(item.priceMinor)}
                   </p>
                 ) : null}
                 <form action={removeWishlistItemAction}>
@@ -188,7 +207,7 @@ export default async function WishlistDetailPage({
                     type="submit"
                     className="mt-2 text-xs text-muted underline-offset-4 hover:text-red-600 hover:underline"
                   >
-                    Remove
+                    {translate(locale, "wishlist.remove")}
                   </button>
                 </form>
               </div>
@@ -202,12 +221,13 @@ export default async function WishlistDetailPage({
           >
             <input type="hidden" name="wishlistId" value={wishlist.id} />
             <p className="text-xs text-muted">
-              {availableCount === 0
-                ? "No items in this list are available right now."
-                : "Selected items are added to your cart and taken to checkout."}
+              {translate(
+                locale,
+                availableCount === 0 ? "wishlist.noneAvailable" : "wishlist.selectedHelp",
+              )}
             </p>
             <Button type="submit" disabled={availableCount === 0}>
-              Add selected to cart &amp; checkout
+              {translate(locale, "wishlist.checkout")}
             </Button>
           </form>
         </div>

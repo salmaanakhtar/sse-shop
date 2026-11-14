@@ -6,6 +6,8 @@ import { z } from "zod";
 import type { Result } from "@/lib/result";
 import { fail } from "@/lib/result";
 import { getAuthSession, requireUserAction } from "@/server/auth/guard";
+import { checkRateLimit } from "@/server/security/rate-limit";
+import { clientIp } from "@/server/security/request";
 import { addToCart } from "@/server/services/cart";
 import {
   createWishlist,
@@ -98,6 +100,13 @@ export async function setVariantWishlistsAction(
   const session = await getAuthSession();
   if (!session) return fail("Sign in to save items.");
 
+  const limit = await checkRateLimit(
+    `wishlist:set:${session.user.id}:${await clientIp()}`,
+    60,
+    60,
+  );
+  if (!limit.ok) return fail("Too many wishlist changes. Try again in a moment.");
+
   const parsed = saveSchema.safeParse({ variantId, wishlistIds });
   if (!parsed.success) return fail("Choose a valid list.");
 
@@ -116,6 +125,13 @@ export async function setVariantWishlistsAction(
 
 export async function addWishlistToCartAction(formData: FormData): Promise<void> {
   const session = await requireUserAction();
+  const limit = await checkRateLimit(
+    `wishlist:checkout:${session.user.id}:${await clientIp()}`,
+    20,
+    60,
+  );
+  if (!limit.ok) redirect(listsUrl("Too many requests. Try again in a moment."));
+
   const wishlistId = idSchema.safeParse(formData.get("wishlistId"));
   if (!wishlistId.success) redirect(listsUrl());
 

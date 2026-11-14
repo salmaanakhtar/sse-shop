@@ -3,12 +3,20 @@
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import type { Result } from "@/lib/result";
+import { fail } from "@/lib/result";
+import { checkRateLimit } from "@/server/security/rate-limit";
+import { clientIp } from "@/server/security/request";
 import { addToCart, removeCartItem, setCartItemQuantity } from "@/server/services/cart";
 
 export async function addToCartAction(
   variantId: string,
   quantity: number,
 ): Promise<Result<{ cartCount: number }>> {
+  const limit = await checkRateLimit(`cart:add:${await clientIp()}`, 60, 60);
+  if (!limit.ok) {
+    return fail("Too many add-to-cart requests. Try again in a moment.");
+  }
+
   const result = await addToCart(variantId, quantity);
   if (result.ok) revalidatePath("/", "layout");
   return result;

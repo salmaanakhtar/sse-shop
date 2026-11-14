@@ -1,3 +1,5 @@
+import { env } from "@/lib/env";
+
 export type MailMessage = {
   to: string;
   subject: string;
@@ -18,6 +20,12 @@ class ConsoleMailer implements Mailer {
       `\n──── mail ────\nto: ${message.to}\nsubject: ${message.subject}\n\n${message.text}\n──────────────\n`,
     );
   }
+}
+
+if (env.MAIL_DRIVER !== "console") {
+  throw new Error(
+    "MAIL_DRIVER is set to SMTP, but real email delivery is not implemented yet. Keep the console driver until the deploy-ready phase.",
+  );
 }
 
 export const mailer: Mailer = new ConsoleMailer();

@@ -3,7 +3,9 @@
 import Link from "next/link";
 import { useEffect, useId, useState, useTransition } from "react";
 import { setVariantWishlistsAction } from "@/app/(storefront)/wishlist-actions";
+import { useStorePreferences } from "@/components/storefront/store-preferences";
 import { Button } from "@/components/ui/button";
+import { localePath } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 
 export type WishlistListOption = {
@@ -24,6 +26,7 @@ export function WishlistSaveButton({
   signedIn: boolean;
 }) {
   const titleId = useId();
+  const { t, locale } = useStorePreferences();
   const [open, setOpen] = useState(false);
   const [selected, setSelected] = useState<string[]>(selectedListIds);
   const [pending, startTransition] = useTransition();
@@ -42,10 +45,10 @@ export function WishlistSaveButton({
   if (!signedIn) {
     return (
       <Link
-        href="/account/sign-in"
+        href={localePath(locale, "/account/sign-in")}
         className="block text-center text-xs text-muted underline-offset-4 hover:text-ink hover:underline"
       >
-        Sign in to save this item
+        {t("product.signInToSave")}
       </Link>
     );
   }
@@ -71,8 +74,11 @@ export function WishlistSaveButton({
       setOpen(false);
       setMessage(
         selected.length === 0
-          ? "Removed from your wishlists."
-          : `Saved to ${selected.length} ${selected.length === 1 ? "list" : "lists"}.`,
+          ? t("wishlist.removed")
+          : t("product.savedTo", {
+              count: selected.length,
+              lists: t(selected.length === 1 ? "product.list" : "product.lists"),
+            }),
       );
     });
   }
@@ -90,8 +96,11 @@ export function WishlistSaveButton({
         className="inline-flex h-9 w-full items-center justify-center rounded-lg border border-line bg-surface px-3 text-sm font-medium text-ink transition-colors hover:bg-page"
       >
         {selected.length > 0
-          ? `Saved to ${selected.length} ${selected.length === 1 ? "list" : "lists"}`
-          : "Save to wishlist"}
+          ? t("product.savedTo", {
+              count: selected.length,
+              lists: t(selected.length === 1 ? "product.list" : "product.lists"),
+            })
+          : t("product.save")}
       </button>
 
       {message ? (
@@ -116,20 +125,18 @@ export function WishlistSaveButton({
           >
             <div className="flex items-center justify-between gap-3">
               <h2 id={titleId} className="text-sm font-semibold">
-                Save to wishlist
+                {t("wishlist.saveTitle")}
               </h2>
               <button
                 type="button"
                 onClick={() => setOpen(false)}
                 className="text-sm text-muted hover:text-ink"
               >
-                Close
+                {t("common.close")}
               </button>
             </div>
 
-            <p className="mt-1 text-xs text-muted">
-              Choose one or more lists. Saving to none removes the item.
-            </p>
+            <p className="mt-1 text-xs text-muted">{t("wishlist.saveHelp")}</p>
 
             <div className="mt-4 space-y-2">
               {lists.map((list, index) => (
@@ -150,7 +157,7 @@ export function WishlistSaveButton({
                   <span>{list.name}</span>
                   {list.isDefault ? (
                     <span className="rounded-full bg-page px-1.5 py-0.5 text-[10px] font-semibold uppercase text-muted">
-                      Default
+                      {t("wishlist.default")}
                     </span>
                   ) : null}
                 </label>
@@ -165,13 +172,13 @@ export function WishlistSaveButton({
 
             <div className="mt-5 flex flex-wrap items-center justify-between gap-3 border-t border-line pt-4">
               <Link
-                href="/account/wishlists"
+                href={localePath(locale, "/account/wishlists")}
                 className="text-xs text-muted underline-offset-4 hover:text-ink hover:underline"
               >
-                Manage lists
+                {t("wishlist.manage")}
               </Link>
               <Button type="button" size="sm" onClick={save} disabled={pending}>
-                {pending ? "Saving…" : "Save"}
+                {pending ? t("wishlist.saving") : t("wishlist.save")}
               </Button>
             </div>
           </div>

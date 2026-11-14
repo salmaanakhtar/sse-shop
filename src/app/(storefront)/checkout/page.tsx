@@ -2,10 +2,12 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { CheckoutForm } from "@/components/storefront/checkout-form";
 import type { Address } from "@/lib/address";
+import { localePath, translate } from "@/lib/i18n";
 import { formatMoney } from "@/lib/money";
 import { getAuthSession } from "@/server/auth/guard";
 import { getDefaultAddress } from "@/server/services/addresses";
 import { getCartView } from "@/server/services/cart";
+import { getLocale, getNumeralPreference } from "@/server/services/preferences";
 
 function toAddress(address: NonNullable<Awaited<ReturnType<typeof getDefaultAddress>>>): Address {
   return {
@@ -21,9 +23,14 @@ function toAddress(address: NonNullable<Awaited<ReturnType<typeof getDefaultAddr
 }
 
 export default async function CheckoutPage() {
-  const cart = await getCartView();
+  const [cart, locale, numerals] = await Promise.all([
+    getCartView(),
+    getLocale(),
+    getNumeralPreference(),
+  ]);
 
-  if (!cart || cart.lines.length === 0) redirect("/cart");
+  if (!cart || cart.lines.length === 0) redirect(localePath(locale, "/cart"));
+  const money = (minor: number) => formatMoney(minor, { locale, numerals });
 
   const session = await getAuthSession();
   const [shipping, billing] = session
@@ -38,9 +45,14 @@ export default async function CheckoutPage() {
   return (
     <div className="mx-auto max-w-5xl px-6 py-10">
       <div className="flex items-baseline justify-between">
-        <h1 className="text-2xl font-semibold tracking-tight">Checkout</h1>
-        <Link href="/cart" className="text-sm text-muted underline-offset-4 hover:underline">
-          Back to cart
+        <h1 className="text-2xl font-semibold tracking-tight">
+          {translate(locale, "checkout.title")}
+        </h1>
+        <Link
+          href={localePath(locale, "/cart")}
+          className="text-sm text-muted underline-offset-4 hover:underline"
+        >
+          {translate(locale, "checkout.backToCart")}
         </Link>
       </div>
 
@@ -68,7 +80,7 @@ export default async function CheckoutPage() {
         />
 
         <aside className="h-fit rounded-xl border border-line bg-surface p-5">
-          <h2 className="text-sm font-semibold">Your order</h2>
+          <h2 className="text-sm font-semibold">{translate(locale, "checkout.yourOrder")}</h2>
 
           <ul className="mt-4 space-y-3 text-sm">
             {cart.lines.map((line) => (
@@ -79,30 +91,32 @@ export default async function CheckoutPage() {
                     {line.optionLabel ? `${line.optionLabel} · ` : ""}× {line.quantity}
                   </span>
                 </span>
-                <span className="shrink-0 tabular-nums">{formatMoney(line.lineTotalMinor)}</span>
+                <span className="shrink-0 tabular-nums">{money(line.lineTotalMinor)}</span>
               </li>
             ))}
           </ul>
 
           <dl className="mt-4 space-y-2 border-t border-line pt-4 text-sm">
             <div className="flex justify-between">
-              <dt className="text-muted">Subtotal</dt>
-              <dd className="tabular-nums">{formatMoney(cart.totals.subtotalMinor)}</dd>
+              <dt className="text-muted">{translate(locale, "checkout.subtotal")}</dt>
+              <dd className="tabular-nums">{money(cart.totals.subtotalMinor)}</dd>
             </div>
             <div className="flex justify-between">
-              <dt className="text-muted">Delivery</dt>
+              <dt className="text-muted">{translate(locale, "checkout.delivery")}</dt>
               <dd className="tabular-nums">
-                {cart.totals.shippingMinor === 0 ? "Free" : formatMoney(cart.totals.shippingMinor)}
+                {cart.totals.shippingMinor === 0
+                  ? translate(locale, "checkout.free")
+                  : money(cart.totals.shippingMinor)}
               </dd>
             </div>
             <div className="flex justify-between border-t border-line pt-3 text-base font-semibold">
-              <dt>Total</dt>
-              <dd className="tabular-nums">{formatMoney(cart.totals.totalMinor)}</dd>
+              <dt>{translate(locale, "checkout.total")}</dt>
+              <dd className="tabular-nums">{money(cart.totals.totalMinor)}</dd>
             </div>
           </dl>
 
           <p className="mt-2 text-xs text-muted">
-            Includes {formatMoney(cart.totals.taxMinor)} VAT
+            {translate(locale, "checkout.includesVat", { amount: money(cart.totals.taxMinor) })}
           </p>
         </aside>
       </div>

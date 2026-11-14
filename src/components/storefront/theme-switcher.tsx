@@ -3,34 +3,39 @@
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { setThemePreferenceAction } from "@/app/(storefront)/preferences-actions";
+import { useStorePreferences } from "@/components/storefront/store-preferences";
 import type { ThemePreference } from "@/lib/theme";
-
-const LABEL: Record<ThemePreference, string> = {
-  system: "Auto",
-  light: "Light",
-  dark: "Dark",
-};
 
 export function ThemeSwitcher({ value }: { value: ThemePreference }) {
   const router = useRouter();
+  const { t } = useStorePreferences();
   const [current, setCurrent] = useState<ThemePreference>(value);
   const [pending, startTransition] = useTransition();
+  const [saved, setSaved] = useState(false);
+
+  const labels: Record<ThemePreference, string> = {
+    system: t("theme.system"),
+    light: t("theme.light"),
+    dark: t("theme.dark"),
+  };
 
   function change(next: ThemePreference) {
     setCurrent(next);
+    setSaved(false);
     document.getElementById("storefront")?.setAttribute("data-theme", next);
 
     startTransition(async () => {
       await setThemePreferenceAction(next);
+      setSaved(true);
       router.refresh();
     });
   }
 
   return (
     <label className="inline-flex items-center gap-1.5 text-xs text-muted">
-      <span className="sr-only">Theme</span>
+      <span className="sr-only">{t("theme.label")}</span>
       <select
-        aria-label="Theme"
+        aria-label={t("theme.label")}
         value={current}
         disabled={pending}
         onChange={(event) => change(event.target.value as ThemePreference)}
@@ -38,10 +43,15 @@ export function ThemeSwitcher({ value }: { value: ThemePreference }) {
       >
         {(["system", "light", "dark"] as const).map((theme) => (
           <option key={theme} value={theme}>
-            {LABEL[theme]}
+            {labels[theme]}
           </option>
         ))}
       </select>
+      {saved ? (
+        <span role="status" data-testid="theme-saved" className="sr-only">
+          Theme saved.
+        </span>
+      ) : null}
     </label>
   );
 }

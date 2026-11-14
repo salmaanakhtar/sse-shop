@@ -55,6 +55,10 @@ without replacing it.
     named list, opens the list, selects the item, and lands on checkout with it in the cart.
 17. **Dark mode** - a customer signs in, chooses Dark, reloads and keeps it, then signs in from a
     fresh browser context and sees the saved account preference.
+18. **Arabic** - `/ar` renders RTL with Arabic navigation, the product page uses Arabic copy, the
+    numeral toggle switches to Arabic-Indic digits, and the language switch returns to English.
+19. **Search and SEO** - the header search opens `/search`, returns the matching product, and the
+    sitemap, robots file, and Product JSON-LD are present.
 
 ## Vitest setup
 
@@ -172,6 +176,13 @@ customer and variant, no repeat while any list still holds it, reset after remov
 list, sale-price drops, and alert cleanup when a list is deleted. The mailer is a mock; the tests
 assert one message and its content. The Playwright journey creates a named list, saves to two lists,
 opens one, and checks out.
+
+Search tests cover text matching, category filtering, min/max price, in-stock filtering, sorting,
+and pagination. Review tests cover verified-purchase eligibility, pending moderation, approval,
+rating summaries, and rejection without a paid order. Related-product tests cover shared-category
+ranking, shared-collection ranking, fallback, and excluding the current product. The Arabic e2e
+covers `/ar`, RTL, Arabic product copy, the numeral toggle, and switching back to English. The SEO
+e2e covers the search page, sitemap, robots file, and Product JSON-LD.
 
 Theme tests cover accepted values and cookie-versus-account precedence. The Playwright journey
 checks the system default, switches to dark, reloads to prove the cookie persists, and signs in from

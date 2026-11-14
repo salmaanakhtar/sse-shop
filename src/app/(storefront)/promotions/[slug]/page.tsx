@@ -1,8 +1,40 @@
 import Image from "next/image";
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import type { Metadata } from "next";
 import { ProductGrid } from "@/components/storefront/product-grid";
+import { localePath, translate } from "@/lib/i18n";
 import { getActivePromotionPage } from "@/server/services/promotions";
+import { getLocale, getNumeralPreference } from "@/server/services/preferences";
+
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ slug: string }>;
+}): Promise<Metadata> {
+  const { slug } = await params;
+  const page = await getActivePromotionPage(slug);
+  if (!page) return {};
+  const base = process.env.NEXT_PUBLIC_STORE_URL ?? "http://localhost:3000";
+  const canonical = `${base}/promotions/${page.promotion.slug}`;
+  return {
+    title: page.promotion.headline || "Promotion",
+    description: page.promotion.subheadline || undefined,
+    alternates: {
+      canonical,
+      languages: {
+        en: canonical,
+        ar: `${base}/ar/promotions/${page.promotion.slug}`,
+      },
+    },
+    openGraph: {
+      title: page.promotion.headline || "Promotion",
+      description: page.promotion.subheadline || undefined,
+      url: canonical,
+      images: [`${base}/media/${page.promotion.imageKey}`],
+    },
+  };
+}
 
 export default async function PromotionPage({
   params,
@@ -13,6 +45,7 @@ export default async function PromotionPage({
   const page = await getActivePromotionPage(slug);
   if (!page) notFound();
 
+  const [locale, numerals] = await Promise.all([getLocale(), getNumeralPreference()]);
   const { promotion, rows } = page;
 
   return (
@@ -20,8 +53,8 @@ export default async function PromotionPage({
       <nav aria-label="Breadcrumb" className="text-xs text-muted">
         <ol className="flex flex-wrap items-center gap-2">
           <li>
-            <Link href="/" className="hover:text-ink">
-              Home
+            <Link href={localePath(locale, "/")} className="hover:text-ink">
+              {translate(locale, "common.home")}
             </Link>
           </li>
           <li className="flex items-center gap-2">
@@ -57,7 +90,7 @@ export default async function PromotionPage({
 
       {rows.length === 0 ? (
         <div className="mt-10 rounded-xl border border-dashed border-line px-6 py-16 text-center text-sm text-muted">
-          Nothing is in this promotion yet.
+          {translate(locale, "home.empty")}
         </div>
       ) : (
         <div className="mt-10 space-y-12">
@@ -66,13 +99,17 @@ export default async function PromotionPage({
               <div className="mb-4 flex items-end justify-between gap-2">
                 <h2 className="text-lg font-semibold tracking-tight">{row.title}</h2>
                 <span className="text-xs text-muted">
-                  {row.products.length} {row.products.length === 1 ? "product" : "products"}
+                  {translate(locale, row.products.length === 1 ? "home.product" : "home.products", {
+                    count: row.products.length,
+                  })}
                 </span>
               </div>
               <ProductGrid
                 products={row.products}
                 label={`${row.title} products`}
-                emptyMessage="Nothing is in this row yet."
+                emptyMessage={translate(locale, "home.empty")}
+                locale={locale}
+                numerals={numerals}
               />
             </section>
           ))}

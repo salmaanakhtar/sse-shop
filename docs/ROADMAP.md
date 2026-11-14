@@ -3,9 +3,17 @@
 Sequenced so every phase leaves a working store. A phase is done when its completion criteria
 hold, not when the code is written.
 
-**Current:** Phase 4 complete. Phase 5 complete. Phase 6 in progress — dark mode is live; Arabic
-translation, RTL, and numerals are next. The final phase is a full UI redesign of layout, theme, and
-design language. No-code control is a continuous background stream, not a numbered phase.
+**Current:** Phase 4 and Phase 5 are complete. Phase 6 is in progress — dark mode and the Arabic
+route/RTL/numeral foundation are shipped; translation QA and secondary account copy remain.
+Phase 7 (money and mail), Phase 8 (hardening), and Phase 9 (full UI redesign) are still open. The
+final phase is a full UI redesign of layout, theme, and design language. No-code control is a
+continuous background stream, not a numbered phase.
+
+**Completion program:** security/foundation fixes, admin settings, homepage sections, legal pages,
+Arabic routing/RTL/numerals, search/filter/sort/pagination, SEO metadata/sitemap/JSON-LD, verified
+reviews, and related products are in place. Order operations, payment lifecycle/refunds, VAT
+invoices, shipping zones, back-in-stock/low-stock/abandoned-cart notifications, marketing email,
+and the analytics dashboard remain.
 
 ## Phase 0 — Foundation
 
@@ -126,14 +134,16 @@ development.
 
 ## Phase 6 — Experience
 
-**Status: in progress — dark mode shipped; Arabic next.**
+**Status: in progress — dark mode and the Arabic route/RTL/numeral foundation are shipped;
+translation QA and secondary copy remain.**
 
 - **Dark mode (done):** the storefront follows the operating system by default. The customer can
   choose Auto, Light, or Dark; the cookie persists per browser and a signed-in preference follows
   them to another device. The palette is scoped to the storefront, so admin stays light.
-- **Arabic:** interface-only translation with a language toggle, RTL layout, and per-customer
-  choice of Arabic-Indic or Latin numerals for prices. Product and category content stays English
-  initially; admin stays English.
+- **Arabic (in progress):** `/ar` URLs with hreflang, Modern Standard Arabic for the shell, home,
+  product, cart, checkout, wishlist, and auth surfaces, RTL layout, and a Latin/Arabic-Indic numeral
+  toggle. Product content, category names, admin, and emails remain English. Account/order detail
+  and some secondary strings still fall back to English.
 
 **Done when** both themes and both languages render correctly, prices keep the same integer value,
 and a customer's choices survive a return visit. Dark mode is complete; Arabic is not.
@@ -167,12 +177,18 @@ the load check.
 
 This is a background stream expanded as each feature lands, not a phase with a finish line.
 
-- `settings` with typed, Zod-validated keys: store name, contact details, currency label, shipping
-  rules, announcement bar.
-- Theme tokens: palette, radius, typography — edited in admin, stored as settings, applied as CSS
-  variables. No deploy.
-- Homepage composed from ordered sections (hero, featured products, category row, text block).
-- Draft/publish for content, with a preview link.
+- **Settings (done):** typed, Zod-validated keys for store identity, contact, legal name/TRN/address,
+  tax, fallback shipping, return window, inventory threshold, abandoned-cart delay, announcement
+  bar, and theme tokens. `/admin/settings` edits them with an audit entry.
+- **Theme tokens (done):** brand colour, soft brand colour, and corner radius are stored as settings
+  and applied to the storefront shell.
+- **Homepage sections (done):** ordered hero, promotion carousel, collection, category, text,
+  hand-picked products, and all-products sections, with active state and admin ordering. A preview
+  workflow is still pending.
+- **Content pages (done):** admin-editable Privacy, Terms, Shipping, Returns, Contact, FAQ, Cookies,
+  and other pages, with published state and SEO fields.
+- **Preview/draft (partial):** products, promotions, categories, collections, and pages have draft
+  or active states, but there is no side-by-side preview link for homepage drafts yet.
 - Each new configurable feature adds its admin screen and its audit entry here.
 
 ## Phase 9 — Full UI redesign

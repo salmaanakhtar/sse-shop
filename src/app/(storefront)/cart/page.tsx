@@ -2,23 +2,33 @@ import Image from "next/image";
 import Link from "next/link";
 import { removeItemAction, updateQuantityAction } from "@/app/(storefront)/cart-actions";
 import { buttonClass } from "@/components/ui/button";
+import { localePath, translate } from "@/lib/i18n";
 import { formatMoney } from "@/lib/money";
 import { getCartView } from "@/server/services/cart";
+import { getLocale, getNumeralPreference } from "@/server/services/preferences";
 
 export default async function CartPage({
   searchParams,
 }: {
   searchParams: Promise<{ error?: string }>;
 }) {
-  const [{ error }, cart] = await Promise.all([searchParams, getCartView()]);
+  const [{ error }, cart, locale, numerals] = await Promise.all([
+    searchParams,
+    getCartView(),
+    getLocale(),
+    getNumeralPreference(),
+  ]);
+  const money = (minor: number) => formatMoney(minor, { locale, numerals });
 
   if (!cart || cart.lines.length === 0) {
     return (
       <div className="mx-auto max-w-5xl px-6 py-20 text-center">
-        <h1 className="text-2xl font-semibold tracking-tight">Your cart is empty</h1>
-        <p className="mt-2 text-sm text-muted">Add something you like and it will show up here.</p>
-        <Link href="/" className={buttonClass("primary", "md", "mt-8")}>
-          Browse the shop
+        <h1 className="text-2xl font-semibold tracking-tight">
+          {translate(locale, "cart.emptyTitle")}
+        </h1>
+        <p className="mt-2 text-sm text-muted">{translate(locale, "cart.emptyBody")}</p>
+        <Link href={localePath(locale, "/")} className={buttonClass("primary", "md", "mt-8")}>
+          {translate(locale, "cart.browse")}
         </Link>
       </div>
     );
@@ -26,7 +36,9 @@ export default async function CartPage({
 
   return (
     <div className="mx-auto max-w-5xl px-6 py-10">
-      <h1 className="text-2xl font-semibold tracking-tight">Cart</h1>
+      <h1 className="text-2xl font-semibold tracking-tight">
+        {translate(locale, "cart.title")}
+      </h1>
 
       {error ? (
         <p role="alert" className="mt-4 rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700">
@@ -56,7 +68,7 @@ export default async function CartPage({
               <div className="flex min-w-0 flex-1 flex-col justify-between gap-3 sm:flex-row sm:items-center">
                 <div className="min-w-0">
                   <Link
-                    href={`/products/${line.productSlug}`}
+                    href={localePath(locale, `/products/${line.productSlug}`)}
                     className="text-sm font-medium hover:underline"
                   >
                     {line.productTitle}
@@ -65,7 +77,9 @@ export default async function CartPage({
                     <p className="mt-0.5 text-xs text-muted">{line.optionLabel}</p>
                   ) : null}
                   {!line.available ? (
-                    <p className="mt-1 text-xs text-red-600">Only {line.stockQty} available</p>
+                    <p className="mt-1 text-xs text-red-600">
+                      {translate(locale, "cart.onlyAvailable", { count: line.stockQty })}
+                    </p>
                   ) : null}
                 </div>
 
@@ -79,7 +93,9 @@ export default async function CartPage({
                       type="submit"
                       name="quantity"
                       value={line.quantity - 1}
-                      aria-label={`Decrease quantity of ${line.productTitle}`}
+                      aria-label={translate(locale, "cart.decrease", {
+                        title: line.productTitle,
+                      })}
                       className="h-8 w-8 text-muted hover:text-ink"
                     >
                       −
@@ -94,7 +110,9 @@ export default async function CartPage({
                       type="submit"
                       name="quantity"
                       value={line.quantity + 1}
-                      aria-label={`Increase quantity of ${line.productTitle}`}
+                      aria-label={translate(locale, "cart.increase", {
+                        title: line.productTitle,
+                      })}
                       className="h-8 w-8 text-muted hover:text-ink"
                       disabled={line.quantity >= line.stockQty}
                     >
@@ -104,11 +122,11 @@ export default async function CartPage({
 
                   <div className="w-24 text-right">
                     <p className="text-sm font-medium tabular-nums">
-                      {formatMoney(line.lineTotalMinor)}
+                      {money(line.lineTotalMinor)}
                     </p>
                     {line.regularPriceMinor > line.unitPriceMinor ? (
                       <p className="text-[11px] text-muted line-through tabular-nums">
-                        {formatMoney(line.regularPriceMinor * line.quantity)}
+                        {money(line.regularPriceMinor * line.quantity)}
                       </p>
                     ) : null}
                   </div>
@@ -119,7 +137,7 @@ export default async function CartPage({
                       type="submit"
                       className="text-xs text-muted underline-offset-4 hover:text-red-600 hover:underline"
                     >
-                      Remove
+                      {translate(locale, "cart.remove")}
                     </button>
                   </form>
                 </div>
@@ -129,33 +147,38 @@ export default async function CartPage({
         </ul>
 
         <aside className="h-fit rounded-xl border border-line bg-surface p-5">
-          <h2 className="text-sm font-semibold">Summary</h2>
+          <h2 className="text-sm font-semibold">{translate(locale, "cart.summary")}</h2>
 
           <dl className="mt-4 space-y-2 text-sm">
             <div className="flex justify-between">
-              <dt className="text-muted">Subtotal</dt>
-              <dd className="tabular-nums">{formatMoney(cart.totals.subtotalMinor)}</dd>
+              <dt className="text-muted">{translate(locale, "cart.subtotal")}</dt>
+              <dd className="tabular-nums">{money(cart.totals.subtotalMinor)}</dd>
             </div>
             <div className="flex justify-between">
-              <dt className="text-muted">Delivery</dt>
+              <dt className="text-muted">{translate(locale, "cart.delivery")}</dt>
               <dd className="tabular-nums">
-                {cart.totals.shippingMinor === 0 ? "Free" : formatMoney(cart.totals.shippingMinor)}
+                {cart.totals.shippingMinor === 0
+                  ? translate(locale, "cart.free")
+                  : money(cart.totals.shippingMinor)}
               </dd>
             </div>
             <div className="flex justify-between border-t border-line pt-3 text-base font-semibold">
-              <dt>Total</dt>
+              <dt>{translate(locale, "cart.total")}</dt>
               <dd className="tabular-nums" data-testid="cart-total">
-                {formatMoney(cart.totals.totalMinor)}
+                {money(cart.totals.totalMinor)}
               </dd>
             </div>
           </dl>
 
           <p className="mt-2 text-xs text-muted">
-            Includes {formatMoney(cart.totals.taxMinor)} VAT
+            {translate(locale, "cart.includesVat", { amount: money(cart.totals.taxMinor) })}
           </p>
 
-          <Link href="/checkout" className={buttonClass("primary", "md", "mt-5 w-full")}>
-            Checkout
+          <Link
+            href={localePath(locale, "/checkout")}
+            className={buttonClass("primary", "md", "mt-5 w-full")}
+          >
+            {translate(locale, "cart.checkout")}
           </Link>
         </aside>
       </div>

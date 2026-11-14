@@ -1,11 +1,21 @@
 import Image from "next/image";
 import Link from "next/link";
 import { badgeToneClass } from "@/lib/badges";
+import { translate, type Locale, type NumeralStyle } from "@/lib/i18n";
+import { localePath } from "@/lib/i18n";
 import { formatMoney } from "@/lib/money";
 import { discountPercent } from "@/lib/sale";
 import type { CatalogCard as CatalogCardData } from "@/server/services/catalog";
 
-export function ProductCard({ product }: { product: CatalogCardData }) {
+export function ProductCard({
+  product,
+  locale = "en",
+  numerals = "latin",
+}: {
+  product: CatalogCardData;
+  locale?: Locale;
+  numerals?: NumeralStyle;
+}) {
   const discount =
     product.compareAtFromMinor !== null
       ? discountPercent(product.compareAtFromMinor, product.priceFromMinor)
@@ -13,7 +23,7 @@ export function ProductCard({ product }: { product: CatalogCardData }) {
 
   return (
     <Link
-      href={`/products/${product.slug}`}
+      href={localePath(locale, `/products/${product.slug}`)}
       className="group block overflow-hidden rounded-xl border border-line bg-surface transition-colors hover:border-brand/40"
     >
       <div className="relative aspect-square overflow-hidden bg-page">
@@ -27,7 +37,7 @@ export function ProductCard({ product }: { product: CatalogCardData }) {
           />
         ) : (
           <div className="flex h-full items-center justify-center text-xs text-muted">
-            No image yet
+            {translate(locale, "product.noImage")}
           </div>
         )}
         {product.badges.length > 0 ? (
@@ -46,7 +56,8 @@ export function ProductCard({ product }: { product: CatalogCardData }) {
         ) : null}
         {product.onSale ? (
           <span className="absolute right-3 top-3 rounded-full bg-brand px-2 py-0.5 text-[10px] font-semibold tracking-wide text-white uppercase">
-            Sale{discount !== null ? ` −${discount}%` : ""}
+            {translate(locale, "product.sale")}
+            {discount !== null ? ` −${discount}%` : ""}
           </span>
         ) : null}
       </div>
@@ -55,15 +66,15 @@ export function ProductCard({ product }: { product: CatalogCardData }) {
         <h2 className="text-sm font-medium">{product.title}</h2>
         {product.inStock ? (
           <p className="flex items-baseline gap-2 text-sm text-muted">
-            <span>{formatMoney(product.priceFromMinor)}</span>
+            <span>{formatMoney(product.priceFromMinor, { locale, numerals })}</span>
             {product.compareAtFromMinor !== null ? (
               <span className="text-xs line-through">
-                {formatMoney(product.compareAtFromMinor)}
+                {formatMoney(product.compareAtFromMinor, { locale, numerals })}
               </span>
             ) : null}
           </p>
         ) : (
-          <p className="text-sm text-muted">Sold out</p>
+          <p className="text-sm text-muted">{translate(locale, "product.soldOut")}</p>
         )}
       </div>
     </Link>

@@ -7,6 +7,8 @@ test("home page renders the catalog without page errors", async ({ page }) => {
   const response = await page.goto("/");
 
   expect(response?.status()).toBe(200);
+  expect(response?.headers()["x-content-type-options"]).toBe("nosniff");
+  expect(response?.headers()["x-frame-options"]).toBe("DENY");
   await expect(page).toHaveTitle(/sse-shop/);
   await expect(page.getByRole("heading", { level: 1 })).toHaveText(
     "Considered goods, delivered across the UAE.",

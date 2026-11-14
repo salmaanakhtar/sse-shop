@@ -13,18 +13,31 @@ function isAdminHost(host: string | null): boolean {
 }
 
 export function proxy(request: NextRequest) {
-  if (!isAdminHost(request.headers.get("host"))) {
-    return NextResponse.next();
+  const host = request.headers.get("host");
+  const pathname = request.nextUrl.pathname;
+
+  if (isAdminHost(host)) {
+    if (pathname.startsWith("/admin") || pathname.startsWith("/api")) {
+      return NextResponse.next();
+    }
+
+    const url = request.nextUrl.clone();
+    url.pathname = `/admin${pathname === "/" ? "" : pathname}`;
+    return NextResponse.rewrite(url);
   }
 
-  const { pathname } = request.nextUrl;
-  if (pathname.startsWith("/admin") || pathname.startsWith("/api")) {
-    return NextResponse.next();
+  const isArabic = pathname === "/ar" || pathname.startsWith("/ar/");
+  const headers = new Headers(request.headers);
+  headers.set("x-store-locale", isArabic ? "ar" : "en");
+  headers.set("x-store-pathname", pathname);
+
+  if (!isArabic) {
+    return NextResponse.next({ request: { headers } });
   }
 
   const url = request.nextUrl.clone();
-  url.pathname = `/admin${pathname === "/" ? "" : pathname}`;
-  return NextResponse.rewrite(url);
+  url.pathname = pathname === "/ar" ? "/" : pathname.slice(3) || "/";
+  return NextResponse.rewrite(url, { request: { headers } });
 }
 
 export const config = {

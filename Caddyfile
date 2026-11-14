@@ -2,6 +2,13 @@
 
 {$STORE_DOMAIN:localhost} {
 	encode zstd gzip
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		X-Content-Type-Options "nosniff"
+		X-Frame-Options "DENY"
+		Referrer-Policy "strict-origin-when-cross-origin"
+		-Server
+	}
 
 	# Product images: immutable filenames, long cache, no authorization needed.
 	handle_path /media/* {
@@ -17,12 +24,18 @@
 
 {$ADMIN_DOMAIN:admin.localhost} {
 	encode zstd gzip
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		X-Content-Type-Options "nosniff"
+		X-Frame-Options "DENY"
+		Referrer-Policy "strict-origin-when-cross-origin"
+		-Server
+	}
 
-	# Second gate in front of the app. Uncomment once ADMIN_BASIC_AUTH_HASH is
-	# set to a bcrypt hash from `caddy hash-password --plaintext '...'`.
-	# basicauth {
-	# 	{$ADMIN_BASIC_AUTH_USER:admin} {$ADMIN_BASIC_AUTH_HASH}
-	# }
+	# Generate with: caddy hash-password --plaintext '...'
+	basicauth {
+		{$ADMIN_BASIC_AUTH_USER:admin} {$ADMIN_BASIC_AUTH_HASH}
+	}
 
 	handle {
 		reverse_proxy web:3000

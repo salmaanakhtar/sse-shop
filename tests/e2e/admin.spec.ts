@@ -132,8 +132,17 @@ test("admin builds a category tree, a collection, and a badge", async ({ page })
   await expect(page).toHaveURL(/#products$/);
   await expect(page.getByRole("link", { name: "Playwright Hoodie" })).toBeVisible();
 
+  await page.goto("/admin/home");
+  const addSection = page.getByTestId("add-home-section");
+  await addSection.locator("#section-kind-new").selectOption("collection");
+  await addSection.locator("#section-source-new").selectOption({ label: "Playwright Picks" });
+  await addSection.locator("#section-title-new").fill("Playwright Picks");
+  await addSection.getByRole("button", { name: "Add section" }).click();
+  await expect(page).toHaveURL(/\/admin\/home$/);
+
   await page.goto("/");
-  const picks = page.getByRole("region", { name: "Playwright Picks collection" });
+  await page.reload();
+  const picks = page.getByRole("region", { name: "Playwright Picks products" });
   await expect(picks.getByRole("link", { name: /Playwright Hoodie/ })).toBeVisible();
 
   await page.goto("/collections/playwright-picks");

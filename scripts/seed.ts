@@ -1,10 +1,12 @@
-import { eq, inArray } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 import { db, sql } from "../src/server/db/client";
 import {
   badges,
   categories,
   collectionProducts,
   collections,
+  homeSections,
+  pages,
   productBadges,
   productCategories,
   productOptionValues,
@@ -21,10 +23,17 @@ const DEMO_SLUG = "essential-tee";
 const SETTINGS: Record<string, unknown> = {
   "store.name": "sse-shop",
   "store.contact_email": "hello@example.com",
+  "store.contact_phone": "+971 50 123 4567",
+  "store.address": "Dubai, United Arab Emirates",
+  "store.legal_name": "sse-shop Trading LLC",
+  "store.trn": "",
   "tax.rate_bp": 500,
   "tax.inclusive": true,
   "shipping.flat_rate_minor": 2000,
   "shipping.free_threshold_minor": 20000,
+  "returns.window_days": 14,
+  "inventory.low_stock_threshold": 5,
+  "cart.abandoned_hours": 4,
 };
 
 async function seedSettings() {
@@ -191,14 +200,6 @@ async function seedLowStockProduct() {
 }
 
 async function seedTaxonomy() {
-  await db
-    .delete(categories)
-    .where(inArray(categories.slug, ["apparel", "tops", "accessories"]));
-  await db
-    .delete(collections)
-    .where(inArray(collections.slug, ["featured", "daily-offers"]));
-  await db.delete(badges).where(inArray(badges.label, ["Best Seller", "New"]));
-
   const [apparel] = await db
     .insert(categories)
     .values({
@@ -206,6 +207,17 @@ async function seedTaxonomy() {
       slug: "apparel",
       description: "Everyday clothing, cut for the UAE climate.",
       position: 0,
+    })
+    .onConflictDoUpdate({
+      target: categories.slug,
+      set: {
+        name: "Apparel",
+        description: "Everyday clothing, cut for the UAE climate.",
+        parentId: null,
+        position: 0,
+        active: true,
+        updatedAt: new Date(),
+      },
     })
     .returning({ id: categories.id });
   const [tops] = await db
@@ -217,6 +229,17 @@ async function seedTaxonomy() {
       parentId: apparel?.id ?? null,
       position: 0,
     })
+    .onConflictDoUpdate({
+      target: categories.slug,
+      set: {
+        name: "Tops",
+        description: "Tees and layers.",
+        parentId: apparel?.id ?? null,
+        position: 0,
+        active: true,
+        updatedAt: new Date(),
+      },
+    })
     .returning({ id: categories.id });
   const [accessories] = await db
     .insert(categories)
@@ -225,6 +248,17 @@ async function seedTaxonomy() {
       slug: "accessories",
       description: "The finishing pieces.",
       position: 1,
+    })
+    .onConflictDoUpdate({
+      target: categories.slug,
+      set: {
+        name: "Accessories",
+        description: "The finishing pieces.",
+        parentId: null,
+        position: 1,
+        active: true,
+        updatedAt: new Date(),
+      },
     })
     .returning({ id: categories.id });
 
@@ -260,6 +294,16 @@ async function seedTaxonomy() {
       description: "A short edit of pieces we reach for.",
       position: 0,
     })
+    .onConflictDoUpdate({
+      target: collections.slug,
+      set: {
+        name: "Featured",
+        description: "A short edit of pieces we reach for.",
+        position: 0,
+        active: true,
+        updatedAt: new Date(),
+      },
+    })
     .returning({ id: collections.id });
   const [daily] = await db
     .insert(collections)
@@ -269,30 +313,57 @@ async function seedTaxonomy() {
       description: "Small prices for the everyday.",
       position: 1,
     })
+    .onConflictDoUpdate({
+      target: collections.slug,
+      set: {
+        name: "Daily Offers",
+        description: "Small prices for the everyday.",
+        position: 1,
+        active: true,
+        updatedAt: new Date(),
+      },
+    })
     .returning({ id: collections.id });
 
   if (featured) {
     const rows = [tee?.id, cap?.id]
       .filter((id): id is string => Boolean(id))
       .map((productId, position) => ({ collectionId: featured.id, productId, position }));
-    if (rows.length > 0) {
-      await db.insert(collectionProducts).values(rows).onConflictDoNothing();
+    for (const row of rows) {
+      await db
+        .insert(collectionProducts)
+        .values(row)
+        .onConflictDoUpdate({
+          target: [collectionProducts.collectionId, collectionProducts.productId],
+          set: { position: row.position },
+        });
     }
   }
   if (daily && cap) {
     await db
       .insert(collectionProducts)
       .values({ collectionId: daily.id, productId: cap.id, position: 0 })
-      .onConflictDoNothing();
+      .onConflictDoUpdate({
+        target: [collectionProducts.collectionId, collectionProducts.productId],
+        set: { position: 0 },
+      });
   }
 
   const [bestSeller] = await db
     .insert(badges)
     .values({ label: "Best Seller", tone: "brand", position: 0 })
+    .onConflictDoUpdate({
+      target: badges.label,
+      set: { tone: "brand", position: 0, active: true, updatedAt: new Date() },
+    })
     .returning({ id: badges.id });
   const [newBadge] = await db
     .insert(badges)
     .values({ label: "New", tone: "success", position: 1 })
+    .onConflictDoUpdate({
+      target: badges.label,
+      set: { tone: "success", position: 1, active: true, updatedAt: new Date() },
+    })
     .returning({ id: badges.id });
 
   if (bestSeller && tee) {
@@ -309,6 +380,154 @@ async function seedTaxonomy() {
   }
 
   console.info("seeded categories, collections, and badges");
+}
+
+async function seedLegalPages() {
+  const existing = await db.select({ slug: pages.slug }).from(pages);
+  const existingSlugs = new Set(existing.map((row) => row.slug));
+
+  const legalPages = [
+    {
+      slug: "privacy",
+      title: "Privacy policy",
+      seoDescription: "How sse-shop collects, uses, and protects personal data.",
+      body: `<h2>Privacy policy</h2>
+<p>This is placeholder policy text for [BUSINESS NAME]. Replace it with your reviewed policy before launch.</p>
+<p>We collect the information needed to process orders, deliver goods, provide support, and meet our legal obligations. We do not sell personal data.</p>
+<h3>Your choices</h3>
+<p>You can request access, correction, or deletion of your personal data by contacting [CONTACT EMAIL]. Orders may be retained where required for accounting and tax records.</p>
+<h3>Cookies</h3>
+<p>We use essential cookies for sign-in, carts, preferences, and security. Analytics or marketing cookies are only used with the appropriate consent.</p>`,
+    },
+    {
+      slug: "terms",
+      title: "Terms of service",
+      seoDescription: "The terms that apply when you use the sse-shop storefront.",
+      body: `<h2>Terms of service</h2>
+<p>These are placeholder terms for [BUSINESS NAME]. Replace them with your reviewed terms before launch.</p>
+<p>By placing an order you confirm that the information you provide is accurate and that you are able to enter into a contract. Prices are shown in AED and include VAT where stated.</p>
+<p>We may refuse or cancel an order where stock, pricing, payment, fraud, or legal checks require it. Any accepted payment is refunded to the original method when possible.</p>`,
+    },
+    {
+      slug: "shipping",
+      title: "Shipping and delivery",
+      seoDescription: "Delivery areas, times, and charges.",
+      body: `<h2>Shipping and delivery</h2>
+<p>This is placeholder shipping content for [BUSINESS NAME]. Replace it with your final service levels before launch.</p>
+<p>We deliver across the United Arab Emirates. Delivery charges and free-delivery thresholds are shown at checkout and may vary by emirate and order weight.</p>
+<p>Delivery estimates are not guarantees. Delays caused by carriers, weather, customs, or events outside our control may affect the estimated date.</p>`,
+    },
+    {
+      slug: "returns",
+      title: "Returns and refunds",
+      seoDescription: "How to return an item and request a refund.",
+      body: `<h2>Returns and refunds</h2>
+<p>This is placeholder returns content for [BUSINESS NAME]. Replace it with your final policy before launch.</p>
+<p>You may request a return within [RETURN WINDOW] days of delivery, provided the item is unused and in its original condition. Some items may be excluded for hygiene or safety reasons.</p>
+<p>Approved returns are refunded to the original payment method after inspection. Delivery charges are refunded only where the return is due to our error or a faulty item.</p>`,
+    },
+    {
+      slug: "contact",
+      title: "Contact us",
+      seoDescription: "How to reach the sse-shop team.",
+      body: `<h2>Contact us</h2>
+<p>For order questions, returns, or product help, email <a href="mailto:[CONTACT EMAIL]">[CONTACT EMAIL]</a>.</p>
+<p>Registered address: [ADDRESS]</p>
+<p>TRN: [TRN]</p>`,
+    },
+    {
+      slug: "faq",
+      title: "Frequently asked questions",
+      seoDescription: "Answers to common shopping and delivery questions.",
+      body: `<h2>Frequently asked questions</h2>
+<h3>How do I track my order?</h3>
+<p>Use the order link in your confirmation email, or sign in and open your order history.</p>
+<h3>Can I change my order?</h3>
+<p>Contact us as soon as possible. Once an order is fulfilled, changes may need to go through the returns process.</p>
+<h3>Do prices include VAT?</h3>
+<p>Yes. Prices are shown in AED and include VAT where stated. The VAT component is shown at checkout and on the order.</p>`,
+    },
+    {
+      slug: "cookies",
+      title: "Cookie policy",
+      seoDescription: "The cookies used by the sse-shop storefront.",
+      body: `<h2>Cookie policy</h2>
+<p>This is placeholder cookie content for [BUSINESS NAME]. Replace it with your reviewed policy before launch.</p>
+<p>Essential cookies keep you signed in, preserve your cart, remember storefront preferences, and protect forms. They are required for the store to work.</p>
+<p>Analytics and marketing cookies are optional and are only used where consent has been collected.</p>`,
+    },
+  ];
+
+  for (const page of legalPages) {
+    if (existingSlugs.has(page.slug)) continue;
+    await db.insert(pages).values({
+      slug: page.slug,
+      title: page.title,
+      body: page.body,
+      published: true,
+      seoTitle: page.title,
+      seoDescription: page.seoDescription,
+    });
+  }
+
+  console.info("seeded legal pages");
+}
+
+async function seedHomeContent() {
+  const [existing] = await db.select({ id: homeSections.id }).from(homeSections).limit(1);
+  if (existing) return;
+
+  const collectionRows = await db
+    .select({ id: collections.id, slug: collections.slug, name: collections.name })
+    .from(collections);
+  const featured = collectionRows.find((row) => row.slug === "featured");
+  const daily = collectionRows.find((row) => row.slug === "daily-offers");
+
+  const sections: (typeof homeSections.$inferInsert)[] = [
+    {
+      kind: "promotions",
+      title: "Promotions",
+      position: 0,
+      active: true,
+    },
+    {
+      kind: "hero",
+      title: "Considered goods, delivered across the UAE.",
+      body: "Free delivery over AED 200. Every price includes 5% VAT.",
+      position: 1,
+      active: true,
+    },
+  ];
+
+  if (featured) {
+    sections.push({
+      kind: "collection",
+      title: featured.name,
+      config: { collectionId: featured.id, limit: 4 },
+      position: sections.length,
+      active: true,
+    });
+  }
+  if (daily) {
+    sections.push({
+      kind: "collection",
+      title: daily.name,
+      config: { collectionId: daily.id, limit: 4 },
+      position: sections.length,
+      active: true,
+    });
+  }
+
+  sections.push({
+    kind: "allProducts",
+    title: "All products",
+    config: { limit: 24 },
+    position: sections.length,
+    active: true,
+  });
+
+  await db.insert(homeSections).values(sections);
+  console.info("seeded homepage sections");
 }
 
 async function seedAdmin() {
@@ -347,6 +566,8 @@ async function main() {
   await seedDemoProduct();
   await seedLowStockProduct();
   await seedTaxonomy();
+  await seedLegalPages();
+  await seedHomeContent();
   console.info("done");
 }
 

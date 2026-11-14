@@ -23,6 +23,8 @@ const TRUNCATE_ORDER = [
   "wishlist_alerts",
   "wishlist_items",
   "wishlists",
+  "home_sections",
+  "pages",
   "promotions",
   "product_badges",
   "collection_products",
@@ -34,6 +36,7 @@ const TRUNCATE_ORDER = [
   "product_option_values",
   "product_options",
   "product_media",
+  "product_reviews",
   "variants",
   "products",
   "audit_log",
@@ -44,6 +47,7 @@ const TRUNCATE_ORDER = [
   "verifications",
   "users",
   "counters",
+  "rate_limits",
 ];
 
 let close: (() => Promise<void>) | undefined;

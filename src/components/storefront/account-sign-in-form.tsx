@@ -4,9 +4,11 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState, type FormEvent } from "react";
 import { mergeCartAfterSignInAction } from "@/app/(storefront)/account/actions";
+import { useStorePreferences } from "@/components/storefront/store-preferences";
 import { Button } from "@/components/ui/button";
 import { Input, Label } from "@/components/ui/field";
 import { authClient } from "@/lib/auth-client";
+import { localePath } from "@/lib/i18n";
 
 function safeNext(next: string | undefined): string {
   return next && next.startsWith("/") && !next.startsWith("//") && !next.includes("\\")
@@ -16,6 +18,7 @@ function safeNext(next: string | undefined): string {
 
 export function AccountSignInForm({ next }: { next?: string }) {
   const router = useRouter();
+  const { t, locale } = useStorePreferences();
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
   const target = safeNext(next);
@@ -58,12 +61,12 @@ export function AccountSignInForm({ next }: { next?: string }) {
   return (
     <form onSubmit={onSubmit} className="space-y-4">
       <div>
-        <Label htmlFor="email">Email</Label>
+        <Label htmlFor="email">{t("auth.email")}</Label>
         <Input id="email" name="email" type="email" required autoComplete="email" />
       </div>
 
       <div>
-        <Label htmlFor="password">Password</Label>
+        <Label htmlFor="password">{t("auth.password")}</Label>
         <Input
           id="password"
           name="password"
@@ -80,16 +83,19 @@ export function AccountSignInForm({ next }: { next?: string }) {
       ) : null}
 
       <Button type="submit" disabled={pending} className="w-full">
-        {pending ? "Signing in…" : "Sign in"}
+        {pending ? t("auth.signingIn") : t("auth.signIn")}
       </Button>
 
       <p className="text-center text-xs text-muted">
-        New here?{" "}
+        {t("auth.newHere")}{" "}
         <Link
-          href={`/account/sign-up${target !== "/account" ? `?next=${encodeURIComponent(target)}` : ""}`}
+          href={localePath(
+            locale,
+            `/account/sign-up${target !== "/account" ? `?next=${encodeURIComponent(target)}` : ""}`,
+          )}
           className="underline underline-offset-4 hover:text-ink"
         >
-          Create an account
+          {t("auth.createAccount")}
         </Link>
       </p>
 

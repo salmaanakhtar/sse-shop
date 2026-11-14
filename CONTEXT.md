@@ -209,12 +209,42 @@ that device; a signed-in customer's saved preference follows them to another bro
 _Avoid_: Color scheme, skin
 
 **Locale**:
-The customer's chosen storefront language. The first Arabic release translates the interface
-only; product content stays English initially.
+The customer's chosen storefront language. English is the default and Arabic is served under `/ar`;
+product content and the admin remain English. The URL prefix is the source of truth, while a cookie
+and account preference remember the choice.
+_Avoid_: Language code, translation file
 
 **Numeral style**:
-The customer's choice between Arabic-Indic digits (٠١٢٣) and Latin digits (0123) for prices.
+The customer's choice between Arabic-Indic digits (٠١٢٣) and Latin digits (0123) for prices and
+dates. It is independent of the language: Arabic pages default to Latin numerals but can switch.
 _Avoid_: Number format
+
+**Store setting**:
+A typed key/value value edited in the admin and read at request time: store identity, contact and
+legal details, tax, fallback shipping, announcement bar, theme tokens, return window, and inventory
+thresholds.
+_Avoid_: Config, environment variable
+
+**Homepage section**:
+One ordered block in the admin-composed home page: hero, promotion carousel, collection row,
+category row, text block, hand-picked products, or all products. Inactive sections stay in admin
+but are hidden from shoppers.
+_Avoid_: Widget, block
+
+**Content page**:
+An admin-editable page such as Privacy, Terms, Shipping, Returns, Contact, FAQ, or Cookies. It has a
+slug, title, trusted admin HTML, published state, and SEO fields.
+_Avoid_: CMS page, static page
+
+**Product review**:
+A moderated rating and written review from a customer with a paid order for that product. One
+review per customer per product; it is pending until an admin approves it.
+_Avoid_: Comment, testimonial
+
+**Related products**:
+A storefront recommendation row. It ranks products sharing a category first, then a collection,
+then the newest active fallback, excluding the current product.
+_Avoid_: Upsell, cross-sell
 
 **Design language**:
 The shared rules for typography, spacing, colour, radius, elevation, motion, iconography, and

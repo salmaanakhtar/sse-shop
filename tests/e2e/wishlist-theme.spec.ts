@@ -77,6 +77,7 @@ test("dark mode persists in the browser and follows the signed-in account", asyn
 
   await page.getByLabel("Theme").selectOption("dark");
   await expect(page.locator("#storefront")).toHaveAttribute("data-theme", "dark");
+  await expect(page.getByTestId("theme-saved")).toHaveText("Theme saved.");
 
   await page.reload();
   await expect(page.locator("#storefront")).toHaveAttribute("data-theme", "dark");

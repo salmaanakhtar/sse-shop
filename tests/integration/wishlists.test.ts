@@ -6,8 +6,10 @@ import {
   users,
   variants,
   wishlistAlerts,
+  wishlists,
 } from "@/server/db/schema";
 import { mailer } from "@/server/mail";
+import { anonymizeCustomer } from "@/server/services/customers";
 import {
   checkWishlistPriceDropsForUser,
   createWishlist,
@@ -200,6 +202,23 @@ describe("wishlists", () => {
         .select()
         .from(wishlistAlerts)
         .where(and(eq(wishlistAlerts.userId, user.id), eq(wishlistAlerts.variantId, variant.id))),
+    ).toHaveLength(0);
+  });
+
+  it("removes wishlists and alerts when the customer is anonymized", async () => {
+    const user = await createUser();
+    const { variant } = await createProductWithVariant(10_000);
+    const saved = await ensureDefaultWishlist(user.id);
+    await setVariantWishlists(user.id, variant.id, [saved.id]);
+    await db.insert(wishlistAlerts).values({ userId: user.id, variantId: variant.id });
+
+    expect(await anonymizeCustomer(user.id, user.id)).toBe(true);
+
+    expect(
+      await db.select().from(wishlists).where(eq(wishlists.userId, user.id)),
+    ).toHaveLength(0);
+    expect(
+      await db.select().from(wishlistAlerts).where(eq(wishlistAlerts.userId, user.id)),
     ).toHaveLength(0);
   });
 });

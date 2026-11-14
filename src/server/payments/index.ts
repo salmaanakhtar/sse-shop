@@ -1,3 +1,5 @@
+import { env } from "@/lib/env";
+
 export type ChargeRequest = {
   orderId: string;
   orderNumber: string;
@@ -15,6 +17,12 @@ export type ChargeResult = {
 export interface PaymentProvider {
   readonly id: string;
   charge(request: ChargeRequest): Promise<ChargeResult>;
+}
+
+if (env.PAYMENT_PROVIDER !== "mock") {
+  throw new Error(
+    "PAYMENT_PROVIDER is set to Stripe, but Stripe is not implemented yet. Keep the mock provider until the deploy-ready phase.",
+  );
 }
 
 /**

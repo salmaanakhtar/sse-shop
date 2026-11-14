@@ -10,8 +10,12 @@ const nav = [
   { href: "/admin/collections", label: "Collections" },
   { href: "/admin/badges", label: "Badges" },
   { href: "/admin/promotions", label: "Promotions" },
+  { href: "/admin/home", label: "Homepage" },
+  { href: "/admin/pages", label: "Pages" },
+  { href: "/admin/reviews", label: "Reviews" },
   { href: "/admin/orders", label: "Orders" },
   { href: "/admin/customers", label: "Customers" },
+  { href: "/admin/settings", label: "Settings" },
 ];
 
 export default async function PanelLayout({ children }: { children: ReactNode }) {

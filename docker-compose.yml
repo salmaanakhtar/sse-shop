@@ -10,6 +10,7 @@ services:
         required: false
     environment:
       DATABASE_URL: postgres://sse_shop:${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD}@db:5432/sse_shop
+      UPLOADS_DIR: /data/uploads
     depends_on:
       db:
         condition: service_healthy
@@ -47,6 +48,8 @@ services:
     environment:
       STORE_DOMAIN: ${STORE_DOMAIN:-localhost}
       ADMIN_DOMAIN: ${ADMIN_DOMAIN:-admin.localhost}
+      ADMIN_BASIC_AUTH_USER: ${ADMIN_BASIC_AUTH_USER:-admin}
+      ADMIN_BASIC_AUTH_HASH: ${ADMIN_BASIC_AUTH_HASH:?set ADMIN_BASIC_AUTH_HASH}
     volumes:
       - ./Caddyfile:/etc/caddy/Caddyfile:ro
       - caddy_data:/data

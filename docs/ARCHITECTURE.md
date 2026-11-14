@@ -47,11 +47,11 @@ rules.
 
 ## Data model
 
-Thirty-one tables, deliberately narrow. Core tables carry `created_at`; most carry `updated_at`;
+Thirty-five tables, deliberately narrow. Core tables carry `created_at`; most carry `updated_at`;
 join tables stay minimal.
 | Table | Holds | Notes |
 | --- | --- | --- |
-| `users` | Admin and customer identity | `role` is `admin` or `customer`; `phone`; `theme_preference`; `deleted_at` tombstones a deleted customer |
+| `users` | Admin and customer identity | `role` is `admin` or `customer`; `phone`; `locale`; `numeral_style`; marketing consent; `theme_preference`; `deleted_at` tombstones a deleted customer |
 | `sessions` | Session records | Token stored hashed, never raw |
 | `accounts` | Password credentials | Better Auth |
 | `verifications` | Short-lived tokens | Email verification, password reset |
@@ -62,6 +62,7 @@ join tables stay minimal.
 | `product_option_values` | The values within a level | e.g. `Black`, `S`, `M` |
 | `variant_nodes` | Explicit variant tree | group or leaf; parent defaults and images; leaf links one `variants` row |
 | `product_media` | Ordered images per product | `storage_key`, `alt`, `position` |
+| `product_reviews` | Verified-buyer ratings and reviews | one per customer/product; `pending`/`approved`/`rejected` |
 | `categories` | Hierarchical navigation | self-referencing `parent_id`; `slug` unique; sibling `position` |
 | `product_categories` | Product ↔ category | Many-to-many; composite primary key |
 | `collections` | Curated product group | `slug` unique; home-page `position` |
@@ -81,6 +82,9 @@ join tables stay minimal.
 | `promotion_row_products` | Hand-picked products in a row | composite key; per-row position |
 | `audit_log` | Admin and account changes | Actor, action, before/after JSON, IP |
 | `settings` | Store configuration | Key → JSONB, changed in admin |
+| `home_sections` | Admin-composed homepage | ordered kind/title/body/config/active |
+| `pages` | Legal and trust pages | slug, trusted HTML, published, SEO fields |
+| `rate_limits` | Hashed fixed-window counters | protects public mutations |
 | `counters` | Monotonic sequences | Order numbers come from here, inside the placement transaction |
 
 ### Invariants
@@ -293,6 +297,63 @@ The cookie wins on that browser; otherwise the account preference applies. The p
 as CSS variables on `.storefront-shell`, so the admin stays light regardless of the shopper's
 choice. The theme switcher sits in the storefront header.
 
+## Storefront content controls
+
+The admin can edit the storefront without a deploy:
+
+- `/admin/settings` writes typed settings: identity, contact and legal details, TRN, tax, fallback
+  shipping, return window, low-stock threshold, abandoned-cart delay, announcement bar, and theme
+  tokens.
+- `/admin/home` composes ordered homepage sections: hero, promotion carousel, collection row,
+  category row, text block, hand-picked products, or all products. Inactive sections stay in admin
+  and are hidden from shoppers.
+- `/admin/pages` manages Privacy, Terms, Shipping, Returns, Contact, FAQ, Cookies, and any other
+  content page. Bodies are trusted admin HTML and are publicly available at `/pages/[slug]`.
+- The footer reads published pages, contact details, VAT copy, and the free-delivery threshold from
+  settings instead of hardcoding them.
+- Every settings, section, and page change writes an audit entry. The current implementation does
+  not yet provide a side-by-side preview/draft workflow for homepage sections.
+
+## Arabic and numerals
+
+English is served at the normal paths. Arabic is served under `/ar`:
+
+- `src/proxy.ts` rewrites `/ar/...` to the same pages and adds `x-store-locale: ar`; the browser URL
+  stays Arabic. The storefront layout sets `lang` and `dir` on the shell, and the shared translation
+  dictionary in `src/lib/i18n.ts` supplies MSA copy for the primary shopping flow.
+- A language switch changes the URL prefix and stores the choice in a cookie and on
+  `users.locale`. A signed-in customer's preference is copied into a new browser after sign-in when
+  no locale cookie exists.
+- Numerals are a separate preference (`latin` or `arabic`) stored in a cookie and
+  `users.numeral_style`. `formatMoney` and `formatDateFor` accept the locale and numeral style.
+- Product content, category names, admin, and emails remain English. Account, checkout, and
+  secondary copy are progressively covered by the dictionary; untranslated strings fall back to
+  English rather than disappearing.
+
+## Search and SEO
+
+- `/search` supports text search over title, description, and slug; category; min/max price;
+  in-stock-only; sort by newest, price, or name; and 12-item pagination. Search results are
+  `noindex`.
+- Search currently loads matching active products and applies price/stock filtering and sorting in
+  the service. The next scale step is a Postgres full-text/trigram index and SQL-level pagination.
+- Product, category, collection, promotion, and content pages emit titles, descriptions, canonical
+  URLs, Arabic alternates, and Open Graph metadata where available.
+- `/sitemap.xml` includes home, products, categories, collections, active promotions, pages, and
+  their Arabic paths. `/robots.txt` is generated from the store URL and disallows admin, account,
+  cart, checkout, order, search, and API routes.
+- Product pages include Product/AggregateOffer JSON-LD with price, currency, availability, and
+  images.
+
+## Reviews and recommendations
+
+- A review requires a paid, non-cancelled order containing the product. One review per customer per
+  product is enforced by a unique index.
+- New and edited reviews are `pending`. Admins approve or reject them at `/admin/reviews`; only
+  approved reviews contribute to the product rating and appear on the product page.
+- Related products rank shared categories first, then shared collections, then the newest active
+  fallback, excluding the current product.
+
 ## Cart and checkout
 
 ```text
@@ -396,11 +457,16 @@ addresses, order history, and faster checkout.
 
 `admin.<domain>` serves the same app. Access is layered:
 
-1. Network: Caddy basic auth now; Tailscale or an IP allowlist later.
-2. Session: a valid session bound to a `role = admin` user.
+1. Network: Caddy basic auth, required in the production compose; Tailscale/IP allowlist is later.
+2. Session: a valid session bound to a `role = admin` user. Admin sessions are capped at 8 hours
+   by the guard even though customer sessions last 30 days.
 3. Factor: TOTP verified for this session in production. `ADMIN_REQUIRE_TWO_FACTOR=false` is a
    local-development override only; it must never be false on the deployed store.
 4. Action: the individual action re-checks the role, not just the page.
+
+The panel lists customers, orders (read-only for now), reviews, products, taxonomy, promotions,
+homepage sections, pages, and settings. Every admin mutation writes an `audit_log` entry, except
+some older product/media/variant mutations that still need to be brought into coverage.
 
 The panel also lists customers: name, email, phone, order count, spend, and last order, with a
 detail page for saved addresses and order history. Customers never reach this host.
@@ -418,9 +484,9 @@ that would require a deploy belongs in this repo, not in the admin UI.
 
 ## Media
 
-Uploads are streamed to a temporary file, validated by magic bytes (not by filename or MIME
-header), capped at 10 MB, and re-encoded with `sharp` into AVIF and WebP at 480/960/1600 px wide.
-EXIF is stripped. Output lands at `/data/uploads/<yyyy>/<mm>/<uuid>-<width>.<ext>`.
+Uploads are validated by decoding with `sharp` (not by filename or MIME header), capped at 10 MB,
+rotated, resized to fit within 1600 px, stripped of metadata, and re-encoded as a single WebP at
+quality 82. Output lands at `/data/uploads/<yyyy>/<mm>/<uuid>.webp`.
 
 The same pipeline serves product gallery images and branch images. A leaf with no image uses the
 nearest ancestor branch image, then the product gallery.
@@ -439,16 +505,22 @@ images are public by design; there is nothing to authorize.
 | `caddy` | 80/443, ACME TLS, serves the uploads volume read-only |
 
 Images are built from the repo. The VPS pulls and restarts on deploy. Secrets come from an env file
-outside the repository with `600` permissions.
+outside the repository with `600` permissions. The runtime entrypoint runs Drizzle migrations before
+starting the standalone server, and the uploads directory is pinned to the shared `/data/uploads`
+volume.
 
 Operationally:
 
-- `/api/health` reports liveness. Database readiness joins it when the data layer serves traffic, so the endpoint never claims a healthy database it cannot reach.
-- Nightly `pg_dump`, compressed, kept 7 daily and 4 weekly, copied off-host.
-- Weekly `rsync` of the uploads volume.
-- A restore is rehearsed quarterly; an untested backup is a hope, not a backup.
-- Logs are structured JSON on stdout, rotated by Docker. The app never logs tokens, emails in full,
-  or request bodies.
+- `/api/health` checks a `select 1` against Postgres and returns 503 when the database is
+  unreachable. Docker uses that endpoint.
+- Security headers are set by Next (`nosniff`, frame denial, referrer policy, permissions policy);
+  Caddy adds HSTS and removes the server header.
+- Public mutations use hashed, database-backed fixed-window rate limits. Better Auth rate limiting
+  remains enabled in production and is disabled only in the Playwright server.
+- Admin access is protected by Caddy basic auth plus app session + TOTP. The admin session guard
+  caps a session at 8 hours.
+- Nightly backups, off-host copies, restore drills, structured logs, error tracking, and uptime/TLS
+  monitoring are still Phase 8 work. They are not implemented yet.
 
 ## Threat model
 

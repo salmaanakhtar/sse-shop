@@ -1,12 +1,47 @@
 import Link from "next/link";
+import {
+  LanguageSwitcher,
+  NumeralSwitcher,
+} from "@/components/storefront/language-switcher";
 import { ThemeSwitcher } from "@/components/storefront/theme-switcher";
+import { localePath, translate, type Locale, type NumeralStyle } from "@/lib/i18n";
+import { formatMoney } from "@/lib/money";
 import type { ThemePreference } from "@/lib/theme";
 import { getAuthSession } from "@/server/auth/guard";
 import { getCartItemCount } from "@/server/services/cart";
 import { listCategoryTree } from "@/server/services/categories";
-import { getStoreSettings } from "@/server/services/settings";
+import type { PageRecord } from "@/server/services/pages";
+import { getStoreSettings, type StoreSettings } from "@/server/services/settings";
 
-export async function SiteHeader({ theme }: { theme: ThemePreference }) {
+export function AnnouncementBar({ settings }: { settings: StoreSettings }) {
+  if (!settings.announcementActive || !settings.announcementText) return null;
+
+  const content = <span>{settings.announcementText}</span>;
+
+  return (
+    <div className="bg-ink px-6 py-2 text-center text-xs font-medium text-white">
+      {settings.announcementHref ? (
+        <Link href={settings.announcementHref} className="hover:underline">
+          {content}
+        </Link>
+      ) : (
+        content
+      )}
+    </div>
+  );
+}
+
+export async function SiteHeader({
+  theme,
+  locale,
+  numerals,
+  pathname,
+}: {
+  theme: ThemePreference;
+  locale: Locale;
+  numerals: NumeralStyle;
+  pathname: string;
+}) {
   const [cartCount, settings, session, categories] = await Promise.all([
     getCartItemCount(),
     getStoreSettings(),
@@ -17,23 +52,27 @@ export async function SiteHeader({ theme }: { theme: ThemePreference }) {
   return (
     <header className="border-b border-line bg-surface">
       <div className="mx-auto flex h-16 max-w-5xl items-center justify-between px-6">
-        <Link href="/" className="text-base font-semibold tracking-tight">
+        <Link href={localePath(locale, "/")} className="text-base font-semibold tracking-tight">
           {settings.name}
         </Link>
 
-        <nav className="flex items-center gap-5 text-sm">
+        <nav className="flex flex-wrap items-center justify-end gap-3 text-sm">
+          <LanguageSwitcher locale={locale} pathname={pathname} />
+          <NumeralSwitcher locale={locale} numerals={numerals} pathname={pathname} />
           <ThemeSwitcher value={theme} />
           <Link
-            href={session ? "/account" : "/account/sign-in"}
+            href={localePath(locale, session ? "/account" : "/account/sign-in")}
             className="text-muted transition-colors hover:text-ink"
           >
-            {session ? "Account" : "Sign in"}
+            {session
+              ? translate(locale, "nav.account")
+              : translate(locale, "nav.signIn")}
           </Link>
           <Link
-            href="/cart"
+            href={localePath(locale, "/cart")}
             className="inline-flex items-center gap-2 text-muted transition-colors hover:text-ink"
           >
-            Cart
+            {translate(locale, "nav.cart")}
             {cartCount > 0 ? (
               <span className="inline-flex min-w-5 items-center justify-center rounded-full bg-brand px-1.5 text-xs font-semibold text-white">
                 {cartCount}
@@ -45,17 +84,36 @@ export async function SiteHeader({ theme }: { theme: ThemePreference }) {
 
       <div className="border-t border-line/70">
         <nav
-          aria-label="Categories"
+          aria-label={translate(locale, "nav.categories")}
           className="mx-auto flex max-w-5xl flex-wrap items-center gap-x-5 gap-y-2 px-6 py-2.5 text-sm"
         >
-          <Link href="/" className="text-muted transition-colors hover:text-ink">
-            All products
+          <form action={localePath(locale, "/search")} method="get" className="flex gap-1.5">
+            <input
+              name="q"
+              type="search"
+              placeholder={translate(locale, "common.search")}
+              aria-label={translate(locale, "common.search")}
+              className="h-8 w-36 rounded-md border border-line bg-surface px-2 text-sm"
+            />
+            <button
+              type="submit"
+              className="h-8 rounded-md border border-line bg-surface px-2 text-xs text-muted hover:text-ink"
+            >
+              {translate(locale, "common.search")}
+            </button>
+          </form>
+
+          <Link
+            href={localePath(locale, "/")}
+            className="text-muted transition-colors hover:text-ink"
+          >
+            {translate(locale, "nav.allProducts")}
           </Link>
 
           {categories.map((category) => (
             <div key={category.id} className="group relative">
               <Link
-                href={`/category/${category.slug}`}
+                href={localePath(locale, `/category/${category.slug}`)}
                 className="inline-flex items-center gap-1 text-muted transition-colors hover:text-ink"
               >
                 {category.name}
@@ -72,7 +130,7 @@ export async function SiteHeader({ theme }: { theme: ThemePreference }) {
                     {category.children.map((child) => (
                       <Link
                         key={child.id}
-                        href={`/category/${child.slug}`}
+                        href={localePath(locale, `/category/${child.slug}`)}
                         className="block rounded-lg px-3 py-2 text-sm text-muted transition-colors hover:bg-page hover:text-ink"
                       >
                         {child.name}
@@ -89,14 +147,58 @@ export async function SiteHeader({ theme }: { theme: ThemePreference }) {
   );
 }
 
-export function SiteFooter({ storeName }: { storeName: string }) {
+export function SiteFooter({
+  settings,
+  pages,
+  locale,
+  numerals,
+}: {
+  settings: StoreSettings;
+  pages: PageRecord[];
+  locale: Locale;
+  numerals: NumeralStyle;
+}) {
   return (
     <footer className="mt-20 border-t border-line">
-      <div className="mx-auto flex max-w-5xl flex-wrap items-center justify-between gap-3 px-6 py-8 text-xs text-muted">
-        <span>
-          {storeName} · Prices include 5% VAT
-        </span>
-        <span>Free delivery over AED 200</span>
+      <div className="mx-auto max-w-5xl space-y-4 px-6 py-8 text-xs text-muted">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <span>
+            {settings.name} ·{" "}
+            {translate(
+              locale,
+              settings.taxInclusive ? "footer.vatIncluded" : "footer.vatAdded",
+            )}
+          </span>
+          <span>
+            {settings.shippingFreeThresholdMinor > 0
+              ? translate(locale, "footer.freeOver", {
+                  amount: formatMoney(settings.shippingFreeThresholdMinor, { locale, numerals }),
+                })
+              : translate(locale, "footer.free")}
+          </span>
+        </div>
+
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+          {pages.map((page) => (
+            <Link
+              key={page.id}
+              href={localePath(locale, `/pages/${page.slug}`)}
+              className="hover:text-ink"
+            >
+              {page.title}
+            </Link>
+          ))}
+          {settings.contactEmail ? (
+            <a href={`mailto:${settings.contactEmail}`} className="hover:text-ink">
+              {translate(locale, "common.contact")}
+            </a>
+          ) : null}
+        </div>
+
+        {settings.address ? <p>{settings.address}</p> : null}
+        {settings.trn ? (
+          <p>{translate(locale, "footer.trn", { trn: settings.trn })}</p>
+        ) : null}
       </div>
     </footer>
   );

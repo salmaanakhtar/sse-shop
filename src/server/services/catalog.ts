@@ -66,7 +66,7 @@ function firstBy<T>(rows: T[], key: (row: T) => string): Map<string, T> {
   return map;
 }
 
-async function catalogCardsForProducts(
+export async function catalogCardsForProducts(
   productRows: (typeof products.$inferSelect)[],
   now = new Date(),
 ): Promise<CatalogCard[]> {

@@ -9,16 +9,19 @@ time. Every feature ships with a unit test and a Playwright journey.
 
 ## Status
 
-Phase 4 is complete. Phase 5 is complete, and Phase 6 is in progress: dark mode is live and Arabic
-is next. Per-variant sales, promotion carousel and pages, and category, collection, and badge
-merchandising are live. A shopper can browse, choose a parent branch and child, save variants to
-named wishlists, receive one console-mailed price-drop alert, add a wishlist selection to the cart,
-check out with a UAE address, and receive an order with a lookup link. They can also create an
-account with saved delivery and billing addresses, see their order history, and claim a guest order
-with its lookup token. An admin can sign in with TOTP, build only the variant branches that exist,
-set sale prices and windows, manage products, images, carousel slides, categories, collections, and
-badges, and review customers and their orders. Payments are simulated behind a provider interface.
-See [`docs/ROADMAP.md`](docs/ROADMAP.md).
+Phase 4 and Phase 5 are complete. Phase 6 is in progress: dark mode is live and the Arabic
+`/ar`/RTL/numeral foundation is shipped, with translation QA and secondary account copy still
+pending. Per-variant sales, promotion pages, category/collection/badge merchandising, search,
+SEO, verified reviews, related products, admin-editable settings, homepage sections, and legal
+pages are live. A shopper can browse, search and filter, choose a parent branch and child, save
+variants to named wishlists, receive one console-mailed price-drop alert, add a wishlist selection
+to the cart, check out with a UAE address, and receive an order with a lookup link. They can also
+create an account with saved delivery and billing addresses, see their order history, review a
+purchased product, and claim a guest order with its lookup token. An admin can sign in with TOTP,
+build only the variant branches that exist, set sale prices and windows, manage products, images,
+carousel slides, categories, collections, badges, homepage sections, legal pages, and reviews, and
+review customers and their orders. Payments are simulated behind a provider interface. See
+[`docs/ROADMAP.md`](docs/ROADMAP.md).
 
 ## Stack
 

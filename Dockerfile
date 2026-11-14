@@ -39,6 +39,7 @@ COPY --from=build --chown=nextjs:nodejs /app/.next/standalone ./
 COPY --from=build --chown=nextjs:nodejs /app/.next/static ./.next/static
 COPY --from=build --chown=nextjs:nodejs /app/public ./public
 COPY --from=build --chown=nextjs:nodejs /app/drizzle ./drizzle
+COPY --from=build --chown=nextjs:nodejs /app/scripts/migrate.mjs ./scripts/migrate.mjs
 
 RUN mkdir -p /data/uploads && chown -R nextjs:nodejs /data
 
@@ -48,4 +49,4 @@ EXPOSE 3000
 HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \
   CMD wget -qO- http://127.0.0.1:3000/api/health || exit 1
 
-CMD ["node", "server.js"]
+CMD ["sh", "-c", "node scripts/migrate.mjs && node server.js"]

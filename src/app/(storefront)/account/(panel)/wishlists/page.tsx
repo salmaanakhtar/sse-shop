@@ -2,11 +2,13 @@ import Link from "next/link";
 import { ConfirmSubmitButton } from "@/components/ui/confirm-submit-button";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/field";
+import { localePath, translate } from "@/lib/i18n";
 import { requireUserPage } from "@/server/auth/guard";
 import {
   createWishlistAction,
   deleteWishlistAction,
 } from "@/app/(storefront)/wishlist-actions";
+import { getLocale } from "@/server/services/preferences";
 import {
   checkWishlistPriceDropsForUser,
   listWishlists,
@@ -20,9 +22,10 @@ export default async function WishlistsPage({
   searchParams: Promise<{ error?: string }>;
 }) {
   const session = await requireUserPage();
-  const [{ error }, lists] = await Promise.all([
+  const [{ error }, lists, locale] = await Promise.all([
     searchParams,
     listWishlists(session.user.id),
+    getLocale(),
   ]);
 
   await checkWishlistPriceDropsForUser(session.user.id).catch((error) => {
@@ -33,14 +36,15 @@ export default async function WishlistsPage({
     <div className="space-y-6">
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
-          <h2 className="text-xl font-semibold tracking-tight">Wishlists</h2>
+          <h2 className="text-xl font-semibold tracking-tight">
+            {translate(locale, "wishlist.title")}
+          </h2>
           <p className="mt-1 max-w-xl text-sm text-muted">
-            Private lists of variants. We send one email per item when its price first drops
-            below what it was when you saved it.
+            {translate(locale, "wishlist.body")}
           </p>
         </div>
-        <Link href="/" className="text-sm text-muted hover:text-ink">
-          Browse the shop
+        <Link href={localePath(locale, "/")} className="text-sm text-muted hover:text-ink">
+          {translate(locale, "cart.browse")}
         </Link>
       </div>
 
@@ -59,7 +63,7 @@ export default async function WishlistsPage({
             htmlFor="new-wishlist-name"
             className="mb-1.5 block text-xs font-semibold tracking-wide text-muted uppercase"
           >
-            New list name
+            {translate(locale, "wishlist.newName")}
           </label>
           <Input
             id="new-wishlist-name"
@@ -70,7 +74,7 @@ export default async function WishlistsPage({
           />
         </div>
         <Button type="submit" size="sm">
-          Create list
+          {translate(locale, "wishlist.create")}
         </Button>
       </form>
 
@@ -83,18 +87,20 @@ export default async function WishlistsPage({
             <div className="flex items-start justify-between gap-3">
               <div>
                 <Link
-                  href={`/account/wishlists/${list.id}`}
+                  href={localePath(locale, `/account/wishlists/${list.id}`)}
                   className="font-medium hover:text-brand"
                 >
                   {list.name}
                 </Link>
                 <p className="mt-1 text-xs text-muted">
-                  {list.itemCount} {list.itemCount === 1 ? "item" : "items"}
+                  {translate(locale, list.itemCount === 1 ? "wishlist.item" : "wishlist.items", {
+                    count: list.itemCount,
+                  })}
                 </p>
               </div>
               {list.isDefault ? (
                 <span className="rounded-full bg-brand-soft px-2 py-0.5 text-[10px] font-semibold tracking-wide text-brand uppercase">
-                  Default
+                  {translate(locale, "wishlist.default")}
                 </span>
               ) : (
                 <form action={deleteWishlistAction}>
@@ -104,17 +110,17 @@ export default async function WishlistsPage({
                     message={`Delete ${list.name}?`}
                     className="text-xs text-muted underline-offset-4 hover:text-red-600 hover:underline"
                   >
-                    Delete
+                    {translate(locale, "wishlist.delete")}
                   </ConfirmSubmitButton>
                 </form>
               )}
             </div>
 
             <Link
-              href={`/account/wishlists/${list.id}`}
+              href={localePath(locale, `/account/wishlists/${list.id}`)}
               className="mt-4 inline-block text-xs text-muted underline-offset-4 hover:text-ink hover:underline"
             >
-              Open list
+              {translate(locale, "wishlist.open")}
             </Link>
           </article>
         ))}

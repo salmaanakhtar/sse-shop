@@ -2,7 +2,7 @@
 
 import { eq } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
-import { headers } from "next/headers";
+import { cookies, headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { deleteAccountSchema, profileSchema } from "@/lib/account";
 import { auth } from "@/server/auth";
@@ -11,6 +11,10 @@ import { db } from "@/server/db/client";
 import { users } from "@/server/db/schema";
 import { mergeCartOnSignIn } from "@/server/services/cart";
 import { anonymizeCustomer } from "@/server/services/customers";
+import {
+  LOCALE_COOKIE,
+  NUMERALS_COOKIE,
+} from "@/server/services/preferences";
 
 export type ProfileState = { error?: string; success?: string } | null;
 export type DeleteAccountState = { error?: string } | null;
@@ -19,6 +23,38 @@ export type DeleteAccountState = { error?: string } | null;
 export async function mergeCartAfterSignInAction(): Promise<void> {
   const session = await requireUserAction();
   await mergeCartOnSignIn(session.user.id);
+
+  const store = await cookies();
+  const hasLocale = store.get(LOCALE_COOKIE)?.value;
+  const hasNumerals = store.get(NUMERALS_COOKIE)?.value;
+  if (!hasLocale || !hasNumerals) {
+    const [user] = await db
+      .select({ locale: users.locale, numeralStyle: users.numeralStyle })
+      .from(users)
+      .where(eq(users.id, session.user.id))
+      .limit(1);
+    if (user) {
+      if (!hasLocale) {
+        store.set(LOCALE_COOKIE, user.locale, {
+          path: "/",
+          sameSite: "lax",
+          httpOnly: true,
+          secure: (process.env.NEXT_PUBLIC_STORE_URL ?? "").startsWith("https://"),
+          maxAge: 60 * 60 * 24 * 365,
+        });
+      }
+      if (!hasNumerals) {
+        store.set(NUMERALS_COOKIE, user.numeralStyle, {
+          path: "/",
+          sameSite: "lax",
+          httpOnly: true,
+          secure: (process.env.NEXT_PUBLIC_STORE_URL ?? "").startsWith("https://"),
+          maxAge: 60 * 60 * 24 * 365,
+        });
+      }
+    }
+  }
+
   revalidatePath("/", "layout");
 }
 

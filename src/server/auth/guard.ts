@@ -5,10 +5,22 @@ import { env } from "@/lib/env";
 import { auth } from "./index";
 
 const requiresTwoFactor = env.ADMIN_REQUIRE_TWO_FACTOR === "true";
+const ADMIN_SESSION_MAX_MS = 8 * 60 * 60 * 1000;
 
 export const getAuthSession = cache(async () =>
   auth.api.getSession({ headers: await headers() }),
 );
+
+function adminSessionExpired(session: NonNullable<Awaited<ReturnType<typeof getAuthSession>>>) {
+  const created = new Date(session.session.createdAt).getTime();
+  return Number.isFinite(created) && Date.now() - created > ADMIN_SESSION_MAX_MS;
+}
+
+async function expireAdminSession() {
+  await auth.api.signOut({ headers: await headers() }).catch(() => {
+    // The session may already be gone; the redirect is the important part.
+  });
+}
 
 /**
  * Page guard. Middleware routes the admin host, but every page and action
@@ -20,6 +32,10 @@ export async function requireAdminPage() {
 
   if (!session) redirect("/admin/sign-in");
   if (session.user.role !== "admin") notFound();
+  if (adminSessionExpired(session)) {
+    await expireAdminSession();
+    redirect("/admin/sign-in?expired=1");
+  }
   if (requiresTwoFactor && !session.user.twoFactorEnabled) redirect("/admin/setup-2fa");
 
   return session;
@@ -51,6 +67,10 @@ export async function requireAdminAction() {
 
   if (!session || session.user.role !== "admin") {
     throw new Error("Not authorized.");
+  }
+  if (adminSessionExpired(session)) {
+    await expireAdminSession();
+    throw new Error("Admin session expired. Sign in again.");
   }
   if (requiresTwoFactor && !session.user.twoFactorEnabled) {
     throw new Error("Two-factor authentication is required.");

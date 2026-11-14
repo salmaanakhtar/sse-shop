@@ -26,6 +26,7 @@ export const userRole = pgEnum("user_role", ["admin", "customer"]);
 export const productStatus = pgEnum("product_status", ["draft", "active", "archived"]);
 export const orderStatus = pgEnum("order_status", ["pending", "confirmed", "cancelled", "fulfilled"]);
 export const paymentStatus = pgEnum("payment_status", ["unpaid", "paid", "refunded", "failed"]);
+export const reviewStatus = pgEnum("review_status", ["pending", "approved", "rejected"]);
 
 /* ─────────────────────── auth (Better Auth) ───────────────────────
  * Key names are camelCase because the adapter resolves models by these keys;
@@ -41,6 +42,12 @@ export const users = pgTable("users", {
   role: userRole("role").notNull().default("customer"),
   /** E.164, e.g. +971501234567. Optional; delivery addresses carry their own. */
   phone: text("phone"),
+  /** en | ar; the /ar route prefix is the storefront source of truth. */
+  locale: text("locale").notNull().default("en"),
+  /** latin | arabic; applies to prices and dates in Arabic. */
+  numeralStyle: text("numeral_style").notNull().default("latin"),
+  marketingConsent: boolean("marketing_consent").notNull().default(false),
+  marketingConsentAt: timestamp("marketing_consent_at", { withTimezone: true, mode: "date" }),
   /** system | light | dark; the storefront cookie overrides it per browser. */
   themePreference: text("theme_preference").notNull().default("system"),
   twoFactorEnabled: boolean("two_factor_enabled").notNull().default(false),
@@ -267,6 +274,31 @@ export const productMedia = pgTable(
     createdAt: createdAt(),
   },
   (table) => [index("product_media_product_id_idx").on(table.productId)],
+);
+
+/** One review per customer per product, linked to a paid order item. */
+export const productReviews = pgTable(
+  "product_reviews",
+  {
+    id: id(),
+    productId: text("product_id")
+      .notNull()
+      .references(() => products.id, { onDelete: "cascade" }),
+    userId: text("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    rating: integer("rating").notNull(),
+    title: text("title").notNull().default(""),
+    body: text("body").notNull(),
+    status: reviewStatus("status").notNull().default("pending"),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (table) => [
+    uniqueIndex("product_reviews_product_user_uq").on(table.productId, table.userId),
+    index("product_reviews_product_status_idx").on(table.productId, table.status),
+    index("product_reviews_status_created_idx").on(table.status, table.createdAt),
+  ],
 );
 
 /* ─────────────────────────── customer addresses ─────────────────────────── */
@@ -672,6 +704,49 @@ export const settings = pgTable("settings", {
   updatedAt: updatedAt(),
 });
 
+/* ─────────────────────── storefront content ─────────────────────── */
+
+/**
+ * Ordered homepage sections. The config is validated per kind by the service;
+ * collection/category ids live in JSON so the composer can be extended without
+ * a migration for every new section type.
+ */
+export const homeSections = pgTable(
+  "home_sections",
+  {
+    id: id(),
+    kind: text("kind").notNull(),
+    title: text("title").notNull().default(""),
+    body: text("body").notNull().default(""),
+    config: jsonb("config").notNull().default({}),
+    position: integer("position").notNull().default(0),
+    active: boolean("active").notNull().default(true),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (table) => [index("home_sections_active_position_idx").on(table.active, table.position)],
+);
+
+/**
+ * Admin-editable content pages such as Privacy, Terms, Shipping, Returns, and
+ * Contact. Body is trusted admin HTML; it is never rendered from customer input.
+ */
+export const pages = pgTable(
+  "pages",
+  {
+    id: id(),
+    slug: text("slug").notNull().unique(),
+    title: text("title").notNull(),
+    body: text("body").notNull().default(""),
+    published: boolean("published").notNull().default(false),
+    seoTitle: text("seo_title").notNull().default(""),
+    seoDescription: text("seo_description").notNull().default(""),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (table) => [index("pages_published_idx").on(table.published)],
+);
+
 /**
  * Monotonic counters. Order numbers come from here rather than a sequence so
  * the value is transactional and the schema stays declarative.
@@ -681,6 +756,21 @@ export const counters = pgTable("counters", {
   value: integer("value").notNull().default(0),
   updatedAt: updatedAt(),
 });
+
+/**
+ * Fixed-window counters for public mutations. A database-backed limiter keeps
+ * a single VPS restart from resetting abuse protection.
+ */
+export const rateLimits = pgTable(
+  "rate_limits",
+  {
+    key: text("key").primaryKey(),
+    count: integer("count").notNull().default(0),
+    windowStart: timestamp("window_start", { withTimezone: true, mode: "date" }).notNull(),
+    expiresAt: timestamp("expires_at", { withTimezone: true, mode: "date" }).notNull(),
+  },
+  (table) => [index("rate_limits_expires_at_idx").on(table.expiresAt)],
+);
 
 /* ─────────────────────────── relations ─────────────────────────── */
 

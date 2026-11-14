@@ -1,3 +1,5 @@
+import type { Locale, NumeralStyle } from "./i18n";
+
 /**
  * Money is always an integer count of fils. 1 AED = 100 fils.
  * Nothing here divides by 100 except `formatMoney`, which runs at the edge.
@@ -6,12 +8,23 @@
 export const CURRENCY = "AED" as const;
 export const MINOR_PER_MAJOR = 100;
 
-const currencyFormatter = new Intl.NumberFormat("en-AE", {
-  style: "currency",
-  currency: CURRENCY,
-  minimumFractionDigits: 2,
-  maximumFractionDigits: 2,
-});
+const formatterCache = new Map<string, Intl.NumberFormat>();
+
+function currencyFormatter(locale: Locale, numerals: NumeralStyle): Intl.NumberFormat {
+  const key = `${locale}:${numerals}`;
+  const cached = formatterCache.get(key);
+  if (cached) return cached;
+
+  const formatter = new Intl.NumberFormat(locale === "ar" ? "ar-AE" : "en-AE", {
+    style: "currency",
+    currency: CURRENCY,
+    numberingSystem: numerals === "arabic" ? "arab" : "latn",
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  });
+  formatterCache.set(key, formatter);
+  return formatter;
+}
 
 function assertInteger(value: number, label: string): void {
   if (!Number.isInteger(value)) {
@@ -19,10 +32,18 @@ function assertInteger(value: number, label: string): void {
   }
 }
 
+export type MoneyFormatOptions = {
+  locale?: Locale;
+  numerals?: NumeralStyle;
+};
+
 /** Integer fils to a display string: 24000 -> "AED 240.00". */
-export function formatMoney(minor: number): string {
+export function formatMoney(minor: number, options?: MoneyFormatOptions): string {
   assertInteger(minor, "money");
-  return currencyFormatter.format(minor / MINOR_PER_MAJOR);
+  return currencyFormatter(
+    options?.locale ?? "en",
+    options?.numerals ?? "latin",
+  ).format(minor / MINOR_PER_MAJOR);
 }
 
 // Accepts a plain number or correctly grouped thousands: 240, 1,240, 1,240.50.

@@ -2,10 +2,10 @@
 
 import { useActionState, useState } from "react";
 import { checkoutAction, type CheckoutState } from "@/app/(storefront)/checkout/actions";
+import { useStorePreferences } from "@/components/storefront/store-preferences";
 import { Button } from "@/components/ui/button";
 import { Input, Label, Textarea } from "@/components/ui/field";
 import { EMIRATES, type Address } from "@/lib/address";
-import { formatMoney } from "@/lib/money";
 
 const initialState: CheckoutState = null;
 
@@ -26,6 +26,7 @@ export function CheckoutForm({
   defaults: CheckoutDefaults;
 }) {
   const [state, formAction, pending] = useActionState(checkoutAction, initialState);
+  const { t, money } = useStorePreferences();
   const [billingSame, setBillingSame] = useState(true);
   const [saveShipping, setSaveShipping] = useState(defaults.signedIn);
   const [saveBilling, setSaveBilling] = useState(defaults.signedIn);
@@ -38,9 +39,9 @@ export function CheckoutForm({
       <input type="hidden" name="expectedTotalMinor" value={expectedTotalMinor} />
 
       <section className="space-y-4">
-        <h2 className="text-sm font-semibold">Contact</h2>
+        <h2 className="text-sm font-semibold">{t("checkout.contact")}</h2>
         <div>
-          <Label htmlFor="email">Email</Label>
+          <Label htmlFor="email">{t("checkout.email")}</Label>
           <Input
             id="email"
             name="email"
@@ -50,17 +51,15 @@ export function CheckoutForm({
             placeholder="you@example.com"
             defaultValue={defaults.email}
           />
-          <p className="mt-1.5 text-xs text-muted">
-            We send the order confirmation and tracking link here.
-          </p>
+          <p className="mt-1.5 text-xs text-muted">{t("checkout.emailHelp")}</p>
         </div>
       </section>
 
       <section className="space-y-4">
-        <h2 className="text-sm font-semibold">Delivery address</h2>
+        <h2 className="text-sm font-semibold">{t("checkout.deliveryAddress")}</h2>
 
         <div>
-          <Label htmlFor="fullName">Full name</Label>
+          <Label htmlFor="fullName">{t("checkout.fullName")}</Label>
           <Input
             id="fullName"
             name="fullName"
@@ -71,7 +70,7 @@ export function CheckoutForm({
         </div>
 
         <div>
-          <Label htmlFor="phone">Mobile</Label>
+          <Label htmlFor="phone">{t("checkout.mobile")}</Label>
           <Input
             id="phone"
             name="phone"
@@ -86,7 +85,7 @@ export function CheckoutForm({
         </div>
 
         <div>
-          <Label htmlFor="emirate">Emirate</Label>
+          <Label htmlFor="emirate">{t("checkout.emirate")}</Label>
           <select
             id="emirate"
             name="emirate"
@@ -104,7 +103,7 @@ export function CheckoutForm({
 
         <div className="grid gap-4 sm:grid-cols-2">
           <div>
-            <Label htmlFor="building">Building or villa</Label>
+            <Label htmlFor="building">{t("checkout.building")}</Label>
             <Input
               id="building"
               name="building"
@@ -114,7 +113,7 @@ export function CheckoutForm({
             />
           </div>
           <div>
-            <Label htmlFor="street">Street</Label>
+            <Label htmlFor="street">{t("checkout.street")}</Label>
             <Input
               id="street"
               name="street"
@@ -127,7 +126,7 @@ export function CheckoutForm({
 
         <div className="grid gap-4 sm:grid-cols-2">
           <div>
-            <Label htmlFor="area">Area or community (optional)</Label>
+            <Label htmlFor="area">{t("checkout.area")}</Label>
             <Input
               id="area"
               name="area"
@@ -137,18 +136,18 @@ export function CheckoutForm({
             />
           </div>
           <div>
-            <Label htmlFor="poBox">PO Box (optional)</Label>
+            <Label htmlFor="poBox">{t("checkout.poBox")}</Label>
             <Input id="poBox" name="poBox" inputMode="numeric" defaultValue={shipping?.poBox ?? ""} />
           </div>
         </div>
 
         <div>
-          <Label htmlFor="notes">Delivery notes (optional)</Label>
+          <Label htmlFor="notes">{t("checkout.notes")}</Label>
           <Textarea
             id="notes"
             name="notes"
             rows={3}
-            placeholder="Gate code, landmark, preferred time"
+            placeholder={t("checkout.notesPlaceholder")}
             defaultValue={shipping?.notes ?? ""}
           />
         </div>
@@ -162,13 +161,13 @@ export function CheckoutForm({
               onChange={(event) => setSaveShipping(event.target.checked)}
               className="size-4"
             />
-            Save this delivery address to my account
+            {t("checkout.saveShipping")}
           </label>
         ) : null}
       </section>
 
       <section className="space-y-4">
-        <h2 className="text-sm font-semibold">Billing address</h2>
+        <h2 className="text-sm font-semibold">{t("checkout.billingAddress")}</h2>
 
         <label className="flex items-center gap-2 text-sm">
           <input
@@ -178,13 +177,13 @@ export function CheckoutForm({
             onChange={(event) => setBillingSame(event.target.checked)}
             className="size-4"
           />
-          Same as delivery address
+          {t("checkout.sameAsDelivery")}
         </label>
 
         {billingSame ? null : (
           <div className="space-y-4 rounded-xl border border-line bg-page/60 p-4">
             <div>
-              <Label htmlFor="billingFullName">Full name</Label>
+              <Label htmlFor="billingFullName">{t("checkout.fullName")}</Label>
               <Input
                 id="billingFullName"
                 name="billingFullName"
@@ -195,7 +194,7 @@ export function CheckoutForm({
             </div>
 
             <div>
-              <Label htmlFor="billingPhone">Mobile</Label>
+              <Label htmlFor="billingPhone">{t("checkout.mobile")}</Label>
               <Input
                 id="billingPhone"
                 name="billingPhone"
@@ -210,7 +209,7 @@ export function CheckoutForm({
             </div>
 
             <div>
-              <Label htmlFor="billingEmirate">Emirate</Label>
+              <Label htmlFor="billingEmirate">{t("checkout.emirate")}</Label>
               <select
                 id="billingEmirate"
                 name="billingEmirate"
@@ -228,7 +227,7 @@ export function CheckoutForm({
 
             <div className="grid gap-4 sm:grid-cols-2">
               <div>
-                <Label htmlFor="billingBuilding">Building or villa</Label>
+                <Label htmlFor="billingBuilding">{t("checkout.building")}</Label>
                 <Input
                   id="billingBuilding"
                   name="billingBuilding"
@@ -238,7 +237,7 @@ export function CheckoutForm({
                 />
               </div>
               <div>
-                <Label htmlFor="billingStreet">Street</Label>
+                <Label htmlFor="billingStreet">{t("checkout.street")}</Label>
                 <Input
                   id="billingStreet"
                   name="billingStreet"
@@ -251,7 +250,7 @@ export function CheckoutForm({
 
             <div className="grid gap-4 sm:grid-cols-2">
               <div>
-                <Label htmlFor="billingArea">Area or community (optional)</Label>
+                <Label htmlFor="billingArea">{t("checkout.area")}</Label>
                 <Input
                   id="billingArea"
                   name="billingArea"
@@ -260,7 +259,7 @@ export function CheckoutForm({
                 />
               </div>
               <div>
-                <Label htmlFor="billingPoBox">PO Box (optional)</Label>
+                <Label htmlFor="billingPoBox">{t("checkout.poBox")}</Label>
                 <Input
                   id="billingPoBox"
                   name="billingPoBox"
@@ -271,7 +270,7 @@ export function CheckoutForm({
             </div>
 
             <div>
-              <Label htmlFor="billingNotes">Notes (optional)</Label>
+              <Label htmlFor="billingNotes">{t("checkout.notes")}</Label>
               <Textarea
                 id="billingNotes"
                 name="billingNotes"
@@ -289,7 +288,7 @@ export function CheckoutForm({
                   onChange={(event) => setSaveBilling(event.target.checked)}
                   className="size-4"
                 />
-                Save this billing address to my account
+                {t("checkout.saveBilling")}
               </label>
             ) : null}
           </div>
@@ -303,12 +302,12 @@ export function CheckoutForm({
       ) : null}
 
       <Button type="submit" disabled={pending} className="w-full" data-testid="place-order">
-        {pending ? "Placing order…" : `Place order · ${formatMoney(expectedTotalMinor)}`}
+        {pending
+          ? t("checkout.saving")
+          : `${t("checkout.placeOrder")} · ${money(expectedTotalMinor)}`}
       </Button>
 
-      <p className="text-center text-xs text-muted">
-        Payment is simulated in this build; no card details are collected.
-      </p>
+      <p className="text-center text-xs text-muted">{t("checkout.paymentHelp")}</p>
     </form>
   );
 }

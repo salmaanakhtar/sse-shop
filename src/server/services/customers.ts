@@ -10,6 +10,8 @@ import {
   twoFactors,
   users,
   verifications,
+  wishlistAlerts,
+  wishlists,
 } from "../db/schema";
 import { listAddresses } from "./addresses";
 import { getCustomerOrderStats, listOrdersForCustomer } from "./orders";
@@ -110,6 +112,8 @@ export async function anonymizeCustomer(
     await tx.delete(sessions).where(eq(sessions.userId, userId));
     await tx.delete(accounts).where(eq(accounts.userId, userId));
     await tx.delete(twoFactors).where(eq(twoFactors.userId, userId));
+    await tx.delete(wishlistAlerts).where(eq(wishlistAlerts.userId, userId));
+    await tx.delete(wishlists).where(eq(wishlists.userId, userId));
     await tx.delete(verifications).where(eq(verifications.identifier, user.email));
 
     await tx
@@ -121,6 +125,11 @@ export async function anonymizeCustomer(
         image: null,
         phone: null,
         twoFactorEnabled: false,
+        marketingConsent: false,
+        marketingConsentAt: null,
+        locale: "en",
+        numeralStyle: "latin",
+        themePreference: "system",
         deletedAt: new Date(),
         updatedAt: new Date(),
       })

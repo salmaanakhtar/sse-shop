@@ -4,6 +4,8 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { addressFromFormData, type Address } from "@/lib/address";
 import { getAuthSession } from "@/server/auth/guard";
+import { checkRateLimit } from "@/server/security/rate-limit";
+import { clientIp } from "@/server/security/request";
 import { saveCheckoutAddress } from "@/server/services/addresses";
 import { placeOrder } from "@/server/services/orders";
 
@@ -13,6 +15,11 @@ export async function checkoutAction(
   _previous: CheckoutState,
   formData: FormData,
 ): Promise<CheckoutState> {
+  const limit = await checkRateLimit(`checkout:${await clientIp()}`, 10, 60);
+  if (!limit.ok) {
+    return { error: "Too many checkout attempts. Try again in a moment." };
+  }
+
   const expectedTotalMinor = Number(formData.get("expectedTotalMinor"));
   const session = await getAuthSession();
 

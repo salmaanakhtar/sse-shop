@@ -3,6 +3,7 @@
 import Image from "next/image";
 import { useMemo, useState } from "react";
 import { ProductOptions } from "@/components/storefront/product-options";
+import { useStorePreferences } from "@/components/storefront/store-preferences";
 import {
   buildVariantTree,
   effectiveImageKey,
@@ -21,6 +22,7 @@ export function ProductDetailView({
   product: ProductDetail;
   wishlist: WishlistStateForProduct | null;
 }) {
+  const { t } = useStorePreferences();
   const tree = useMemo(() => buildVariantTree(product.nodes), [product.nodes]);
 
   const [selectedIds, setSelectedIds] = useState<string[]>(() => {
@@ -69,7 +71,7 @@ export function ProductDetailView({
               />
             ) : (
               <div className="flex h-full items-center justify-center text-xs text-muted">
-                No image yet
+                {t("product.noImage")}
               </div>
             )}
           </div>

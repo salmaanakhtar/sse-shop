@@ -4,9 +4,9 @@ import { useRouter } from "next/navigation";
 import { useMemo, useState, useTransition } from "react";
 import { addToCartAction } from "@/app/(storefront)/cart-actions";
 import { SaleCountdown } from "@/components/storefront/sale-countdown";
+import { useStorePreferences } from "@/components/storefront/store-preferences";
 import { WishlistSaveButton } from "@/components/storefront/wishlist-save-button";
 import { Button } from "@/components/ui/button";
-import { formatMoney } from "@/lib/money";
 import { activeSalePrice, discountPercent } from "@/lib/sale";
 import { cn } from "@/lib/utils";
 import type { WishlistStateForProduct } from "@/server/services/wishlists";
@@ -41,6 +41,7 @@ export function ProductOptions({
   wishlist,
 }: Props) {
   const router = useRouter();
+  const { t, money } = useStorePreferences();
   const [pending, startTransition] = useTransition();
   const [message, setMessage] = useState<{ kind: "ok" | "error"; text: string } | null>(null);
 
@@ -75,10 +76,10 @@ export function ProductOptions({
   const selectedLabel =
     options.length > 0 ? path.map((node) => node.label).join(" / ") : "";
   const statusText = !variant
-    ? "Not available in this combination"
+    ? t("product.notAvailable")
     : !variant.active || variant.stockQty === 0
-      ? "Sold out"
-      : `${variant.stockQty} in stock`;
+      ? t("product.soldOut")
+      : t("product.inStock", { count: variant.stockQty });
 
   function choose(node: VariantTreeNode) {
     const leaf = firstAvailableLeaf(node) ?? firstLeaf(node) ?? node;
@@ -93,7 +94,7 @@ export function ProductOptions({
     startTransition(async () => {
       const result = await addToCartAction(variant.id, 1);
       if (result.ok) {
-        setMessage({ kind: "ok", text: "Added to cart." });
+        setMessage({ kind: "ok", text: t("cart.added") });
         router.refresh();
       } else {
         setMessage({ kind: "error", text: result.error });
@@ -140,18 +141,22 @@ export function ProductOptions({
         ))}
       </div>
 
-      {selectedLabel ? <p className="text-xs text-muted">Selected: {selectedLabel}</p> : null}
+      {selectedLabel ? (
+        <p className="text-xs text-muted">
+          {t("product.selected", { label: selectedLabel })}
+        </p>
+      ) : null}
 
       <div className="flex items-baseline justify-between gap-4 border-t border-line pt-5">
         <div>
           <div className="flex flex-wrap items-baseline gap-2">
             <p className="text-xl font-semibold tabular-nums">
-              {effectivePriceMinor !== null ? formatMoney(effectivePriceMinor) : "—"}
+              {effectivePriceMinor !== null ? money(effectivePriceMinor) : "—"}
             </p>
             {salePriceMinor !== null && variant ? (
               <>
                 <p className="text-sm text-muted line-through tabular-nums">
-                  {formatMoney(variant.priceMinor)}
+                  {money(variant.priceMinor)}
                 </p>
                 {percent !== null ? (
                   <span className="rounded-full bg-brand-soft px-2 py-0.5 text-[10px] font-semibold text-brand">
@@ -166,7 +171,7 @@ export function ProductOptions({
             <SaleCountdown endsAt={variant.saleEndsAt} />
           ) : null}
         </div>
-        <p className="text-xs text-muted">VAT included</p>
+        <p className="text-xs text-muted">{t("product.vatIncluded")}</p>
       </div>
 
       <div className="space-y-3">
@@ -176,7 +181,11 @@ export function ProductOptions({
           className="w-full"
           data-testid="add-to-cart"
         >
-          {soldOut ? "Sold out" : pending ? "Adding…" : "Add to cart"}
+          {soldOut
+            ? t("product.soldOut")
+            : pending
+              ? t("product.adding")
+              : t("product.addToCart")}
         </Button>
 
         {message ? (
